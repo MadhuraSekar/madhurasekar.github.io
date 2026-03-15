@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 :root {
+  --font-syne: 'Syne', system-ui, sans-serif;
+  --font-dm-mono: 'DM Mono', 'SF Mono', 'Fira Code', monospace;
   --bg: #080909;
   --surface: #0c0d0f;
   --surface2: #101214;
@@ -37,6 +39,7 @@ html, body {
 }
 
 body {
+  font-family: var(--font-dm-mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

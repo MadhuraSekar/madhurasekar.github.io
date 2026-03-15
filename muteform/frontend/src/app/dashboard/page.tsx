@@ -5,19 +5,19 @@ import { TopBar, TabName } from '@/components/TopBar'
 import dynamic from 'next/dynamic'
 import { C, mono } from '@/components/ui/tokens'
 
-const ScanTab = dynamic(() => import('@/components/ScanTab').then(m => ({ default: m.ScanTab })), {
+const ScanTab = dynamic(() => import('@/components/ScanTab'), {
   loading: () => <TabLoader />,
 })
-const HistoryTab = dynamic(() => import('@/components/HistoryTab').then(m => ({ default: m.HistoryTab })), {
+const HistoryTab = dynamic(() => import('@/components/HistoryTab'), {
   loading: () => <TabLoader />,
 })
-const DriftTab = dynamic(() => import('@/components/DriftTab').then(m => ({ default: m.DriftTab })), {
+const DriftTab = dynamic(() => import('@/components/DriftTab'), {
   loading: () => <TabLoader />,
 })
-const RulesTab = dynamic(() => import('@/components/RulesTab').then(m => ({ default: m.RulesTab })), {
+const RulesTab = dynamic(() => import('@/components/RulesTab'), {
   loading: () => <TabLoader />,
 })
-const MCPTab = dynamic(() => import('@/components/MCPTab').then(m => ({ default: m.MCPTab })), {
+const MCPTab = dynamic(() => import('@/components/MCPTab'), {
   loading: () => <TabLoader />,
 })
 
