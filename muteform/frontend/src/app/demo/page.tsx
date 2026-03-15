@@ -40,121 +40,81 @@ const SAMPLE_RULESET: Ruleset = {
   },
 }
 
-// ─── Sample Broken Artifact ─────────────────────────────────────
-const SAMPLE_ARTIFACT: Artifact = {
-  id: 'artifact-demo-001',
-  name: 'AI-Generated Dashboard',
-  source: 'claude-3.5-sonnet',
-  nodes: [
-    {
-      id: 'header-1',
-      type: 'frame',
-      name: 'TopNav',
-      styles: { color: '#1a1a2e', spacing: 18 },
-      children: [
-        {
-          id: 'logo-text',
-          type: 'text',
-          name: 'Logo Text',
-          parentName: 'TopNav',
-          styles: { color: '#ffffff', typographyStyle: 'display-hero' },
-        },
-        {
-          id: 'nav-btn',
-          type: 'component',
-          name: 'Menu Button',
-          parentName: 'TopNav',
-          component: { name: 'Button', variant: 'flat' },
-        },
-      ],
+// ─── Demo Artifact (hardcoded for /demo) ─────────────────────────
+const demoArtifact: Artifact = {
+  id: "demo_artifact",
+  name: "Checkout Flow",
+  source: "generic-json",
+  nodes: [{
+    id: "node_1",
+    type: "button",
+    name: "Primary CTA",
+    parentName: "Payment Form",
+    styles: {
+      color: "#3478F6",
+      spacing: 22,
+      typographyStyle: "display-xl"
     },
-    {
-      id: 'hero-section',
-      type: 'frame',
-      name: 'Hero Section',
-      styles: { spacing: 22 },
-      layout: { gridColumns: 5 },
-      children: [
-        {
-          id: 'hero-title',
-          type: 'text',
-          name: 'Hero Title',
-          parentName: 'Hero Section',
-          styles: { color: '#e8e8e8', typographyStyle: 'title-jumbo' },
-        },
-        {
-          id: 'hero-subtitle',
-          type: 'text',
-          name: 'Hero Subtitle',
-          parentName: 'Hero Section',
-          styles: { color: '#999999', typographyStyle: 'body-md' },
-        },
-      ],
+    component: {
+      name: "Button",
+      variant: "ghost",
+      size: "md"
     },
-    {
-      id: 'card-grid',
-      type: 'frame',
-      name: 'Stats Grid',
-      styles: { spacing: 10 },
-      layout: { gridColumns: 3 },
-      children: [
-        {
-          id: 'stat-card-1',
-          type: 'component',
-          name: 'Revenue Card',
-          parentName: 'Stats Grid',
-          component: { name: 'Card', variant: 'floating' },
-          styles: { color: '#00d4aa' },
-        },
-        {
-          id: 'stat-card-2',
-          type: 'component',
-          name: 'Users Card',
-          parentName: 'Stats Grid',
-          component: { name: 'Card', variant: 'default' },
-          styles: { color: '#7c3aed' },
-        },
-        {
-          id: 'stat-card-3',
-          type: 'component',
-          name: 'Growth Card',
-          parentName: 'Stats Grid',
-          component: { name: 'Tooltip', variant: 'dark' },
-          styles: { color: '#ff6b6b' },
-        },
-      ],
-    },
-    {
-      id: 'data-table',
-      type: 'frame',
-      name: 'Data Table',
-      styles: { spacing: 14 },
-      children: [
-        {
-          id: 'table-header',
-          type: 'text',
-          name: 'Table Header',
-          parentName: 'Data Table',
-          styles: { typographyStyle: 'heading-md' },
-        },
-        {
-          id: 'table-badge',
-          type: 'component',
-          name: 'Status Badge',
-          parentName: 'Data Table',
-          component: { name: 'Badge', variant: 'info' },
-        },
-        {
-          id: 'table-avatar',
-          type: 'component',
-          name: 'User Avatar',
-          parentName: 'Data Table',
-          component: { name: 'Avatar', variant: 'square' },
-        },
-      ],
-    },
-  ],
+    layout: {
+      gridColumns: 10
+    }
+  }]
 }
+
+// ─── Design Principles ─────────────────────────────────────────
+interface DesignPrinciple {
+  icon: string
+  principle: string
+  check: string
+  result: 'PASS' | 'FAIL'
+  explanation: string
+  severity: 'HIGH' | 'MEDIUM' | 'N/A'
+  whyItMatters: string
+}
+
+const DESIGN_PRINCIPLES: DesignPrinciple[] = [
+  {
+    icon: '◇',
+    principle: 'Visual Hierarchy',
+    check: 'Primary action must be the most visually dominant element on screen',
+    result: 'FAIL',
+    explanation: 'Button uses ghost variant. Ghost buttons recede visually. Primary actions require filled variants to establish correct hierarchy.',
+    severity: 'HIGH',
+    whyItMatters: 'This weakens the user\'s sense of what action to take next.',
+  },
+  {
+    icon: '◉',
+    principle: 'Accessibility',
+    check: 'All interactive elements must meet WCAG AA contrast ratio (4.5:1 minimum)',
+    result: 'FAIL',
+    explanation: 'Color #3478F6 on white background achieves 3.1:1 contrast ratio. Minimum required: 4.5:1',
+    severity: 'HIGH',
+    whyItMatters: 'This reduces readability and increases accessibility risk.',
+  },
+  {
+    icon: '⊡',
+    principle: 'Cognitive Load',
+    check: 'Each screen section should have one primary action maximum',
+    result: 'PASS',
+    explanation: 'Single primary action detected in payment form',
+    severity: 'N/A',
+    whyItMatters: 'Keeping one primary action per section helps users decide faster.',
+  },
+  {
+    icon: '⊞',
+    principle: 'Spacing Consistency',
+    check: 'All spacing must follow the 8pt grid system',
+    result: 'FAIL',
+    explanation: 'Spacing 22px does not align to 8pt grid. Nearest grid value: 24px',
+    severity: 'MEDIUM',
+    whyItMatters: 'This introduces subtle inconsistency that makes the interface feel less trustworthy.',
+  },
+]
 
 export default function DemoPage() {
   const [result, setResult] = useState<ScanResult | null>(null)
@@ -163,14 +123,13 @@ export default function DemoPage() {
   const [scanning, setScanning] = useState(true)
 
   useEffect(() => {
-    // Simulate a brief scan delay for dramatic effect
+    // Run scan locally — no API call, completes instantly
     const timer = setTimeout(() => {
-      const scanResult = scanArtifact(SAMPLE_ARTIFACT, SAMPLE_RULESET)
+      const scanResult = scanArtifact(demoArtifact, SAMPLE_RULESET)
       setResult(scanResult)
       setScanning(false)
-      // Auto-expand first violation
       setExpanded(new Set([0]))
-    }, 800)
+    }, 400)
     return () => clearTimeout(timer)
   }, [])
 
@@ -186,6 +145,12 @@ export default function DemoPage() {
     setFixed(prev => new Set(prev).add(v.id))
   }
 
+  const handleFixAll = () => {
+    if (!result) return
+    const allIds = new Set(result.violations.map(v => v.id))
+    setFixed(allIds)
+  }
+
   const handleIgnore = (id: string) => {
     // no-op in demo
   }
@@ -197,6 +162,9 @@ export default function DemoPage() {
     }
     return counts
   }
+
+  const activeViolations = result ? result.violations.filter(v => !fixed.has(v.id)).length : 0
+  const allFixed = result ? result.violations.length > 0 && fixed.size >= result.violations.length : false
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg }}>
@@ -260,7 +228,7 @@ export default function DemoPage() {
           </span>
       </div>
 
-      {/* Hero section */}
+      {/* Hero — two lines of context */}
       <div style={{
         padding: '48px 24px 32px',
         maxWidth: 960,
@@ -274,21 +242,19 @@ export default function DemoPage() {
           color: C.text,
           letterSpacing: '-0.03em',
           lineHeight: 1.2,
+          margin: 0,
         }}>
           Design governance for<br />AI-generated interfaces
         </h1>
         <p style={{
           fontFamily: mono,
-          fontSize: 14,
+          fontSize: 13,
           color: C.muted,
           marginTop: 12,
-          maxWidth: 520,
-          marginLeft: 'auto',
-          marginRight: 'auto',
+          marginBottom: 0,
           lineHeight: 1.6,
         }}>
-          Scan any AI-generated UI against your design system ruleset.
-          Catch violations before they ship.
+          Token rules + Design principles. Enforced at the point of AI generation.
         </p>
       </div>
 
@@ -333,7 +299,7 @@ export default function DemoPage() {
               borderRadius: 14,
               marginBottom: 16,
             }}>
-              <ScoreRing score={result.health_score} size={72} />
+              <ScoreRing score={allFixed ? 100 : result.health_score} size={72} />
 
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -341,7 +307,7 @@ export default function DemoPage() {
                     Health Score
                   </span>
                   <span style={{ fontFamily: mono, fontSize: 12, color: C.muted }}>
-                    {SAMPLE_ARTIFACT.name}
+                    {demoArtifact.name}
                   </span>
                 </div>
                 <div style={{
@@ -351,7 +317,7 @@ export default function DemoPage() {
                   marginTop: 4,
                   letterSpacing: '0.02em',
                 }}>
-                  Source: {SAMPLE_ARTIFACT.source} · Ruleset: {SAMPLE_RULESET.name}
+                  Source: {demoArtifact.source} · Ruleset: {SAMPLE_RULESET.name}
                 </div>
               </div>
 
@@ -375,12 +341,13 @@ export default function DemoPage() {
               </div>
             </div>
 
-            {/* Type breakdown pills */}
+            {/* Type breakdown pills + FIX ALL */}
             <div style={{
               display: 'flex',
               gap: 8,
               marginBottom: 16,
               flexWrap: 'wrap',
+              alignItems: 'center',
             }}>
               {Object.entries(typeCount(result.violations)).map(([type, count]) => {
                 const meta = VMETA[type] || { short: type, icon: '!', color: C.muted }
@@ -409,6 +376,40 @@ export default function DemoPage() {
                   </div>
                 )
               })}
+
+              <div style={{ flex: 1 }} />
+
+              {!allFixed && (
+                <button
+                  onClick={handleFixAll}
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    padding: '7px 16px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    background: C.green,
+                    color: '#fff',
+                    border: 'none',
+                    transition: 'opacity 0.15s, transform 0.1s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'scale(1.02)' }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)' }}
+                >
+                  FIX ALL ({activeViolations})
+                </button>
+              )}
+              {allFixed && (
+                <span style={{
+                  fontFamily: mono, fontSize: 11, letterSpacing: '0.06em',
+                  color: C.green, padding: '7px 16px', borderRadius: 6,
+                  background: C.greenDim, border: `1px solid ${C.greenBorder}`,
+                }}>
+                  ALL FIXED ✓
+                </span>
+              )}
             </div>
 
             {/* Violations list */}
@@ -446,6 +447,172 @@ export default function DemoPage() {
                   showPath={true}
                 />
               ))}
+            </div>
+
+            {/* ─── Design Principles Analysis ─── */}
+            <div style={{ marginTop: 32 }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 10,
+                marginBottom: 16,
+              }}>
+                <h2 style={{
+                  fontFamily: syne,
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: C.text,
+                  letterSpacing: '-0.02em',
+                  margin: 0,
+                }}>
+                  Design Principles Analysis
+                </h2>
+                <span style={{
+                  fontFamily: mono,
+                  fontSize: 10,
+                  color: C.purple,
+                  background: `${C.purple}15`,
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  border: `1px solid ${C.purple}33`,
+                  letterSpacing: '0.06em',
+                }}>
+                  HIGHER-ORDER
+                </span>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 12,
+              }}>
+                {DESIGN_PRINCIPLES.map((p, i) => {
+                  const isFail = p.result === 'FAIL'
+                  const sevColor = p.severity === 'HIGH' ? SEVC.high : p.severity === 'MEDIUM' ? SEVC.medium : C.green
+                  const borderColor = isFail ? `${sevColor}44` : `${C.green}44`
+                  const accentGrad = isFail
+                    ? `linear-gradient(135deg, ${sevColor}08, transparent)`
+                    : `linear-gradient(135deg, ${C.green}08, transparent)`
+
+                  return (
+                    <div key={i} style={{
+                      padding: '20px',
+                      borderRadius: 12,
+                      background: accentGrad,
+                      border: `1px solid ${borderColor}`,
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}>
+                      {/* Left accent bar */}
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 3,
+                        background: isFail ? sevColor : C.green,
+                        borderRadius: '12px 0 0 12px',
+                      }} />
+
+                      {/* Header: icon + principle + result */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 10,
+                      }}>
+                        <span style={{
+                          fontFamily: mono,
+                          fontSize: 16,
+                          color: isFail ? sevColor : C.green,
+                          width: 28,
+                          height: 28,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 6,
+                          background: isFail ? `${sevColor}15` : `${C.green}15`,
+                          flexShrink: 0,
+                        }}>
+                          {p.icon}
+                        </span>
+                        <span style={{
+                          fontFamily: syne,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: C.text,
+                          flex: 1,
+                        }}>
+                          {p.principle}
+                        </span>
+                        <span style={{
+                          fontFamily: mono,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          letterSpacing: '0.08em',
+                          padding: '3px 8px',
+                          borderRadius: 4,
+                          color: isFail ? sevColor : C.green,
+                          background: isFail ? `${sevColor}18` : `${C.green}18`,
+                          border: `1px solid ${isFail ? `${sevColor}33` : `${C.green}33`}`,
+                        }}>
+                          {p.result}
+                        </span>
+                        {p.severity !== 'N/A' && (
+                          <span style={{
+                            fontFamily: mono,
+                            fontSize: 9,
+                            letterSpacing: '0.06em',
+                            padding: '2px 6px',
+                            borderRadius: 3,
+                            color: sevColor,
+                            background: `${sevColor}12`,
+                          }}>
+                            {p.severity}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Rule */}
+                      <div style={{
+                        fontFamily: mono,
+                        fontSize: 11,
+                        color: C.muted,
+                        lineHeight: 1.5,
+                        marginBottom: 8,
+                        paddingLeft: 36,
+                      }}>
+                        &ldquo;{p.check}&rdquo;
+                      </div>
+
+                      {/* Explanation */}
+                      <div style={{
+                        fontFamily: syne,
+                        fontSize: 12,
+                        color: C.text,
+                        lineHeight: 1.5,
+                        paddingLeft: 36,
+                        marginBottom: 8,
+                      }}>
+                        {p.explanation}
+                      </div>
+
+                      {/* Why it matters */}
+                      <div style={{
+                        fontFamily: syne,
+                        fontSize: 11,
+                        color: isFail ? sevColor : C.green,
+                        lineHeight: 1.4,
+                        paddingLeft: 36,
+                        fontStyle: 'italic',
+                        opacity: 0.85,
+                      }}>
+                        Why it matters: {p.whyItMatters}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Ruleset preview */}
