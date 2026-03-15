@@ -2,7 +2,7 @@ import './globals.css'
 
 export const metadata = {
   title: 'Muteform',
-  description: 'Design system compliance scanner',
+  description: 'Design governance for AI-generated interfaces',
 }
 
 export default function RootLayout({
