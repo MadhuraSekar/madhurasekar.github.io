@@ -243,23 +243,21 @@ export default function DemoPage() {
           </span>
         </div>
 
-        <a
-          href="/login"
-          style={{
+        <span style={{
             fontFamily: mono,
-            fontSize: 12,
-            fontWeight: 500,
-            color: '#fff',
-            background: C.blue,
-            padding: '8px 16px',
-            borderRadius: 8,
-            textDecoration: 'none',
-            letterSpacing: '0.02em',
-            transition: 'opacity 0.15s',
-          }}
-        >
-          Get started free →
-        </a>
+            fontSize: 11,
+            color: C.green,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              backgroundColor: C.green,
+              boxShadow: `0 0 8px ${C.green}66`,
+            }} />
+            ENGINE READY
+          </span>
       </div>
 
       {/* Hero section */}
@@ -562,7 +560,7 @@ export default function DemoPage() {
                 Scan every AI-generated interface automatically.
               </p>
               <a
-                href="/login"
+                href="mailto:hello@muteform.com"
                 style={{
                   display: 'inline-block',
                   fontFamily: mono,
@@ -578,7 +576,7 @@ export default function DemoPage() {
                   transition: 'opacity 0.15s, transform 0.1s',
                 }}
               >
-                Set up your own ruleset →
+                Get early access →
               </a>
             </div>
           </>
