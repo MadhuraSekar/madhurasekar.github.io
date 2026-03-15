@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [focused, setFocused] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,40 +49,77 @@ export default function LoginPage() {
       minHeight: '100vh',
       background: T.bg,
       padding: 20,
+      position: 'relative',
+      overflow: 'hidden',
     }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+      {/* Ambient glow */}
+      <div style={{
+        position: 'absolute',
+        top: '30%',
+        left: '50%',
+        width: 600,
+        height: 600,
+        transform: 'translate(-50%, -50%)',
+        background: `radial-gradient(circle, ${T.blue}08 0%, transparent 70%)`,
+        pointerEvents: 'none',
+      }} />
+
+      <div style={{ width: '100%', maxWidth: 400, position: 'relative', zIndex: 1 }}>
+        {/* Logo + tagline */}
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            background: `linear-gradient(135deg, ${T.blue}, ${T.blue}99)`,
+            marginBottom: 20,
+            boxShadow: `0 0 40px ${T.blue}22`,
+          }}>
+            <span style={{
+              fontFamily: "'Syne', sans-serif",
+              fontSize: 20,
+              fontWeight: 800,
+              color: '#fff',
+            }}>M</span>
+          </div>
           <h1 style={{
-            fontFamily: 'var(--font-syne), sans-serif',
-            fontSize: 28,
+            fontFamily: "'Syne', sans-serif",
+            fontSize: 32,
             fontWeight: 700,
             color: T.text,
-            letterSpacing: '-0.02em',
+            letterSpacing: '-0.03em',
           }}>
             muteform
           </h1>
           <p style={{
-            fontFamily: 'var(--font-dm-mono), monospace',
-            fontSize: 13,
+            fontFamily: "'DM Mono', monospace",
+            fontSize: 12,
             color: T.muted,
             marginTop: 8,
+            letterSpacing: '0.02em',
           }}>
-            Design system compliance
+            Design governance for AI-generated interfaces
           </p>
         </div>
 
+        {/* Form card */}
         <form onSubmit={handleSubmit} style={{
           background: T.surface,
           border: `1px solid ${T.border}`,
-          borderRadius: 12,
-          padding: 32,
+          borderRadius: 16,
+          padding: '36px 32px',
+          boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px ${T.border}`,
+          backdropFilter: 'blur(12px)',
         }}>
           <h2 style={{
-            fontFamily: 'var(--font-syne), sans-serif',
+            fontFamily: "'Syne', sans-serif",
             fontSize: 18,
             fontWeight: 600,
             color: T.text,
-            marginBottom: 24,
+            marginBottom: 28,
           }}>
             Sign in
           </h2>
@@ -95,21 +133,21 @@ export default function LoginPage() {
               marginBottom: 20,
               fontSize: 13,
               color: T.red,
-              fontFamily: 'var(--font-dm-mono), monospace',
+              fontFamily: "'DM Mono', monospace",
             }}>
               {error}
             </div>
           )}
 
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 20 }}>
             <label style={{
               display: 'block',
-              fontSize: 12,
+              fontSize: 11,
               color: T.muted,
-              marginBottom: 6,
-              fontFamily: 'var(--font-dm-mono), monospace',
+              marginBottom: 8,
+              fontFamily: "'DM Mono', monospace",
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: '0.08em',
             }}>
               Email
             </label>
@@ -120,30 +158,32 @@ export default function LoginPage() {
               required
               style={{
                 width: '100%',
-                padding: '10px 14px',
+                padding: '12px 14px',
                 background: T.surface2,
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
+                border: `1px solid ${focused === 'email' ? T.blue : T.border}`,
+                borderRadius: 10,
                 color: T.text,
                 fontSize: 14,
-                fontFamily: 'var(--font-dm-mono), monospace',
+                fontFamily: "'DM Mono', monospace",
                 outline: 'none',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+                boxShadow: focused === 'email' ? `0 0 0 3px ${T.blue}15` : 'none',
               }}
-              onFocus={e => e.target.style.borderColor = T.blue}
-              onBlur={e => e.target.style.borderColor = T.border}
+              onFocus={() => setFocused('email')}
+              onBlur={() => setFocused(null)}
               placeholder="you@example.com"
             />
           </div>
 
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 28 }}>
             <label style={{
               display: 'block',
-              fontSize: 12,
+              fontSize: 11,
               color: T.muted,
-              marginBottom: 6,
-              fontFamily: 'var(--font-dm-mono), monospace',
+              marginBottom: 8,
+              fontFamily: "'DM Mono', monospace",
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: '0.08em',
             }}>
               Password
             </label>
@@ -154,17 +194,19 @@ export default function LoginPage() {
               required
               style={{
                 width: '100%',
-                padding: '10px 14px',
+                padding: '12px 14px',
                 background: T.surface2,
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
+                border: `1px solid ${focused === 'password' ? T.blue : T.border}`,
+                borderRadius: 10,
                 color: T.text,
                 fontSize: 14,
-                fontFamily: 'var(--font-dm-mono), monospace',
+                fontFamily: "'DM Mono', monospace",
                 outline: 'none',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+                boxShadow: focused === 'password' ? `0 0 0 3px ${T.blue}15` : 'none',
               }}
-              onFocus={e => e.target.style.borderColor = T.blue}
-              onBlur={e => e.target.style.borderColor = T.border}
+              onFocus={() => setFocused('password')}
+              onBlur={() => setFocused(null)}
               placeholder="Enter password"
             />
           </div>
@@ -174,40 +216,46 @@ export default function LoginPage() {
             disabled={loading}
             style={{
               width: '100%',
-              padding: '12px 20px',
-              background: T.blue,
+              padding: '13px 20px',
+              background: `linear-gradient(135deg, ${T.blue}, #0044cc)`,
               color: '#fff',
               border: 'none',
-              borderRadius: 8,
+              borderRadius: 10,
               fontSize: 14,
               fontWeight: 600,
-              fontFamily: 'var(--font-dm-mono), monospace',
+              fontFamily: "'DM Mono', monospace",
               cursor: loading ? 'wait' : 'pointer',
               opacity: loading ? 0.7 : 1,
-              transition: 'opacity 0.15s',
+              transition: 'opacity 0.15s, transform 0.1s, box-shadow 0.2s',
+              boxShadow: `0 4px 16px ${T.blue}33`,
+              letterSpacing: '0.02em',
             }}
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
-
-          <p style={{
-            textAlign: 'center',
-            marginTop: 20,
-            fontSize: 13,
-            color: T.muted,
-            fontFamily: 'var(--font-dm-mono), monospace',
-          }}>
-            No account?{' '}
-            <a
-              href="/signup"
-              style={{ color: T.blue, textDecoration: 'none' }}
-              onMouseEnter={e => (e.target as HTMLElement).style.textDecoration = 'underline'}
-              onMouseLeave={e => (e.target as HTMLElement).style.textDecoration = 'none'}
-            >
-              Create one
-            </a>
-          </p>
         </form>
+
+        {/* Demo link */}
+        <p style={{
+          textAlign: 'center',
+          marginTop: 24,
+          fontSize: 12,
+          color: T.dim,
+          fontFamily: "'DM Mono', monospace",
+        }}>
+          <a
+            href="/demo"
+            style={{
+              color: T.muted,
+              textDecoration: 'none',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => (e.target as HTMLElement).style.color = T.text}
+            onMouseLeave={e => (e.target as HTMLElement).style.color = T.muted}
+          >
+            Try the live demo →
+          </a>
+        </p>
       </div>
     </div>
   )
