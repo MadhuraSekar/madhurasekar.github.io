@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Stepper from '@/components/Stepper'
+import Header from '@/components/Header'
 import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
 import { getFixture } from '@/lib/fixtures'
 import { buildGovernanceReport, reportToJSON } from '@/lib/governance'
@@ -205,23 +205,23 @@ Only return code where health_score >= 85.`
   return (
     <div style={{
       minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)',
-      fontFamily: 'var(--font-sans)',
+      fontFamily: 'var(--font-mono)',
     }}>
       <style dangerouslySetInnerHTML={{ __html: glowKeyframes }} />
-      <Stepper />
+      <Header />
 
       {/* ── Content ── */}
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '40px 24px 100px' }}>
 
         {/* Page heading */}
         <h1 style={{
-          fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 700,
+          fontFamily: 'var(--font-heading)', fontSize: 28, fontWeight: 700,
           color: 'var(--text-primary)', margin: '0 0 6px',
         }}>
           MCP Integration
         </h1>
         <p style={{
-          fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)',
+          fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)',
           margin: '0 0 40px', lineHeight: 1.6, maxWidth: 600,
         }}>
           Connect Claude Code to the Muteform validation engine. Every generated component is scanned and patched before delivery.
@@ -245,7 +245,7 @@ Only return code where health_score >= 85.`
                 background: 'var(--success)',
                 animation: 'glow-green 2s ease-in-out infinite',
               }} />
-              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
                 Endpoint active
               </span>
             </div>
@@ -335,7 +335,7 @@ Only return code where health_score >= 85.`
               completed={completedSteps.has(1)}
               onComplete={() => markStepComplete(1)}
             >
-              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
                 Open your project in Claude Code.
               </span>
             </StepRow>
@@ -351,7 +351,7 @@ Only return code where health_score >= 85.`
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                 </svg>
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
                   Create or open{' '}
                   <code style={{
                     color: 'var(--accent)', background: 'var(--accent-dim)',
@@ -373,7 +373,7 @@ Only return code where health_score >= 85.`
               last={false}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
                   Paste this at the top:
                 </span>
                 <CodeBlock
@@ -396,7 +396,7 @@ Only return code where health_score >= 85.`
               completed={completedSteps.has(4)}
               onComplete={() => markStepComplete(4)}
             >
-              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
                 Generate any UI component.
               </span>
             </StepRow>
@@ -408,7 +408,7 @@ Only return code where health_score >= 85.`
               onComplete={() => markStepComplete(5)}
               last
             >
-              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
                 Come back here to see it governed.
               </span>
             </StepRow>
@@ -430,10 +430,10 @@ Only return code where health_score >= 85.`
                 background: 'var(--warning)', marginBottom: 14,
                 animation: 'pulse-amber 2s ease-in-out infinite',
               }} />
-              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', margin: '0 0 8px' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)', margin: '0 0 8px' }}>
                 No calls yet.
               </p>
-              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
                 Add the snippet to CLAUDE.md and generate your first component.
               </p>
             </div>
@@ -518,7 +518,7 @@ Only return code where health_score >= 85.`
         {/* ══════════════════════════════════════════════════════ */}
         <Section label="04" title="Live Test">
           <p style={{
-            fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
             margin: '0 0 14px', lineHeight: 1.6,
           }}>
             Paste an artifact JSON and run it through the engine locally. The raw JSON response below is exactly what Claude Code receives.
@@ -576,7 +576,7 @@ Only return code where health_score >= 85.`
             }}
             style={{
               width: '100%', padding: '14px 0',
-              fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 700,
+              fontFamily: 'var(--font-heading)', fontSize: 14, fontWeight: 700,
               letterSpacing: '0.04em', color: 'var(--bg)',
               background: running ? 'var(--text-muted)' : 'var(--accent)',
               border: 'none', borderRadius: 6, cursor: running ? 'not-allowed' : 'pointer',
@@ -603,7 +603,7 @@ Only return code where health_score >= 85.`
                 onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--accent)' }}
                 style={{
                   display: 'block', textAlign: 'center',
-                  fontFamily: 'var(--font-serif)', fontSize: 13, fontWeight: 700,
+                  fontFamily: 'var(--font-heading)', fontSize: 13, fontWeight: 700,
                   color: 'var(--bg)', background: 'var(--accent)',
                   padding: '14px 0', borderRadius: 6,
                   textDecoration: 'none', letterSpacing: '0.02em',
@@ -686,7 +686,7 @@ function Section({ label, title, children }: { label: string; title: string; chi
     <div style={{ marginBottom: 40, animation: 'fadeInSection 0.4s ease both' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 18 }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent)', letterSpacing: '0.1em' }}>{label}</span>
-        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{title}</h2>
+        <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{title}</h2>
         <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
       </div>
       {children}
@@ -814,7 +814,7 @@ function StatCard({ value, label, color, bg }: { value: number; label: string; c
       padding: '16px 14px', textAlign: 'center',
       background: bg, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`, borderRadius: 4,
     }}>
-      <div style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-heading)', fontSize: 28, fontWeight: 700, color }}>{value}</div>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color, letterSpacing: '0.08em', marginTop: 4 }}>{label}</div>
     </div>
   )

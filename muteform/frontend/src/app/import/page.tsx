@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Stepper from '@/components/Stepper'
+import Header from '@/components/Header'
 import {
   type ImportedDesignSystem,
   SAMPLE_SYSTEMS,
@@ -15,8 +15,8 @@ import {
 } from '@/lib/session'
 
 // ─── Font shorthands ─────────────────────────────────────────
-const serif = 'var(--font-serif)'
-const sans = 'var(--font-sans)'
+const serif = 'var(--font-heading)'
+const sans = 'var(--font-mono)'
 const mono = 'var(--font-mono)'
 
 // ─── Sample system visual identity ───────────────────────────
@@ -904,7 +904,7 @@ export default function ImportPage() {
       color: 'var(--text-primary)',
       fontFamily: sans,
     }}>
-      <Stepper />
+      <Header />
 
       {/* Identity Modal */}
       {showModal && <IdentityModal onSave={handleSaveUser} />}

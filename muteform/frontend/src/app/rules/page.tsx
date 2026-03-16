@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import Stepper from '@/components/Stepper'
+import Header from '@/components/Header'
 import {
   loadDesignSystem, type ImportedDesignSystem,
   loadGovernanceRules, saveGovernanceRules,
@@ -260,19 +260,19 @@ export default function RulesPage() {
   // ─── Render ─────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
-      <Stepper />
+      <Header />
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '48px 20px 120px' }}>
         {/* ─── Page Header ──────────────────────────────── */}
         <h1 style={{
-          fontFamily: 'var(--font-serif)', fontSize: 36, fontWeight: 700,
+          fontFamily: 'var(--font-heading)', fontSize: 36, fontWeight: 700,
           color: 'var(--text-primary)', marginBottom: 8, lineHeight: 1.15,
           letterSpacing: '-0.025em',
         }}>
           Governance Rules
         </h1>
         <p style={{
-          fontFamily: 'var(--font-sans)', fontSize: 15, color: 'var(--text-secondary)',
+          fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--text-secondary)',
           marginBottom: 40, lineHeight: 1.6,
         }}>
           Configure rules for {companyName} design system
@@ -292,7 +292,7 @@ export default function RulesPage() {
               <StatBadge label="Components" count={componentCount} />
             </div>
             <a href="/import" style={{
-              fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--accent)',
+              fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)',
               textDecoration: 'none', padding: '4px 12px', borderRadius: 4,
               border: '1px solid var(--accent)', background: 'var(--accent-dim)',
               transition: 'all 200ms ease',
@@ -307,7 +307,7 @@ export default function RulesPage() {
             padding: '14px 20px', background: 'var(--surface)', border: '1px solid var(--border)',
             borderRadius: 4, marginBottom: 28,
           }}>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)' }}>
               No design system imported yet.{' '}
               <a href="/import" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Import one</a>
             </span>
@@ -321,8 +321,8 @@ export default function RulesPage() {
             borderRadius: 4, marginBottom: 28,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 18, color: 'var(--warning)', fontWeight: 700 }}>!</span>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--warning)', fontWeight: 600 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--warning)', fontWeight: 700 }}>!</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--warning)', fontWeight: 600 }}>
               These rules will catch {violationCount} violation{violationCount !== 1 ? 's' : ''} in a sample scan
             </span>
           </div>
@@ -354,7 +354,7 @@ export default function RulesPage() {
                 {/* Card top row: icon, name, toggle */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 10 }}>
                   <span style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 20,
+                    fontFamily: 'var(--font-mono)', fontSize: 20,
                     color: enabled ? 'var(--text-primary)' : 'var(--text-muted)',
                     width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: enabled ? 'var(--surface-elevated)' : 'transparent',
@@ -366,13 +366,13 @@ export default function RulesPage() {
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+                      fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
                       color: 'var(--text-primary)', marginBottom: 4, lineHeight: 1.3,
                     }}>
                       {cat.label}
                     </div>
                     <div style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)',
+                      fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)',
                       lineHeight: 1.5,
                     }}>
                       {cat.description}
@@ -389,14 +389,14 @@ export default function RulesPage() {
                   {/* Severity selector */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)',
                       textTransform: 'uppercase', letterSpacing: '0.06em',
                     }}>
                       Severity
                     </span>
                     {cat.severityLocked ? (
                       <span style={{
-                        fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+                        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
                         color: SEV_COLORS[cat.severityLocked].color,
                         background: SEV_COLORS[cat.severityLocked].dim,
                         padding: '3px 10px', borderRadius: 4,
@@ -409,7 +409,7 @@ export default function RulesPage() {
                         value={sev}
                         onChange={e => updateRule(cat.ruleId, { severity: e.target.value as GovernanceRule['severity'] })}
                         style={{
-                          fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
+                          fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
                           color: sevStyle.color,
                           background: sevStyle.dim,
                           border: '1px solid var(--border)',
@@ -431,7 +431,7 @@ export default function RulesPage() {
                   {cat.hasAutoFix && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{
-                        fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)',
+                        fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)',
                         textTransform: 'uppercase', letterSpacing: '0.06em',
                       }}>
                         Auto-fix
@@ -445,7 +445,7 @@ export default function RulesPage() {
 
                   {rule?.autoFix && (
                     <span style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600,
+                      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
                       color: 'var(--success)', background: 'var(--success-dim)',
                       padding: '2px 8px', borderRadius: 4,
                       textTransform: 'uppercase', letterSpacing: '0.04em',
@@ -459,7 +459,7 @@ export default function RulesPage() {
                 {enabled && ruleViolations > 0 && (
                   <div style={{
                     marginLeft: 46, marginTop: 12,
-                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--warning)',
+                    fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--warning)',
                     animation: 'fadeIn 400ms ease',
                     opacity: 1,
                   }}>
@@ -477,13 +477,13 @@ export default function RulesPage() {
           borderRadius: 4, marginBottom: 16,
         }}>
           <h3 style={{
-            fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700,
+            fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700,
             color: 'var(--text-primary)', marginBottom: 6,
           }}>
             Custom Rule Builder
           </h3>
           <p style={{
-            fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', marginBottom: 24,
+            fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)', marginBottom: 24,
           }}>
             Describe what should happen in plain language.
           </p>
@@ -491,7 +491,7 @@ export default function RulesPage() {
           {/* Sentence builder */}
           <div style={{
             display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
-            fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 2.4,
+            fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 2.4,
           }}>
             <span style={{ color: 'var(--text-muted)' }}>When a</span>
             <SentenceDropdown value={sbComponent} onChange={setSbComponent} options={SB_COMPONENTS} placeholder="component &#9662;" />
@@ -511,19 +511,19 @@ export default function RulesPage() {
                 border: '1px solid var(--border-strong)', marginBottom: 14,
               }}>
                 <div style={{
-                  fontFamily: 'var(--font-sans)', fontSize: 10, color: 'var(--text-muted)',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
                   textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6,
                 }}>
                   Rule preview
                 </div>
                 <div style={{
-                  fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6,
+                  fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6,
                 }}>
                   {sbToRule().description}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <span style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                    fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
                     color: SEV_COLORS[sbToRule().severity].color,
                     background: SEV_COLORS[sbToRule().severity].dim,
                     padding: '2px 8px', borderRadius: 4,
@@ -532,7 +532,7 @@ export default function RulesPage() {
                   </span>
                   {sbToRule().autoFix && (
                     <span style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600,
+                      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
                       color: 'var(--success)', background: 'var(--success-dim)',
                       padding: '2px 8px', borderRadius: 4,
                       textTransform: 'uppercase',
@@ -545,7 +545,7 @@ export default function RulesPage() {
               <button
                 onClick={handleAddSentenceRule}
                 style={{
-                  fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+                  fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
                   color: 'var(--bg)', background: 'var(--accent)',
                   border: 'none', borderRadius: 4, padding: '10px 24px', cursor: 'pointer',
                   transition: 'background 200ms ease',
@@ -573,11 +573,11 @@ export default function RulesPage() {
               transition: 'all 200ms ease',
             }}
           >
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)' }}>
               Advanced: add rule with form
             </span>
             <span style={{
-              fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
               transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0)',
               transition: 'transform 200ms ease', display: 'inline-block',
             }}>
@@ -591,7 +591,7 @@ export default function RulesPage() {
                 {/* Rule name */}
                 <div>
                   <label style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
                     display: 'block', marginBottom: 6,
                   }}>
                     Rule name
@@ -602,7 +602,7 @@ export default function RulesPage() {
                     onChange={e => setCustomName(e.target.value)}
                     placeholder="e.g. Brand color only in headers"
                     style={{
-                      width: '100%', fontFamily: 'var(--font-sans)', fontSize: 13,
+                      width: '100%', fontFamily: 'var(--font-mono)', fontSize: 13,
                       color: 'var(--text-primary)', background: 'var(--surface-elevated)',
                       border: '1px solid var(--border-strong)', borderRadius: 4,
                       padding: '10px 14px', outline: 'none', boxSizing: 'border-box',
@@ -617,7 +617,7 @@ export default function RulesPage() {
                 <div className="stack-mobile" style={{ display: 'flex', gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <label style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
                       display: 'block', marginBottom: 6,
                     }}>
                       Category
@@ -626,7 +626,7 @@ export default function RulesPage() {
                       value={customCategory}
                       onChange={e => setCustomCategory(e.target.value as CategoryId)}
                       style={{
-                        width: '100%', fontFamily: 'var(--font-sans)', fontSize: 13,
+                        width: '100%', fontFamily: 'var(--font-mono)', fontSize: 13,
                         color: 'var(--text-primary)', background: 'var(--surface-elevated)',
                         border: '1px solid var(--border-strong)', borderRadius: 4,
                         padding: '10px 14px', outline: 'none', cursor: 'pointer',
@@ -643,7 +643,7 @@ export default function RulesPage() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
                       display: 'block', marginBottom: 6,
                     }}>
                       Severity
@@ -652,7 +652,7 @@ export default function RulesPage() {
                       value={customSeverity}
                       onChange={e => setCustomSeverity(e.target.value as GovernanceRule['severity'])}
                       style={{
-                        width: '100%', fontFamily: 'var(--font-sans)', fontSize: 13,
+                        width: '100%', fontFamily: 'var(--font-mono)', fontSize: 13,
                         color: SEV_COLORS[customSeverity].color,
                         background: 'var(--surface-elevated)',
                         border: '1px solid var(--border-strong)', borderRadius: 4,
@@ -669,11 +669,11 @@ export default function RulesPage() {
 
                 {/* Auto-fix toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <label style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)' }}>
+                  <label style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>
                     Auto-fix
                   </label>
                   <Toggle on={customAutoFix} onToggle={() => setCustomAutoFix(!customAutoFix)} />
-                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
                     {customAutoFix ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
@@ -681,7 +681,7 @@ export default function RulesPage() {
                 {/* Description */}
                 <div>
                   <label style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
                     display: 'block', marginBottom: 6,
                   }}>
                     Description
@@ -692,7 +692,7 @@ export default function RulesPage() {
                     placeholder="Describe what this rule enforces..."
                     rows={3}
                     style={{
-                      width: '100%', fontFamily: 'var(--font-sans)', fontSize: 13,
+                      width: '100%', fontFamily: 'var(--font-mono)', fontSize: 13,
                       color: 'var(--text-primary)', background: 'var(--surface-elevated)',
                       border: '1px solid var(--border-strong)', borderRadius: 4,
                       padding: '10px 14px', outline: 'none', resize: 'vertical', boxSizing: 'border-box',
@@ -708,7 +708,7 @@ export default function RulesPage() {
                   onClick={handleAddCustomRule}
                   disabled={!customName.trim()}
                   style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+                    fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
                     color: 'var(--bg)',
                     background: customName.trim() ? 'var(--accent)' : 'var(--border-strong)',
                     border: 'none', borderRadius: 4, padding: '10px 20px',
@@ -729,7 +729,7 @@ export default function RulesPage() {
         {customRules.length > 0 && (
           <div style={{ marginBottom: 32 }}>
             <h3 style={{
-              fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+              fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
               color: 'var(--text-primary)', marginBottom: 12,
             }}>
               Your custom rules
@@ -746,13 +746,13 @@ export default function RulesPage() {
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <span style={{
-                          fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
+                          fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
                           color: 'var(--text-primary)',
                         }}>
                           {cr.name}
                         </span>
                         <span style={{
-                          fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
                           color: sevC.color, background: sevC.dim,
                           padding: '1px 6px', borderRadius: 4,
                         }}>
@@ -761,7 +761,7 @@ export default function RulesPage() {
                       </div>
                       {cr.description && (
                         <span style={{
-                          fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                          fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
                         }}>
                           {cr.description}
                         </span>
@@ -769,7 +769,7 @@ export default function RulesPage() {
                     </div>
                     {cr.autoFix && (
                       <span style={{
-                        fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600,
+                        fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
                         color: 'var(--success)', background: 'var(--success-dim)',
                         padding: '2px 8px', borderRadius: 4,
                         textTransform: 'uppercase',
@@ -793,7 +793,7 @@ export default function RulesPage() {
           style={{
             width: '100%', padding: '18px 24px', borderRadius: 4,
             background: 'var(--accent)', color: 'var(--bg)',
-            fontFamily: 'var(--font-sans)', fontSize: 17, fontWeight: 700,
+            fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 700,
             border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
             transition: 'background 200ms ease, transform 200ms ease',
@@ -823,14 +823,14 @@ function StatBadge({ label, count }: { label: string; count: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{
-        fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+        fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
         color: 'var(--accent)', background: 'var(--accent-dim)',
         padding: '2px 8px', borderRadius: 4,
         minWidth: 24, textAlign: 'center',
       }}>
         {count}
       </span>
-      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)' }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>
         {label}
       </span>
     </div>
