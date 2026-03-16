@@ -259,6 +259,7 @@ export default function PlaygroundPage() {
   const [apiResponse, setApiResponse] = useState<string | null>(null)
   const [apiLoading, setApiLoading] = useState(false)
   const [apiExpanded, setApiExpanded] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleScan = useCallback(() => {
     setScanning(true)
@@ -369,7 +370,7 @@ export default function PlaygroundPage() {
           fontFamily: serif, fontStyle: 'italic', fontSize: 22,
           color: T.textBright, textDecoration: 'none', fontWeight: 400,
         }}>muteform</a>
-        <div style={{ display: 'flex', gap: 28 }}>
+        <div className="nav-links" style={{ display: 'flex', gap: 28 }}>
           {navItems.map(n => (
             <a key={n.label} href={n.href} style={{
               fontFamily: sans, fontSize: 14, fontWeight: 500,
@@ -379,16 +380,31 @@ export default function PlaygroundPage() {
             }}>{n.label}</a>
           ))}
         </div>
+        <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)}
+          aria-label="Open menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
       </nav>
 
+      {/* mobile menu */}
+      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
+        {navItems.map(n => (
+          <a key={n.label} href={n.href} onClick={() => setMobileMenuOpen(false)}
+            style={{ fontFamily: sans, color: n.label === 'Playground' ? T.green : undefined }}>{n.label}</a>
+        ))}
+      </div>
+
       {/* ─── Two-column Layout ───────────────────────────────── */}
-      <div style={{
+      <div className="two-col" style={{
         display: 'flex', gap: 0,
         maxWidth: 1440, margin: '0 auto',
         minHeight: 'calc(100vh - 56px)',
       }}>
         {/* ─── LEFT COLUMN: Editor + Fixtures ─────────────── */}
-        <div style={{
+        <div className="two-col-left" style={{
           width: '60%', padding: '28px 24px 28px 32px',
           borderRight: `1px solid ${T.border}`,
           display: 'flex', flexDirection: 'column', gap: 20,
@@ -504,7 +520,7 @@ export default function PlaygroundPage() {
         </div>
 
         {/* ─── RIGHT COLUMN: Results ─────────────────────── */}
-        <div style={{
+        <div className="two-col-right" style={{
           width: '40%', padding: '28px 32px 28px 24px',
           display: 'flex', flexDirection: 'column', gap: 20,
           overflow: 'auto',
@@ -952,6 +968,11 @@ export default function PlaygroundPage() {
         @keyframes fadeSlideIn {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 768px) {
+          .two-col-left, .two-col-right {
+            padding: 16px !important;
+          }
         }
       `}</style>
     </div>

@@ -315,6 +315,16 @@ export default function GovernancePage() {
   const [principles, setPrinciples] = useState<Principle[]>(INITIAL_PRINCIPLES)
   const [contextRules, setContextRules] = useState<ContextRule[]>(INITIAL_RULES)
   const [toast, setToast] = useState<string | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const navItems = [
+    { label: 'Dashboard', href: '/dashboard' },
+    { label: 'Scan', href: '/scan' },
+    { label: 'Rules', href: '/rules' },
+    { label: 'Governance', href: '/governance', active: true },
+    { label: 'Integrate', href: '/integrate' },
+    { label: 'Team', href: '/team' },
+  ]
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -418,15 +428,8 @@ export default function GovernancePage() {
         >
           muteform
         </a>
-        <nav style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-          {[
-            { label: 'Dashboard', href: '/dashboard' },
-            { label: 'Scan', href: '/scan' },
-            { label: 'Rules', href: '/rules' },
-            { label: 'Governance', href: '/governance', active: true },
-            { label: 'Integrate', href: '/integrate' },
-            { label: 'Team', href: '/team' },
-          ].map((l) => (
+        <nav className="nav-links" style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          {navItems.map((l) => (
             <a
               key={l.label}
               href={l.href}
@@ -447,10 +450,25 @@ export default function GovernancePage() {
             </a>
           ))}
         </nav>
+        <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)}
+          aria-label="Open menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
       </header>
 
+      {/* mobile menu */}
+      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
+        {navItems.map(l => (
+          <a key={l.label} href={l.href} onClick={() => setMobileMenuOpen(false)}
+            style={{ fontFamily: syne, color: l.active ? T.green : undefined }}>{l.label}</a>
+        ))}
+      </div>
+
       {/* --- page body --- */}
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 96px' }}>
+      <main className="page-container" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 96px' }}>
         {/* ============================== SECTION 1: DESIGN SYSTEM ============================== */}
         <section style={{ marginBottom: 56 }}>
           <SectionHeader>Design System</SectionHeader>
@@ -871,7 +889,7 @@ export default function GovernancePage() {
               </div>
 
               {/* Color pair display */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                   <div style={{
                     width: 64, height: 64, borderRadius: 8,

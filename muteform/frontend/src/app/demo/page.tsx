@@ -109,6 +109,7 @@ export default function DemoPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [shipIt, setShipIt] = useState(false)
   const [skippedCount, setSkippedCount] = useState(0)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const logRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -397,6 +398,11 @@ export default function DemoPage() {
         @keyframes glow { 0%, 100% { box-shadow: 0 0 20px ${T.greenGlow} } 50% { box-shadow: 0 0 40px ${T.green}44 } }
         @keyframes slideIn { from { opacity: 0; transform: translateX(-8px) } to { opacity: 1; transform: translateX(0) } }
         @keyframes scoreUp { from { opacity: 0; transform: scale(0.8) } to { opacity: 1; transform: scale(1) } }
+        @media (max-width: 768px) {
+          .demo-hero h1 { font-size: 26px !important; }
+          .demo-hero p { font-size: 11px !important; }
+          .demo-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       {/* ─── Top Bar ─── */}
@@ -468,7 +474,7 @@ export default function DemoPage() {
       </div>
 
       {/* ─── Hero ─── */}
-      <div style={{
+      <div className="demo-hero" style={{
         padding: '36px 20px 24px', maxWidth: 1200, margin: '0 auto', textAlign: 'center',
       }}>
         <h1 style={{
@@ -486,7 +492,7 @@ export default function DemoPage() {
       </div>
 
       {/* ─── Two-Column Layout ─── */}
-      <div style={{
+      <div className="demo-grid" style={{
         maxWidth: 1200, margin: '0 auto', padding: '0 20px 60px',
         display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16,
       }}>

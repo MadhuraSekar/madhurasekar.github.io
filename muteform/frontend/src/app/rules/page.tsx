@@ -88,6 +88,7 @@ const SEV: Record<string, { color: string; dim: string }> = {
 const SEVERITIES = ['critical', 'high', 'medium', 'low']
 
 export default function RulesPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [yaml, setYaml] = useState(YAML_CONTENT)
   const [rules, setRules] = useState(INITIAL_RULES)
 
@@ -128,10 +129,20 @@ export default function RulesPage() {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{activeCount} rules active</span>
           <a href="/dashboard" style={{ fontFamily: mono, fontSize: 11, color: T.muted, textDecoration: 'none' }}>← Dashboard</a>
+          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
         </div>
       </div>
+      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
+        <a href="/dashboard" style={{ fontFamily: sans }}>Dashboard</a>
+        <a href="/scan" style={{ fontFamily: sans }}>Scan</a>
+        <a href="/rules" style={{ fontFamily: sans, color: T.green }}>Rules</a>
+        <a href="/governance" style={{ fontFamily: sans }}>Governance</a>
+        <a href="/integrate" style={{ fontFamily: sans }}>Integrate</a>
+        <a href="/team" style={{ fontFamily: sans }}>Team</a>
+      </div>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px 80px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="page-container grid-2" style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px 80px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Left: YAML editor */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
