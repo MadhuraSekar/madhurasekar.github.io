@@ -127,6 +127,10 @@ body {
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 
+@media (max-width: 1024px) {
+  .page-container { padding-left: 20px !important; padding-right: 20px !important; }
+}
+
 @media (max-width: 768px) {
   .nav-links { display: none !important; }
   .nav-hamburger { display: flex !important; }
@@ -136,10 +140,26 @@ body {
   .grid-2 { grid-template-columns: 1fr !important; }
   .grid-3 { grid-template-columns: 1fr !important; }
   .page-container { padding-left: 16px !important; padding-right: 16px !important; }
+
+  /* Score rings shrink on mobile */
+  .score-ring-mobile { width: 56px !important; height: 56px !important; }
+
+  /* Buttons full width on mobile */
+  .btn-mobile-full { width: 100% !important; }
+
+  /* Stack horizontal layouts */
+  .stack-mobile { flex-direction: column !important; }
+  .stack-mobile > * { width: 100% !important; }
+
+  /* Action bars stack on mobile */
+  .action-bar-mobile { flex-direction: column !important; }
+  .action-bar-mobile > * { width: 100% !important; }
+  .action-bar-mobile > div[style*="flex: 1"] { display: none !important; }
 }
 
 @media (max-width: 480px) {
   .grid-4 { grid-template-columns: 1fr !important; }
+  body { font-size: 14px; }
 }
 
 /* ── Input autofill ── */

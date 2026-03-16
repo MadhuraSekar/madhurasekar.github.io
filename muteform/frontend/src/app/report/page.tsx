@@ -791,7 +791,7 @@ export default function ReportPage() {
         )}
 
         {/* ─── Bottom Action Bar ───────────────────────────── */}
-        <div style={{
+        <div className="action-bar-mobile" style={{
           display: 'flex', gap: 10, marginTop: 48, flexWrap: 'wrap',
           padding: '24px 0',
           borderTop: '1px solid var(--border)',
@@ -814,7 +814,7 @@ export default function ReportPage() {
           <div style={{ flex: 1 }} />
           <a
             href="/scan"
-            className="report-btn"
+            className="report-btn btn-mobile-full"
             style={{
               fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
               padding: '10px 24px', borderRadius: 4, cursor: 'pointer',

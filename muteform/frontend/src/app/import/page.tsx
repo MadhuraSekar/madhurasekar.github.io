@@ -332,21 +332,21 @@ function IdentityModal({
     <div style={{
       position: 'fixed',
       inset: 0,
-      zIndex: 9999,
+      zIndex: 300,
+      background: 'rgba(0,0,0,0.5)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'rgba(10,9,8,0.7)',
-      backdropFilter: 'blur(4px)',
-      padding: 24,
+      animation: 'modalIn 0.3s ease',
     }}>
       <div style={{
-        width: '100%',
         maxWidth: 420,
+        width: 'calc(100% - 32px)',
         background: 'var(--surface)',
         border: '1px solid var(--border)',
-        borderRadius: 4,
-        padding: '40px 32px 32px',
+        borderRadius: 8,
+        padding: '40px 36px',
+        animation: 'modalCardIn 0.3s ease',
       }}>
         <h2 style={{
           fontFamily: serif,
@@ -356,16 +356,16 @@ function IdentityModal({
           margin: '0 0 8px',
           lineHeight: 1.2,
         }}>
-          Before we start &mdash; who are you?
+          Welcome to Muteform
         </h2>
         <p style={{
           fontFamily: sans,
           fontSize: 14,
-          color: 'var(--text-secondary)',
+          color: 'var(--text-muted)',
           margin: '0 0 32px',
           lineHeight: 1.6,
         }}>
-          We&apos;ll save your progress so you can pick up where you left off.
+          Help us personalize your experience
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -419,10 +419,11 @@ function IdentityModal({
               padding: '12px 24px', cursor: canSave ? 'pointer' : 'not-allowed',
               opacity: canSave ? 1 : 0.4,
               marginTop: 8,
+              width: '100%',
               transition: 'opacity 0.15s',
             }}
           >
-            Save and continue
+            Save and continue &rarr;
           </button>
         </div>
       </div>
@@ -762,7 +763,7 @@ export default function ImportPage() {
     const session = loadSession()
     if (session.user) {
       setSavedUser({ name: session.user.name, company: session.user.company })
-    } else {
+    } else if (typeof window !== 'undefined' && !localStorage.getItem('muteform-welcomed')) {
       setShowModal(true)
     }
     const existing = loadDesignSystem()
@@ -790,6 +791,9 @@ export default function ImportPage() {
     saveSession(session)
     setSavedUser({ name, company })
     setShowModal(false)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('muteform-welcomed', '1')
+    }
     const id = await syncUserToSupabase(user)
     if (id) {
       session.user!.id = id

@@ -981,7 +981,7 @@ export default function ScanPage() {
               </div>
 
               {/* Violation summary cards */}
-              <div style={{
+              <div className="grid-3" style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: 12, marginBottom: 32,
               }}>
@@ -1074,6 +1074,25 @@ export default function ScanPage() {
               ═══════════════════════════════════════════════ */}
           {phase === 'governed' && report && (
             <div style={{ animation: 'fadeIn 150ms ease' }}>
+              {/* Governed banner */}
+              <div style={{
+                width: '100%', textAlign: 'center', padding: '16px 20px',
+                background: 'var(--success-dim)', borderRadius: 4, marginBottom: 20,
+                border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
+              }}>
+                <div style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+                  color: 'var(--success)', marginBottom: 4,
+                }}>
+                  Governed &mdash; ready to ship
+                </div>
+                <div style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                }}>
+                  {report.autoFixedCount} fixes applied &middot; {report.warningCount} warning{report.warningCount !== 1 ? 's' : ''} &middot; {report.blockedCount} blocked
+                </div>
+              </div>
+
               {/* Before / After comparison */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1112,7 +1131,7 @@ export default function ScanPage() {
               </div>
 
               {/* Violation summary (post-governance) */}
-              <div style={{
+              <div className="grid-3" style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: 12, marginBottom: 32,
               }}>
@@ -1306,10 +1325,67 @@ export default function ScanPage() {
                 </div>
               </div>
 
-              {/* Bottom actions */}
+              {/* Governed banner */}
               <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: 16, flexWrap: 'wrap',
+                padding: '16px 20px', background: 'var(--success-dim)',
+                border: '1px solid var(--success)', borderRadius: 4,
+                marginBottom: 24, textAlign: 'center',
+              }}>
+                <div style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+                  color: 'var(--success)', marginBottom: 6,
+                }}>
+                  Governed {'\u2014'} ready to ship
+                </div>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
+                }}>
+                  {report.autoFixedCount} fixes applied {'\u00b7'} {report.warningCount} warnings {'\u00b7'} {report.blockedCount} blocked
+                </div>
+              </div>
+
+              {/* Bottom actions */}
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                <a
+                  href="/report"
+                  style={{
+                    flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 4,
+                    fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+                    color: 'var(--bg)', background: 'var(--accent)',
+                    textDecoration: 'none', transition: 'all 150ms ease',
+                  }}
+                >
+                  View full report {'\u2192'}
+                </a>
+                <button
+                  onClick={() => {
+                    setPhase('select')
+                    setSelectedFixture(null)
+                    setCustomExpanded(false)
+                    setCustomInput('')
+                    setParseError(null)
+                    setScanResult(null)
+                    setRewriteResult(null)
+                    setReport(null)
+                    setArtifact(null)
+                    setActiveTab('violations')
+                    setFixesApplied(0)
+                  }}
+                  style={{
+                    flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 4,
+                    fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+                    color: 'var(--text-primary)', background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer', transition: 'all 150ms ease',
+                  }}
+                >
+                  Scan another {'\u2192'}
+                </button>
+              </div>
+
+              {/* Legacy bottom actions */}
+              <div className="action-bar-mobile" style={{
+                display: 'none',
               }}>
                 <a
                   href="/report"
