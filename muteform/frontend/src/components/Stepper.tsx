@@ -3,7 +3,6 @@
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { loadSession } from '@/lib/session'
-import ThemeToggle from '@/components/ThemeToggle'
 
 const STEPS = [
   { label: 'Import', href: '/import', step: 0 },
@@ -17,14 +16,11 @@ const PRODUCT_PATHS = ['/import', '/rules', '/scan', '/report', '/integrate']
 export default function Stepper() {
   const pathname = usePathname()
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
-  const [userName, setUserName] = useState<string | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     const session = loadSession()
     setCompletedSteps(session.completedSteps || [])
-    if (session.user?.name) {
-      setUserName(session.user.name)
-    }
   }, [])
 
   if (!PRODUCT_PATHS.some(p => pathname === p)) return null
@@ -32,37 +28,24 @@ export default function Stepper() {
   const currentIdx = STEPS.findIndex(s => pathname === s.href)
 
   return (
-    <div style={{
+    <nav style={{
       display: 'flex',
       alignItems: 'center',
-      padding: '12px 24px',
+      justifyContent: 'space-between',
+      padding: '0 20px',
+      height: 56,
       background: 'var(--surface)',
       borderBottom: '1px solid var(--border)',
-      position: 'relative',
-      zIndex: 50,
-      fontFamily: 'var(--font-sans)',
+      position: 'sticky',
+      top: 0,
+      zIndex: 100,
+      fontFamily: 'var(--font-mono)',
     }}>
-      <style>{`
-        .stepper-steps-scroll {
-          display: flex;
-          align-items: center;
-          flex: 1;
-          justify-content: center;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: none;
-        }
-        .stepper-steps-scroll::-webkit-scrollbar { display: none; }
-        @media (max-width: 640px) {
-          .stepper-steps-scroll { justify-content: flex-start; }
-        }
-      `}</style>
 
       {/* Logo */}
       <a href="/" style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        textDecoration: 'none', marginRight: 24, flexShrink: 0,
-        transition: 'opacity 150ms ease',
+        textDecoration: 'none', flexShrink: 0,
       }}>
         <div style={{
           width: 26, height: 26, borderRadius: 4,
@@ -71,21 +54,20 @@ export default function Stepper() {
         }}>
           <span style={{
             fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 700,
-            color: 'var(--bg)',
+            color: '#fff',
           }}>M</span>
         </div>
         <span style={{
-          fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+          fontFamily: 'var(--font-heading)', fontSize: 15, fontWeight: 700,
           color: 'var(--text-primary)', letterSpacing: '-0.01em',
         }}>muteform</span>
       </a>
 
-      {/* Steps */}
-      <div className="stepper-steps-scroll">
+      {/* Steps (desktop) */}
+      <div className="nav-links" style={{ gap: 4, flex: 1, justifyContent: 'center' }}>
         {STEPS.map((step, i) => {
           const isActive = i === currentIdx
           const isCompleted = completedSteps.includes(i)
-          const isFuture = !isActive && !isCompleted
           const isClickable = isCompleted || isActive
 
           return (
@@ -94,38 +76,36 @@ export default function Stepper() {
                 <a
                   href={step.href}
                   style={{
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: 13,
-                    fontWeight: isActive ? 600 : 500,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    fontWeight: isActive ? 600 : 400,
                     textDecoration: 'none',
                     color: isActive ? 'var(--text-primary)' : 'var(--accent)',
-                    padding: '6px 12px',
+                    padding: '6px 10px',
                     borderRadius: 4,
                     whiteSpace: 'nowrap',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 7,
-                    transition: 'all 150ms ease',
+                    gap: 6,
                   }}
                 >
                   {isCompleted ? (
                     <span style={{
-                      width: 20, height: 20, borderRadius: '50%',
+                      width: 18, height: 18, borderRadius: '50%',
                       background: 'var(--accent)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0,
                     }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     </span>
                   ) : (
                     <span style={{
-                      width: 20, height: 20, borderRadius: '50%',
+                      width: 18, height: 18, borderRadius: '50%',
                       border: '2px solid var(--accent)',
-                      background: 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
+                      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
                       color: 'var(--accent)',
                       flexShrink: 0,
                     }}>
@@ -136,25 +116,22 @@ export default function Stepper() {
                 </a>
               ) : (
                 <span style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: 13,
-                  fontWeight: 500,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
                   color: 'var(--text-muted)',
-                  padding: '6px 12px',
-                  borderRadius: 4,
+                  padding: '6px 10px',
                   whiteSpace: 'nowrap',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 7,
-                  opacity: isFuture ? 0.7 : 1,
-                  cursor: 'default',
+                  gap: 6,
+                  opacity: 0.6,
                 }}>
                   <span style={{
-                    width: 20, height: 20, borderRadius: '50%',
+                    width: 18, height: 18, borderRadius: '50%',
                     background: 'var(--surface-elevated)',
                     border: '1px solid var(--border)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
                     color: 'var(--text-muted)',
                     flexShrink: 0,
                   }}>
@@ -164,12 +141,11 @@ export default function Stepper() {
                 </span>
               )}
 
-              {/* Connection line between steps */}
+              {/* Connection line */}
               {i < STEPS.length - 1 && (
                 <div style={{
-                  width: 32, height: 1, margin: '0 2px',
+                  width: 24, height: 1, margin: '0 2px',
                   background: isCompleted ? 'var(--accent)' : 'var(--border)',
-                  transition: 'background 400ms ease',
                 }} />
               )}
             </div>
@@ -177,22 +153,31 @@ export default function Stepper() {
         })}
       </div>
 
-      {/* Right side: user name + ThemeToggle */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        marginLeft: 16, flexShrink: 0,
-      }}>
-        {userName && (
-          <span style={{
-            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
-            color: 'var(--text-secondary)',
-            whiteSpace: 'nowrap',
-          }}>
-            {userName}
-          </span>
-        )}
-        <ThemeToggle />
+      {/* Get help (desktop) */}
+      <div className="nav-links" style={{ gap: 10, flexShrink: 0 }}>
+        <a href="/integrate" style={{
+          fontFamily: 'var(--font-mono)', fontSize: 12,
+          color: 'var(--text-secondary)', textDecoration: 'none',
+        }}>Get help</a>
       </div>
-    </div>
+
+      {/* Hamburger (mobile) */}
+      <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
+      </button>
+
+      {/* Mobile menu — uses global .nav-mobile-menu from globals.css */}
+      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
+        {STEPS.map(step => (
+          <a key={step.label} href={step.href} onClick={() => setMobileMenuOpen(false)}>
+            {step.label}
+          </a>
+        ))}
+        <a href="/integrate" onClick={() => setMobileMenuOpen(false)}>Get help</a>
+      </div>
+    </nav>
   )
 }
