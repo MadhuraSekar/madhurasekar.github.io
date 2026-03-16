@@ -303,8 +303,8 @@ export default function DemoPage() {
       setConfig(policy)
       const result = scanArtifact(fixture.artifact, policy)
       setScanResult(result)
-      setScore(result.score)
       const initialReport = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, result, null, policy)
+      setScore(initialReport.overallScore)
       setReport(initialReport)
       setPhase('scanned')
     } catch (e) { console.error('Demo scan failed:', e) }
@@ -316,8 +316,8 @@ export default function DemoPage() {
     if (!fixture) return
     const result = rewriteArtifact(fixture.artifact, scanResult.violations, config)
     setRewriteResult(result)
-    setScore(result.afterScore)
     const govReport = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, scanResult, result, config)
+    setScore(govReport.afterScore)
     setReport(govReport)
     setPhase('governed')
     setDiffTab('original')

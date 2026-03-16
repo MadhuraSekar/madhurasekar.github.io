@@ -148,6 +148,39 @@ function Toggle({
   )
 }
 
+function ProgressStepper({ current }: { current: number }) {
+  const steps = [
+    { label: 'Import', href: '/import' },
+    { label: 'Governance Rules', href: '/governance' },
+    { label: 'Connect MCP', href: '/integrate' },
+    { label: 'Scan', href: '/demo' },
+  ]
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 0, marginBottom: 32,
+      overflowX: 'auto', padding: '4px 0',
+    }}>
+      {steps.map((step, i) => (
+        <div key={step.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <a href={step.href} style={{
+            fontFamily: mono, fontSize: 11, fontWeight: 600, textDecoration: 'none',
+            color: i === current ? '#000' : i < current ? T.green : T.dim,
+            background: i === current ? T.green : i < current ? T.greenDim : 'transparent',
+            padding: '5px 12px', borderRadius: 6,
+            border: i < current ? `1px solid ${T.green}33` : '1px solid transparent',
+            whiteSpace: 'nowrap',
+          }}>
+            {i < current ? '✓ ' : ''}{step.label}
+          </a>
+          {i < steps.length - 1 && (
+            <div style={{ width: 24, height: 1, background: i < current ? T.green : T.border, margin: '0 4px' }} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function InputField({
   value,
   onChange,
@@ -563,6 +596,8 @@ export default function GovernancePage() {
       {/* page body */}
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 96px' }}>
 
+        <ProgressStepper current={1} />
+
         {/* page title */}
         <div style={{ marginBottom: 40 }}>
           <h1
@@ -580,6 +615,26 @@ export default function GovernancePage() {
             Baseline from imported design system, rules engine, and design principles.
           </p>
         </div>
+
+        {/* Baseline loaded banner */}
+        {ds && (
+          <div style={{
+            marginBottom: 32, padding: '16px 20px',
+            background: T.greenDim, border: `1px solid ${T.green}33`,
+            borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <span style={{ color: '#000', fontWeight: 700, fontSize: 14 }}>✓</span>
+            </div>
+            <div style={{ fontFamily: syne, fontWeight: 700, fontSize: 14, color: T.green }}>
+              Baseline: {ds.sourceLabel} — loaded
+            </div>
+          </div>
+        )}
 
         {/* ======================================================
             SECTION A — Baseline (Imported Design System)
@@ -1347,6 +1402,34 @@ export default function GovernancePage() {
             + Add Principle
           </button>
         </section>
+
+        {/* ======================================================
+            CTA — Connect Claude Code
+        ====================================================== */}
+        <div style={{
+          marginTop: 48, padding: '32px 24px',
+          background: T.surface, border: `1px solid ${T.border}`,
+          borderRadius: 12, textAlign: 'center',
+        }}>
+          <div style={{ fontFamily: syne, fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+            Rules configured. Connect Claude Code.
+          </div>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T.muted, marginBottom: 24 }}>
+            Wire the MCP endpoint so every generated component is scanned and patched automatically.
+          </p>
+          <a
+            href="/integrate"
+            style={{
+              fontFamily: mono, fontSize: 14, fontWeight: 700,
+              color: '#000', background: T.green,
+              padding: '14px 32px', borderRadius: 8,
+              textDecoration: 'none', display: 'inline-block',
+              letterSpacing: '0.02em',
+            }}
+          >
+            Connect Claude Code →
+          </a>
+        </div>
 
       </main>
     </div>
