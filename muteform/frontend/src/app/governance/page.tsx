@@ -859,6 +859,153 @@ export default function GovernancePage() {
           </button>
         </section>
 
+        {/* ============================== SECTION 2.5: WCAG CONTRAST CHECK ============================== */}
+        <section style={{ marginBottom: 56 }}>
+          <SectionHeader>Accessibility Check</SectionHeader>
+
+          <Card>
+            {/* Test case: #3478F6 on white */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ fontFamily: syne, fontSize: 14, fontWeight: 700, color: T.text }}>
+                WCAG AA Contrast Verification
+              </div>
+
+              {/* Color pair display */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: 8,
+                    background: '#3478F6', border: `1px solid ${T.border2}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: '#fff' }}>Aa</span>
+                  </div>
+                  <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>#3478F6</span>
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>on</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: 8,
+                    background: '#FFFFFF', border: `1px solid ${T.border2}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: '#3478F6' }}>Aa</span>
+                  </div>
+                  <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>#FFFFFF</span>
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: T.amber, marginLeft: 8 }}>
+                  3.1:1
+                </div>
+              </div>
+
+              {/* Contrast ratio meter bar */}
+              <div style={{ position: 'relative', height: 24, borderRadius: 6, overflow: 'hidden', background: T.surface2 }}>
+                {/* Scale markers */}
+                <div style={{
+                  position: 'absolute', left: '33.3%', top: 0, bottom: 0,
+                  borderLeft: `1px dashed ${T.border2}`, zIndex: 2,
+                }} />
+                <div style={{
+                  position: 'absolute', left: '60%', top: 0, bottom: 0,
+                  borderLeft: `1px dashed ${T.border2}`, zIndex: 2,
+                }} />
+                {/* Bar fill: 3.1 / 7.0 scale = ~44% but we use a 1-7 range */}
+                <div style={{
+                  position: 'absolute', left: 0, top: 0, bottom: 0,
+                  width: `${(3.1 / 7) * 100}%`,
+                  background: `linear-gradient(90deg, ${T.red}, ${T.amber})`,
+                  borderRadius: 6,
+                  transition: 'width 0.5s ease',
+                }} />
+                {/* Labels */}
+                <div style={{
+                  position: 'absolute', left: '33.3%', top: -1, transform: 'translateX(-50%)',
+                  fontFamily: mono, fontSize: 8, color: T.muted,
+                }}>3:1</div>
+                <div style={{
+                  position: 'absolute', left: '60%', bottom: -1, transform: 'translateX(-50%)',
+                  fontFamily: mono, fontSize: 8, color: T.muted,
+                }}>4.5:1</div>
+              </div>
+
+              {/* FAIL badge */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 14px', borderRadius: 8,
+                background: T.redDim, border: `1px solid ${T.red}33`,
+              }}>
+                <span style={{
+                  fontFamily: mono, fontSize: 11, fontWeight: 800,
+                  color: T.red, background: `${T.red}22`,
+                  padding: '2px 10px', borderRadius: 4,
+                  border: `1px solid ${T.red}44`,
+                  letterSpacing: '0.1em',
+                }}>FAIL</span>
+                <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>
+                  Minimum 4.5:1 required for WCAG AA
+                </span>
+              </div>
+
+              {/* Suggested fix */}
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 12,
+                padding: '14px', borderRadius: 8,
+                background: T.greenDim, border: `1px solid ${T.green}33`,
+              }}>
+                <div style={{ fontFamily: mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, color: T.green }}>
+                  Suggested Fix
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                  {/* Before swatch */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 6,
+                      background: '#3478F6', border: `2px solid ${T.red}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontFamily: mono, fontSize: 10, color: '#fff' }}>Aa</span>
+                    </div>
+                    <span style={{ fontFamily: mono, fontSize: 9, color: T.red }}>#3478F6</span>
+                    <span style={{ fontFamily: mono, fontSize: 9, color: T.muted }}>3.1:1</span>
+                  </div>
+
+                  <span style={{ fontFamily: mono, fontSize: 18, color: T.dim }}>&rarr;</span>
+
+                  {/* After swatch */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 6,
+                      background: '#0055FF', border: `2px solid ${T.green}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontFamily: mono, fontSize: 10, color: '#fff' }}>Aa</span>
+                    </div>
+                    <span style={{ fontFamily: mono, fontSize: 9, color: T.green }}>#0055FF</span>
+                    <span style={{ fontFamily: mono, fontSize: 9, color: T.green }}>5.2:1</span>
+                  </div>
+
+                  {/* Second meter bar showing improvement */}
+                  <div style={{ flex: 1, minWidth: 120 }}>
+                    <div style={{ position: 'relative', height: 16, borderRadius: 4, overflow: 'hidden', background: T.surface2 }}>
+                      <div style={{
+                        position: 'absolute', left: 0, top: 0, bottom: 0,
+                        width: `${(5.2 / 7) * 100}%`,
+                        background: `linear-gradient(90deg, ${T.green}99, ${T.green})`,
+                        borderRadius: 4,
+                      }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                      <span style={{ fontFamily: mono, fontSize: 8, color: T.muted }}>1:1</span>
+                      <span style={{ fontFamily: mono, fontSize: 8, color: T.green, fontWeight: 700 }}>5.2:1 PASS</span>
+                      <span style={{ fontFamily: mono, fontSize: 8, color: T.muted }}>7:1</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </section>
+
         {/* ============================== SECTION 3: CONTEXT RULES ============================== */}
         <section>
           <SectionHeader>Context Rules</SectionHeader>

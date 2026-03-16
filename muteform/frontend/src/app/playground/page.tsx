@@ -255,6 +255,10 @@ export default function PlaygroundPage() {
   const [error, setError] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
   const [fixing, setFixing] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [apiResponse, setApiResponse] = useState<string | null>(null)
+  const [apiLoading, setApiLoading] = useState(false)
+  const [apiExpanded, setApiExpanded] = useState(false)
 
   const handleScan = useCallback(() => {
     setScanning(true)
@@ -282,7 +286,7 @@ export default function PlaygroundPage() {
     }, 50)
   }, [yamlText, selectedFixture])
 
-  const handleFixAll = useCallback(() => {
+  const handleApplyGovernance = useCallback(() => {
     if (!scanResult) return
     setFixing(true)
 
@@ -300,6 +304,38 @@ export default function PlaygroundPage() {
       }
     }, 50)
   }, [scanResult, yamlText, selectedFixture])
+
+  const handleCopyGoverned = useCallback(() => {
+    if (!rewriteResult) return
+    navigator.clipboard.writeText(JSON.stringify(rewriteResult.rewrittenArtifact, null, 2))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [rewriteResult])
+
+  const handleApiCall = useCallback(async () => {
+    setApiLoading(true)
+    setApiResponse(null)
+    const fixture = getFixture(selectedFixture)
+    if (!fixture) return
+    try {
+      const res = await fetch('https://muteform-production.up.railway.app/v1/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artifact: fixture.artifact,
+          config: yamlText,
+        }),
+      })
+      const json = await res.json()
+      setApiResponse(JSON.stringify(json, null, 2))
+      setApiExpanded(true)
+    } catch (e: any) {
+      setApiResponse(`Error: ${e.message || 'Network request failed'}`)
+      setApiExpanded(true)
+    } finally {
+      setApiLoading(false)
+    }
+  }, [selectedFixture, yamlText])
 
   const fixture = getFixture(selectedFixture)
   const violationNodeIds = new Set(scanResult?.violations.map(v => v.nodeId) || [])
@@ -618,137 +654,276 @@ export default function PlaygroundPage() {
                 </div>
               )}
 
-              {/* FIX ALL button */}
+              {/* APPLY GOVERNANCE button */}
               {scanResult.violations.length > 0 && !rewriteResult && (
                 <button
-                  onClick={handleFixAll}
+                  onClick={handleApplyGovernance}
                   disabled={fixing}
                   style={{
-                    width: '100%', padding: '12px 0',
-                    background: fixing ? T.dim : T.green,
+                    width: '100%', padding: '14px 0',
+                    background: fixing ? T.dim : `linear-gradient(135deg, ${T.green}, #00c070)`,
                     border: 'none', borderRadius: 8,
-                    fontFamily: mono, fontSize: 13, fontWeight: 700,
-                    color: T.bg, cursor: fixing ? 'wait' : 'pointer',
+                    fontFamily: mono, fontSize: 14, fontWeight: 700,
+                    color: fixing ? T.muted : T.bg,
+                    cursor: fixing ? 'wait' : 'pointer',
                     letterSpacing: 1.5, textTransform: 'uppercase',
                     transition: 'all 0.2s',
+                    boxShadow: fixing ? 'none' : `0 0 24px ${T.greenGlow}`,
                   }}
-                >{fixing ? 'Applying fixes...' : 'Fix All'}</button>
+                >{fixing ? 'Applying governance...' : 'Apply Governance'}</button>
               )}
 
-              {/* Rewrite result */}
-              {rewriteResult && fixture && (
-                <div style={{
-                  display: 'flex', flexDirection: 'column', gap: 16,
-                }}>
-                  {/* Summary */}
-                  <div style={{
-                    fontFamily: mono, fontSize: 12, color: T.text,
-                    background: T.greenDim, border: `1px solid ${T.green}33`,
-                    borderRadius: 8, padding: '12px 16px',
-                    lineHeight: 1.6,
-                  }}>
-                    <strong style={{ color: T.green }}>{autoFixCount}</strong> violation{autoFixCount !== 1 ? 's' : ''} fixed
-                    {manualCount > 0 && (
-                      <>, <strong style={{ color: T.amber }}>{manualCount}</strong> require human review</>
-                    )}
-                  </div>
+              {/* Governance result: visual before/after cards */}
+              {rewriteResult && fixture && (() => {
+                // Group violations by category for visual cards
+                const colorViolations = scanResult.violations.filter(v => v.property.startsWith('colors.'))
+                const spacingViolations = scanResult.violations.filter(v => v.property.startsWith('spacing.'))
+                const typographyViolations = scanResult.violations.filter(v => v.property.startsWith('typography.') || v.property === 'contrast.ratio')
+                const componentViolations = scanResult.violations.filter(v => v.property.startsWith('component.'))
+                const layoutViolations = scanResult.violations.filter(v => v.property.startsWith('layout.'))
 
-                  {/* Before/After wireframes */}
-                  <div style={{
-                    fontFamily: mono, fontSize: 11, color: T.muted,
-                    textTransform: 'uppercase', letterSpacing: 2,
-                  }}>Visual Comparison</div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <WireframeView
-                      wireframe={fixture.wireframe}
-                      violationNodeIds={violationNodeIds}
-                      fixedNodeIds={new Set()}
-                      label="Before"
-                    />
-                    <WireframeView
-                      wireframe={fixture.wireframe}
-                      violationNodeIds={new Set()}
-                      fixedNodeIds={fixedNodeIds}
-                      label="After"
-                    />
-                  </div>
+                const cardStyle: React.CSSProperties = {
+                  background: T.surface, border: `1px solid ${T.border}`,
+                  borderRadius: 8, padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
+                }
+                const labelStyle: React.CSSProperties = {
+                  fontFamily: mono, fontSize: 10, textTransform: 'uppercase' as const,
+                  letterSpacing: 1.5, color: T.muted,
+                }
+                const beforeAfterRow: React.CSSProperties = {
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }
 
-                  {/* Applied fixes list */}
-                  <div style={{
-                    fontFamily: mono, fontSize: 11, color: T.muted,
-                    textTransform: 'uppercase', letterSpacing: 2,
-                  }}>Applied Fixes ({rewriteResult.appliedFixes.length})</div>
-                  {rewriteResult.appliedFixes.map((fix, i) => (
-                    <div key={`${fix.ruleId}-${fix.nodeId}-${i}`} style={{
-                      background: T.surface, border: `1px solid ${T.border}`,
-                      borderRadius: 6, padding: '10px 12px',
-                      display: 'flex', flexDirection: 'column', gap: 6,
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {/* Summary */}
+                    <div style={{
+                      fontFamily: mono, fontSize: 12, color: T.text,
+                      background: T.greenDim, border: `1px solid ${T.green}33`,
+                      borderRadius: 8, padding: '12px 16px', lineHeight: 1.6,
                     }}>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                      }}>
-                        <span style={{
-                          fontFamily: mono, fontSize: 10,
-                          color: T.green, background: T.greenDim,
-                          padding: '2px 8px', borderRadius: 4,
-                        }}>FIXED</span>
-                        <span style={{
-                          fontFamily: mono, fontSize: 10,
-                          color: T.blue, background: T.blueDim,
-                          padding: '2px 8px', borderRadius: 4,
-                        }}>{fix.ruleId}</span>
-                        <span style={{
-                          fontFamily: mono, fontSize: 10, color: T.muted,
-                        }}>{fix.nodeId}</span>
-                      </div>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                      }}>
-                        <ValuePreview property={fix.property} value={fix.currentValue} />
-                        <span style={{
-                          fontFamily: mono, fontSize: 12, color: T.dim,
-                        }}>&rarr;</span>
-                        <ValuePreview property={fix.property} value={fix.suggestedValue} />
-                      </div>
+                      <strong style={{ color: T.green }}>{autoFixCount}</strong> violation{autoFixCount !== 1 ? 's' : ''} governed
+                      {manualCount > 0 && (
+                        <>, <strong style={{ color: T.amber }}>{manualCount}</strong> require human review</>
+                      )}
                     </div>
-                  ))}
 
-                  {/* Manual review items */}
-                  {manualCount > 0 && (
-                    <>
-                      <div style={{
-                        fontFamily: mono, fontSize: 11, color: T.muted,
-                        textTransform: 'uppercase', letterSpacing: 2,
-                      }}>Requires Manual Review ({manualCount})</div>
-                      {scanResult.violations.filter(v => !v.autoFixAvailable).map((v, i) => (
-                        <div key={`manual-${v.ruleId}-${v.nodeId}-${i}`} style={{
-                          background: T.surface, border: `1px solid ${T.amber}33`,
-                          borderRadius: 6, padding: '10px 12px',
-                          display: 'flex', flexDirection: 'column', gap: 6,
-                        }}>
-                          <div style={{
-                            display: 'flex', alignItems: 'center', gap: 6,
-                          }}>
-                            <span style={{
-                              fontFamily: mono, fontSize: 10, fontWeight: 700,
-                              color: T.amber, background: T.amberDim,
-                              padding: '2px 8px', borderRadius: 4,
-                            }}>MANUAL</span>
-                            <span style={{
-                              fontFamily: mono, fontSize: 10,
-                              color: T.blue, background: T.blueDim,
-                              padding: '2px 8px', borderRadius: 4,
-                            }}>{v.ruleId}</span>
+                    {/* Color Card */}
+                    {colorViolations.length > 0 && (
+                      <div style={cardStyle}>
+                        <div style={labelStyle}>Color Governance</div>
+                        {colorViolations.map((v, i) => (
+                          <div key={i} style={beforeAfterRow}>
+                            <div style={{
+                              width: 32, height: 32, borderRadius: 6,
+                              background: typeof v.currentValue === 'string' ? v.currentValue : T.red,
+                              border: `2px solid ${T.red}`,
+                              flexShrink: 0,
+                            }} />
+                            <span style={{ fontFamily: mono, fontSize: 18, color: T.dim }}>&rarr;</span>
+                            <div style={{
+                              width: 32, height: 32, borderRadius: 6,
+                              background: typeof v.suggestedValue === 'string' ? v.suggestedValue : T.green,
+                              border: `2px solid ${T.green}`,
+                              flexShrink: 0,
+                            }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {String(v.currentValue)} &rarr; {String(v.suggestedValue)}
+                              </div>
+                            </div>
                           </div>
-                          <div style={{
-                            fontFamily: mono, fontSize: 11, color: T.muted,
-                          }}>{v.nodePath}</div>
-                          <div style={{
-                            fontFamily: sans, fontSize: 12, color: T.muted,
-                          }}>{v.message}</div>
-                        </div>
-                      ))}
-                    </>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Spacing Card */}
+                    {spacingViolations.length > 0 && (
+                      <div style={cardStyle}>
+                        <div style={labelStyle}>Spacing Governance</div>
+                        {spacingViolations.map((v, i) => {
+                          const curNum = parseInt(String(v.currentValue), 10) || 10
+                          const sugNum = parseInt(String(v.suggestedValue), 10) || 10
+                          return (
+                            <div key={i} style={beforeAfterRow}>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <div style={{
+                                  height: 10, borderRadius: 3,
+                                  width: `${Math.min(curNum * 2, 100)}%`,
+                                  background: T.red, border: `1px solid ${T.red}`,
+                                  transition: 'width 0.3s',
+                                }} />
+                                <div style={{
+                                  height: 10, borderRadius: 3,
+                                  width: `${Math.min(sugNum * 2, 100)}%`,
+                                  background: T.green, border: `1px solid ${T.green}`,
+                                  transition: 'width 0.3s',
+                                }} />
+                              </div>
+                              <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, whiteSpace: 'nowrap' }}>
+                                {String(v.currentValue)} &rarr; {String(v.suggestedValue)}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Typography Card */}
+                    {typographyViolations.length > 0 && (
+                      <div style={cardStyle}>
+                        <div style={labelStyle}>Typography Governance</div>
+                        {typographyViolations.map((v, i) => (
+                          <div key={i} style={beforeAfterRow}>
+                            <div style={{
+                              padding: '4px 10px', borderRadius: 6,
+                              background: T.redDim, border: `1px solid ${T.red}44`,
+                            }}>
+                              <span style={{ fontFamily: sans, fontSize: 18, fontWeight: 600, color: T.red }}>Aa</span>
+                              <div style={{ fontFamily: mono, fontSize: 9, color: T.red, marginTop: 2 }}>{String(v.currentValue)}</div>
+                            </div>
+                            <span style={{ fontFamily: mono, fontSize: 18, color: T.dim }}>&rarr;</span>
+                            <div style={{
+                              padding: '4px 10px', borderRadius: 6,
+                              background: T.greenDim, border: `1px solid ${T.green}44`,
+                            }}>
+                              <span style={{ fontFamily: sans, fontSize: 18, fontWeight: 600, color: T.green }}>Aa</span>
+                              <div style={{ fontFamily: mono, fontSize: 9, color: T.green, marginTop: 2 }}>{String(v.suggestedValue)}</div>
+                            </div>
+                            <div style={{ flex: 1, fontFamily: mono, fontSize: 10, color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {v.ruleId}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Component Card */}
+                    {componentViolations.length > 0 && (
+                      <div style={cardStyle}>
+                        <div style={labelStyle}>Component Governance</div>
+                        {componentViolations.map((v, i) => (
+                          <div key={i} style={beforeAfterRow}>
+                            <span style={{
+                              fontFamily: mono, fontSize: 11, fontWeight: 700,
+                              padding: '4px 12px', borderRadius: 6,
+                              background: T.redDim, color: T.red,
+                              border: `1px solid ${T.red}44`,
+                            }}>{String(v.currentValue)}</span>
+                            <span style={{ fontFamily: mono, fontSize: 18, color: T.dim }}>&rarr;</span>
+                            <span style={{
+                              fontFamily: mono, fontSize: 11, fontWeight: 700,
+                              padding: '4px 12px', borderRadius: 6,
+                              background: T.greenDim, color: T.green,
+                              border: `1px solid ${T.green}44`,
+                            }}>{String(v.suggestedValue)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Layout Card */}
+                    {layoutViolations.length > 0 && (
+                      <div style={cardStyle}>
+                        <div style={labelStyle}>Layout Governance</div>
+                        {layoutViolations.map((v, i) => {
+                          const curCols = parseInt(String(v.currentValue), 10) || 5
+                          const sugCols = parseInt(String(v.suggestedValue), 10) || 12
+                          return (
+                            <div key={i} style={beforeAfterRow}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${curCols}, 1fr)`, gap: 2, marginBottom: 4 }}>
+                                  {Array.from({ length: curCols }).map((_, j) => (
+                                    <div key={j} style={{ height: 12, borderRadius: 2, background: T.red, opacity: 0.6 }} />
+                                  ))}
+                                </div>
+                                <div style={{ fontFamily: mono, fontSize: 9, color: T.red }}>{String(v.currentValue)}</div>
+                              </div>
+                              <span style={{ fontFamily: mono, fontSize: 18, color: T.dim }}>&rarr;</span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${sugCols}, 1fr)`, gap: 2, marginBottom: 4 }}>
+                                  {Array.from({ length: sugCols }).map((_, j) => (
+                                    <div key={j} style={{ height: 12, borderRadius: 2, background: T.green, opacity: 0.6 }} />
+                                  ))}
+                                </div>
+                                <div style={{ fontFamily: mono, fontSize: 9, color: T.green }}>{String(v.suggestedValue)}</div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Manual review items */}
+                    {manualCount > 0 && (
+                      <div style={{
+                        fontFamily: mono, fontSize: 11, color: T.amber,
+                        background: T.amberDim, border: `1px solid ${T.amber}33`,
+                        borderRadius: 8, padding: '10px 14px',
+                      }}>
+                        {manualCount} violation{manualCount !== 1 ? 's' : ''} require human review (layout grid)
+                      </div>
+                    )}
+
+                    {/* Copy governed output button */}
+                    <button
+                      onClick={handleCopyGoverned}
+                      style={{
+                        width: '100%', padding: '12px 0',
+                        background: copied ? T.green : T.surface,
+                        border: `1px solid ${copied ? T.green : T.border}`,
+                        borderRadius: 8,
+                        fontFamily: mono, fontSize: 12, fontWeight: 700,
+                        color: copied ? T.bg : T.text,
+                        cursor: 'pointer',
+                        letterSpacing: 1, textTransform: 'uppercase',
+                        transition: 'all 0.2s',
+                      }}
+                    >{copied ? 'Copied!' : 'Copy Governed Output'}</button>
+                  </div>
+                )
+              })()}
+
+              {/* Railway API panel */}
+              {scanResult && (
+                <div style={{
+                  background: T.surface, border: `1px solid ${T.border}`,
+                  borderRadius: 8, overflow: 'hidden',
+                }}>
+                  <button
+                    onClick={apiResponse ? () => setApiExpanded(!apiExpanded) : handleApiCall}
+                    disabled={apiLoading}
+                    style={{
+                      width: '100%', padding: '10px 14px',
+                      background: 'transparent', border: 'none',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      cursor: apiLoading ? 'wait' : 'pointer',
+                    }}
+                  >
+                    <span style={{
+                      fontFamily: mono, fontSize: 9, width: 12, textAlign: 'center' as const,
+                      color: T.dim, transform: apiExpanded ? 'rotate(90deg)' : 'none',
+                      transition: 'transform 0.15s', display: 'inline-block',
+                    }}>{'\u25B6'}</span>
+                    <span style={{
+                      fontFamily: mono, fontSize: 10, color: T.blue,
+                      letterSpacing: 1, textTransform: 'uppercase' as const,
+                    }}>
+                      {apiLoading ? 'Calling Railway API...' : apiResponse ? 'MCP Response \u2014 what Claude Code receives' : 'Call Railway API (POST /v1/validate)'}
+                    </span>
+                  </button>
+                  {apiExpanded && apiResponse && (
+                    <div style={{
+                      padding: '0 14px 14px',
+                      borderTop: `1px solid ${T.border}`,
+                    }}>
+                      <pre style={{
+                        fontFamily: mono, fontSize: 10, color: T.text,
+                        background: T.bg, padding: 12, borderRadius: 6,
+                        overflow: 'auto', maxHeight: 300, margin: '10px 0 0',
+                        lineHeight: 1.6, whiteSpace: 'pre-wrap',
+                      }}>{apiResponse}</pre>
+                    </div>
                   )}
                 </div>
               )}

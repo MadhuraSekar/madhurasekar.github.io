@@ -8,6 +8,7 @@ import type {
   TokenDefinitions,
 } from './types'
 import { contrastRatio, deltaE2000, findNearestColor, adjustForegroundForContrast } from './color'
+import yaml from 'js-yaml'
 
 /** Flatten nested color tokens into a flat Record<string, string> */
 export function flattenColors(obj: any, prefix = ''): Record<string, string> {
@@ -29,8 +30,6 @@ export function loadConfig(yamlString: string): MuteformConfig {
   try {
     return JSON.parse(yamlString) as MuteformConfig
   } catch {
-    // Use js-yaml
-    const yaml = require('js-yaml')
     const raw = yaml.load(yamlString) as any
     return normalizeConfig(raw)
   }
