@@ -1,31 +1,27 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { validate, calculateScore, remediate } from '@/lib/engine'
-import type { MuteformConfig, InterfaceDefinition, Violation, ValidationResult } from '@/lib/engine'
-import {
-  ORIGINAL_ARTIFACT,
-  GOVERNED_ARTIFACT,
-  DESIGN_PRINCIPLES,
-  type DesignPrinciple,
-} from '@/lib/engine/hardcoded-scan'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
+import type { MuteformConfig, Violation, ScanResult, RewriteResult } from '@/lib/engine'
+import { FIXTURES, getFixture, type FixtureEntry } from '@/lib/fixtures'
 
 // ─── Design Tokens ───────────────────────────────────────────
-const C = {
-  bg: '#080909', surface: '#0c0d0f', surface2: '#101214',
-  border: '#161819', border2: '#1e2226',
-  blue: '#0055FF', blueDim: '#0a1428',
-  green: '#22c55e', greenDim: '#061a0c', greenBorder: '#0d3018',
-  red: '#ef4444', redDim: '#1a0505',
-  amber: '#f59e0b', amberDim: '#1a1000',
-  text: '#f0f1f3', muted: '#6b7280', dim: '#374151', dim2: '#252b33',
-  textBright: '#f8f9fb',
+const T = {
+  bg: '#08090d', surface: '#0c0e12', surface2: '#111318',
+  border: '#1a1d24', border2: '#252830',
+  green: '#00e087', greenDim: '#00e08718', greenGlow: '#00e08733',
+  red: '#ff4070', redDim: '#ff407018',
+  amber: '#ffb830', amberDim: '#ffb83018',
+  blue: '#4090ff', blueDim: '#4090ff18',
+  muted: '#6b7280', dim: '#3a3f4a',
+  text: '#e8eaf0', textBright: '#f8f9fb',
 }
-const syne = "'Syne', sans-serif"
-const mono = "'DM Mono', monospace"
+const mono = "'JetBrains Mono', 'DM Mono', monospace"
+const sans = "'DM Sans', 'Inter', system-ui, sans-serif"
+const serif = "'Instrument Serif', Georgia, serif"
 
-// ─── Hardcoded YAML (visual only) ───────────────────────────
-const RULESET_YAML = `name: "Acme Design System"
+// ─── Default YAML ────────────────────────────────────────────
+const DEFAULT_YAML = `name: "Acme Design System"
 version: "1.0.0"
 
 tokens:
@@ -34,1135 +30,755 @@ tokens:
     neutral900: "#111111"
     success: "#22c55e"
     warning: "#f59e0b"
+    accent: "#9ca3af"
   spacing:
     scale: [4, 8, 12, 16, 24, 32, 48, 64]
   typography:
-    allowedStyles: [h1, h2, h3, body, body-sm, caption, label]
+    families:
+      display: "Instrument Serif"
+      body: "DM Sans"
+      mono: "JetBrains Mono"
+    allowed_styles: [h1, h2, h3, body, body-sm, caption, label]
   components:
     button:
-      allowedVariants: [primary, secondary]
-      allowedSizes: [sm, md, lg]
+      allowed_variants: [primary, secondary]
+      allowed_sizes: [sm, md, lg]
   layout:
-    allowedGridColumns: [4, 8, 12]
+    grid_columns: [4, 8, 12]
 
 rules:
   - id: "color-token-compliance"
     severity: high
-    description: "All colors must reference approved tokens"
+    description: "All colors must reference approved design tokens"
     check: "color.value IN tokens.colors.*"
     auto_fix: "snap_nearest_delta_e"
   - id: "spacing-scale-compliance"
     severity: medium
-    description: "Spacing values must use approved scale"
+    description: "Spacing values must use the approved scale"
     check: "spacing.value IN tokens.spacing.scale"
     auto_fix: "snap_nearest"
+  - id: "contrast-wcag-aa"
+    severity: critical
+    description: "All text must meet WCAG AA contrast requirements"
+    check: "contrast.ratio >= 4.5"
+    auto_fix: "adjust_foreground"
+  - id: "typography-style-compliance"
+    severity: high
+    description: "Typography styles must be from approved list"
+    check: "typography.style IN tokens.typography.allowed_styles"
+    auto_fix: "snap_nearest_category"
+  - id: "component-variant-compliance"
+    severity: critical
+    description: "Component variants must be from approved list"
+    check: "component.variant IN tokens.components.*.allowed_variants"
+    auto_fix: "snap_nearest_category"
   - id: "layout-grid-compliance"
     severity: medium
     description: "Grid columns must use approved column counts"
-    check: "layout.columns IN tokens.layout.*"
-    auto_fix: false
-  - id: "typography-style-compliance"
-    severity: high
-    description: "Typography styles must use approved styles"
-    check: "typography.style IN tokens.typography.allowedStyles"
-    auto_fix: "snap_nearest"
-  - id: "component-variant-compliance"
-    severity: critical
-    description: "Component variants must be approved"
-    check: "component.variant IN tokens.components.*.allowedVariants"
-    auto_fix: "snap_nearest"`
+    check: "layout.columns IN tokens.layout.grid_columns"
+    auto_fix: false`
 
-// ─── Config (JS object — source of truth) ────────────────────
-const BASE_CONFIG: MuteformConfig = {
-  name: 'Acme Design System',
-  version: '1.0.0',
-  tokens: {
-    colors: {
-      primary: '#0055FF',
-      neutral900: '#111111',
-      success: '#22c55e',
-      warning: '#f59e0b',
-    },
-    spacing: { scale: [4, 8, 12, 16, 24, 32, 48, 64] },
-    layout: { grid_columns: [4, 8, 12] },
-  },
-  rules: [
-    { id: 'color-token-compliance', severity: 'high', description: 'All colors must reference approved design tokens', check: 'color.value IN tokens.colors.*', auto_fix: 'snap_nearest_delta_e' },
-    { id: 'spacing-scale-compliance', severity: 'medium', description: 'Spacing values must use the approved scale', check: 'spacing.value IN tokens.spacing.scale', auto_fix: 'snap_nearest' },
-    { id: 'layout-grid-compliance', severity: 'medium', description: 'Grid columns must use approved column counts', check: 'layout.columns IN tokens.layout.grid_columns', auto_fix: false },
-  ],
+// ─── Severity helpers ────────────────────────────────────────
+function severityColor(s: string): string {
+  switch (s) {
+    case 'critical': return T.red
+    case 'high': return T.red
+    case 'medium': return T.amber
+    case 'low': return T.muted
+    default: return T.muted
+  }
 }
 
-// ─── Sample Interfaces ───────────────────────────────────────
-const SAMPLE_INTERFACES: Record<string, { label: string; def: InterfaceDefinition }> = {
-  checkout: {
-    label: 'Checkout Flow',
-    def: {
-      nodes: [
-        {
-          id: 'node_1', type: 'interactive', path: 'Checkout Flow / Payment Form / Primary CTA',
-          properties: {
-            colors: { color: '#3478F6' },
-            spacing: { margin: 22 },
-            layout: { columns: 10 },
-          },
-        },
-      ],
-      metadata: { source: 'generic-json', platform: 'web', generatedAt: new Date().toISOString() },
-    },
-  },
-  dashboard: {
-    label: 'SaaS Dashboard',
-    def: {
-      nodes: [
-        {
-          id: 'dash-sidebar', type: 'container', path: 'Dashboard > Sidebar',
-          properties: {
-            colors: { 'background-color': '#1e2230', color: '#c8ccd4' },
-            spacing: { padding: 20, gap: 14 },
-          },
-        },
-        {
-          id: 'dash-action-btn', type: 'interactive', path: 'Dashboard > Header > ActionBtn',
-          properties: {
-            colors: { color: '#ffffff', 'background-color': '#2563EB' },
-            spacing: { padding: 12, margin: 16 },
-          },
-        },
-      ],
-      metadata: { source: 'playground', platform: 'web', generatedAt: new Date().toISOString() },
-    },
-  },
-  onboarding: {
-    label: 'Mobile Onboarding',
-    def: {
-      nodes: [
-        {
-          id: 'onboard-hero', type: 'container', path: 'Onboarding > HeroScreen',
-          properties: {
-            colors: { 'background-color': '#0a1628' },
-            spacing: { padding: 32, gap: 24 },
-          },
-        },
-        {
-          id: 'onboard-next-btn', type: 'interactive', path: 'Onboarding > NextButton',
-          properties: {
-            colors: { color: '#ffffff', 'background-color': '#22c55e' },
-            spacing: { padding: 16, margin: 24 },
-          },
-        },
-      ],
-      metadata: { source: 'playground', platform: 'mobile', generatedAt: new Date().toISOString() },
-    },
-  },
+function severityBg(s: string): string {
+  switch (s) {
+    case 'critical': return T.redDim
+    case 'high': return T.redDim
+    case 'medium': return T.amberDim
+    case 'low': return `${T.muted}18`
+    default: return `${T.muted}18`
+  }
 }
 
-// ─── Manual violations for typography + component (engine can't catch) ──
-function getManualViolations(): Violation[] {
-  return [
-    {
-      ruleId: 'typography-style-compliance',
-      severity: 'high',
-      nodeId: 'node_1',
-      nodePath: 'Checkout Flow / Payment Form / Primary CTA',
-      property: 'typographyStyle',
-      currentValue: 'display-xl',
-      suggestedValue: 'body',
-      message: 'Typography style "display-xl" is not in allowed styles',
-      autoFixAvailable: true,
-      detail: 'The typographyStyle "display-xl" does not exist in the design system. Allowed: [h1, h2, h3, body, body-sm, caption, label].',
-    },
-    {
-      ruleId: 'component-variant-compliance',
-      severity: 'critical',
-      nodeId: 'node_1',
-      nodePath: 'Checkout Flow / Payment Form / Primary CTA',
-      property: 'component.variant',
-      currentValue: 'ghost',
-      suggestedValue: 'primary',
-      message: 'Button variant "ghost" is not allowed',
-      autoFixAvailable: true,
-      detail: 'The button uses variant "ghost" which is not approved. Allowed: [primary, secondary].',
-    },
-  ]
+function scoreColor(score: number): string {
+  if (score < 50) return T.red
+  if (score < 80) return T.amber
+  return T.green
 }
 
-// ─── Principle Icons ──────────────────────────────────────────
-const PRINCIPLE_ICONS: Record<string, string> = {
-  hierarchy: '\u25B2',
-  contrast: '\u25D0',
-  brain: '\u2609',
-  grid: '\u2588',
-}
-
-// ─── Health Score Ring ────────────────────────────────────────
-function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
-  const stroke = 8
-  const radius = (size - stroke) / 2
-  const circ = 2 * Math.PI * radius
-  const [animatedScore, setAnimatedScore] = useState(0)
-  const [offset, setOffset] = useState(circ)
+// ─── Animated Score Ring ─────────────────────────────────────
+function ScoreRing({ score, size = 160 }: { score: number; size?: number }) {
+  const [displayed, setDisplayed] = useState(0)
+  const animRef = useRef<number>()
 
   useEffect(() => {
-    const target = circ - (circ * score) / 100
-    const timer = setTimeout(() => {
-      setOffset(target)
-      setAnimatedScore(score)
-    }, 50)
-    return () => clearTimeout(timer)
-  }, [score, circ])
+    setDisplayed(0)
+    const start = performance.now()
+    const duration = 1200
+    const animate = (now: number) => {
+      const t = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setDisplayed(Math.round(eased * score))
+      if (t < 1) animRef.current = requestAnimationFrame(animate)
+    }
+    animRef.current = requestAnimationFrame(animate)
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current) }
+  }, [score])
 
-  const color = score >= 80 ? C.green : score >= 50 ? C.amber : C.red
+  const r = (size - 16) / 2
+  const circ = 2 * Math.PI * r
+  const offset = circ - (circ * displayed) / 100
+  const color = scoreColor(displayed)
 
   return (
-    <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
+    <div style={{ position: 'relative', width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={C.border2} strokeWidth={stroke} />
-        <circle cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={color} strokeWidth={stroke}
+        <circle cx={size / 2} cy={size / 2} r={r}
+          stroke={T.border} strokeWidth={8} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r}
+          stroke={color} strokeWidth={8} fill="none"
           strokeDasharray={circ} strokeDashoffset={offset}
           strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 1s ease-out, stroke 0.5s ease' }} />
+          style={{ transition: 'stroke 0.3s ease' }} />
       </svg>
       <div style={{
-        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
       }}>
-        <span style={{ fontFamily: mono, fontSize: 36, fontWeight: 700, color: color, lineHeight: 1 }}>
-          {animatedScore}
-        </span>
-        <span style={{ fontFamily: mono, fontSize: 10, color: C.muted, marginTop: 4, letterSpacing: '0.1em' }}>
-          HEALTH
-        </span>
+        <span style={{
+          fontFamily: mono, fontSize: size * 0.3, fontWeight: 700,
+          color, lineHeight: 1,
+        }}>{displayed}</span>
+        <span style={{
+          fontFamily: sans, fontSize: 11, color: T.muted,
+          textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 4,
+        }}>health</span>
       </div>
     </div>
   )
 }
 
-// ─── Visual Violation Card ───────────────────────────────────
-function ViolationCard({ v, isFixed, onFix }: { v: Violation; isFixed: boolean; onFix: () => void }) {
-  const prop = (v.property || v.ruleId || '').toLowerCase()
-  const isColor = prop.includes('color')
-  const isSpacing = prop.includes('spacing') || prop.includes('margin') || prop.includes('padding')
-  const isTypo = prop.includes('typography') || prop.includes('typographystyle')
-  const isComponent = prop.includes('component') || prop.includes('variant')
-  const isLayout = prop.includes('layout') || prop.includes('grid') || prop.includes('column')
-
-  const sevColors: Record<string, string> = { critical: C.red, high: C.red, medium: C.amber, low: C.muted }
-  const sevCol = sevColors[v.severity] || C.muted
-
+// ─── Wireframe Visualizer ────────────────────────────────────
+function WireframeView({
+  wireframe,
+  violationNodeIds,
+  fixedNodeIds,
+  label,
+}: {
+  wireframe: { id: string; label: string; x: number; y: number; w: number; h: number; color: string }[]
+  violationNodeIds: Set<string>
+  fixedNodeIds: Set<string>
+  label: string
+}) {
   return (
     <div style={{
-      background: C.surface, border: `1px solid ${isFixed ? C.greenBorder : C.border}`,
-      borderRadius: 10, padding: 20, transition: 'all 0.3s',
-      opacity: isFixed ? 0.6 : 1,
+      flex: 1, background: T.surface, border: `1px solid ${T.border}`,
+      borderRadius: 8, padding: 12, minWidth: 0,
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{
-            fontFamily: mono, fontSize: 9, letterSpacing: '0.08em', padding: '2px 8px',
-            borderRadius: 3, color: sevCol, background: `${sevCol}18`, border: `1px solid ${sevCol}33`,
-            textTransform: 'uppercase',
-          }}>
-            {v.severity}
-          </span>
-          <span style={{
-            fontFamily: mono, fontSize: 9, letterSpacing: '0.08em', padding: '2px 6px',
-            borderRadius: 3, color: C.green, background: C.greenDim, border: `1px solid ${C.greenBorder}`,
-          }}>
-            {v.autoFixAvailable ? 'HIGH' : 'MANUAL REVIEW'}
-          </span>
-        </div>
-        {isFixed && (
-          <span style={{
-            fontFamily: mono, fontSize: 10, color: C.green, fontWeight: 600,
-          }}>
-            &#10003; FIXED
-          </span>
-        )}
-      </div>
-
-      {/* Node path */}
       <div style={{
-        fontFamily: mono, fontSize: 10, color: C.dim, marginBottom: 12,
-        padding: '4px 8px', background: C.bg, borderRadius: 4, border: `1px solid ${C.border}`,
-      }}>
-        {v.nodePath}
-      </div>
-
-      {/* Visual comparison */}
+        fontFamily: mono, fontSize: 10, color: T.muted,
+        textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8,
+      }}>{label}</div>
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12,
-        alignItems: 'center', marginBottom: 12,
+        position: 'relative', width: '100%', paddingBottom: '85%',
+        background: T.bg, borderRadius: 6, overflow: 'hidden',
       }}>
-        {/* Left: wrong value */}
-        <div style={{
-          padding: 12, borderRadius: 8,
-          background: `${C.red}08`, border: `1px solid ${C.red}22`,
-        }}>
-          {isColor && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 6, backgroundColor: String(v.currentValue),
-                border: `2px solid ${C.red}`, boxShadow: `0 0 8px ${C.red}22`,
-              }} />
-              <div>
-                <div style={{ fontFamily: mono, fontSize: 11, color: C.red, fontWeight: 600 }}>{String(v.currentValue)}</div>
-              </div>
-            </div>
-          )}
-          {isSpacing && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{
-                width: Math.min(Number(v.currentValue) * 3, 140), height: 16, borderRadius: 3,
-                backgroundColor: C.red, opacity: 0.8,
-              }} />
+        {wireframe.map(block => {
+          const isViolation = violationNodeIds.has(block.id)
+          const isFixed = fixedNodeIds.has(block.id)
+          let borderColor = 'transparent'
+          if (isViolation) borderColor = T.red
+          if (isFixed) borderColor = T.green
+          return (
+            <div key={block.id} style={{
+              position: 'absolute',
+              left: `${block.x}%`, top: `${block.y * 1.15}%`,
+              width: `${block.w}%`, height: `${block.h * 1.15}%`,
+              background: isFixed ? `${T.green}18` : isViolation ? `${T.red}18` : `${block.color}40`,
+              border: `2px solid ${borderColor}`,
+              borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.3s ease',
+            }}>
               <span style={{
-                fontFamily: mono, fontSize: 11, color: C.red, fontWeight: 600,
-                textDecoration: 'line-through',
-              }}>
-                {String(v.currentValue)}px
-              </span>
+                fontFamily: mono, fontSize: 8, color: isFixed ? T.green : isViolation ? T.red : T.muted,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                padding: '0 2px',
+              }}>{block.label}</span>
             </div>
-          )}
-          {isTypo && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontFamily: syne, fontSize: 28, color: C.red, fontWeight: 700, lineHeight: 1.1 }}>Aa</span>
-              <span style={{ fontFamily: mono, fontSize: 10, color: C.red, fontWeight: 600 }}>{String(v.currentValue)}</span>
-            </div>
-          )}
-          {isComponent && (
-            <div style={{
-              display: 'inline-flex', padding: '6px 14px', borderRadius: 20,
-              border: `2px solid ${C.red}`, background: 'transparent',
-            }}>
-              <span style={{ fontFamily: mono, fontSize: 12, color: C.red, fontWeight: 600 }}>{String(v.currentValue)}</span>
-            </div>
-          )}
-          {isLayout && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', gap: 2 }}>
-                {Array.from({ length: Math.min(Number(v.currentValue), 12) }).map((_, i) => (
-                  <div key={i} style={{ width: 8, height: 24, borderRadius: 2, backgroundColor: C.red, opacity: 0.6 }} />
-                ))}
-              </div>
-              <span style={{ fontFamily: mono, fontSize: 10, color: C.red, fontWeight: 600 }}>
-                {String(v.currentValue)} cols
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Arrow */}
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: C.surface2, border: `1px solid ${C.border2}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: C.muted, fontSize: 16, fontWeight: 700,
-        }}>
-          {'\u2192'}
-        </div>
-
-        {/* Right: correct value */}
-        <div style={{
-          padding: 12, borderRadius: 8,
-          background: `${C.green}08`, border: `1px solid ${C.green}22`,
-        }}>
-          {isColor && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 6, backgroundColor: String(v.suggestedValue),
-                border: `2px solid ${C.green}`, boxShadow: `0 0 8px ${C.green}22`,
-              }} />
-              <div>
-                <div style={{ fontFamily: mono, fontSize: 11, color: C.green, fontWeight: 600 }}>{String(v.suggestedValue)}</div>
-                <div style={{ fontFamily: mono, fontSize: 9, color: C.muted }}>token: primary</div>
-              </div>
-            </div>
-          )}
-          {isSpacing && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{
-                width: Math.min(Number(v.suggestedValue) * 3, 140), height: 16, borderRadius: 3,
-                backgroundColor: C.green, opacity: 0.8,
-              }} />
-              <span style={{ fontFamily: mono, fontSize: 11, color: C.green, fontWeight: 600 }}>
-                {String(v.suggestedValue)}px (token)
-              </span>
-            </div>
-          )}
-          {isTypo && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontFamily: syne, fontSize: 20, color: C.green, fontWeight: 700, lineHeight: 1.1 }}>Aa</span>
-              <span style={{ fontFamily: mono, fontSize: 10, color: C.green, fontWeight: 600 }}>{String(v.suggestedValue)}</span>
-            </div>
-          )}
-          {isComponent && (
-            <div style={{
-              display: 'inline-flex', padding: '6px 14px', borderRadius: 20,
-              border: `2px solid ${C.green}`, background: `${C.green}18`,
-              boxShadow: `0 0 8px ${C.green}22`,
-            }}>
-              <span style={{ fontFamily: mono, fontSize: 12, color: C.green, fontWeight: 600 }}>{String(v.suggestedValue)}</span>
-            </div>
-          )}
-          {isLayout && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', gap: 2 }}>
-                {Array.from({ length: Math.min(Number(v.suggestedValue), 12) }).map((_, i) => (
-                  <div key={i} style={{ width: 8, height: 24, borderRadius: 2, backgroundColor: C.green, opacity: 0.6 }} />
-                ))}
-              </div>
-              <span style={{ fontFamily: mono, fontSize: 10, color: C.green, fontWeight: 600 }}>
-                {String(v.suggestedValue)} cols
-              </span>
-            </div>
-          )}
-        </div>
+          )
+        })}
       </div>
-
-      {/* Message */}
-      <p style={{ fontFamily: mono, fontSize: 11, color: C.muted, lineHeight: 1.5, margin: 0 }}>
-        {v.message}
-      </p>
-
-      {/* Fix button */}
-      {v.autoFixAvailable && !isFixed && (
-        <button onClick={onFix} style={{
-          marginTop: 12, padding: '6px 16px', borderRadius: 4,
-          background: C.greenDim, color: C.green,
-          fontFamily: mono, fontSize: 10, fontWeight: 600,
-          border: `1px solid ${C.greenBorder}`,
-          cursor: 'pointer', letterSpacing: '0.06em',
-        }}>
-          AUTO-FIX
-        </button>
-      )}
     </div>
   )
 }
 
-// ─── Before/After Fix Card ───────────────────────────────────
-function BeforeAfterCard({ v }: { v: Violation }) {
-  const prop = (v.property || '').toLowerCase()
-  const isColor = prop.includes('color')
-
-  return (
-    <div style={{
-      background: C.surface, border: `1px solid ${C.greenBorder}`,
-      borderRadius: 8, padding: 14, display: 'flex', alignItems: 'center', gap: 14,
-    }}>
-      <span style={{ color: C.green, fontSize: 18 }}>&#10003;</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: mono, fontSize: 10, color: C.muted, marginBottom: 4 }}>
-          {v.nodePath}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Before */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {isColor && (
-              <div style={{ width: 18, height: 18, borderRadius: 3, backgroundColor: String(v.currentValue), border: `1px solid ${C.red}` }} />
-            )}
-            <span style={{ fontFamily: mono, fontSize: 11, color: C.red, textDecoration: 'line-through' }}>
-              {String(v.currentValue)}
-            </span>
-          </div>
-          <span style={{ color: C.dim, fontSize: 12 }}>{'\u2192'}</span>
-          {/* After */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {isColor && (
-              <div style={{ width: 18, height: 18, borderRadius: 3, backgroundColor: String(v.suggestedValue), border: `1px solid ${C.green}` }} />
-            )}
-            <span style={{ fontFamily: mono, fontSize: 11, color: C.green, fontWeight: 600 }}>
-              {String(v.suggestedValue)}
-            </span>
-          </div>
-        </div>
-      </div>
-      <span style={{
-        fontFamily: mono, fontSize: 9, letterSpacing: '0.08em', padding: '2px 6px',
-        borderRadius: 3, color: C.green, background: C.greenDim, border: `1px solid ${C.greenBorder}`,
-      }}>
-        {v.autoFixAvailable ? 'HIGH' : 'MANUAL REVIEW'}
+// ─── Value Preview (colors, spacing, text) ───────────────────
+function ValuePreview({ property, value }: { property: string; value: any }) {
+  const str = typeof value === 'string' ? value : JSON.stringify(value)
+  // Color swatch
+  if (property.startsWith('colors.') && typeof value === 'string' && value.startsWith('#')) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span style={{
+          display: 'inline-block', width: 14, height: 14,
+          background: value, borderRadius: 3,
+          border: `1px solid ${T.border2}`,
+        }} />
+        <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{value}</span>
       </span>
-    </div>
-  )
-}
-
-// ─── Design Principle Card ───────────────────────────────────
-function PrincipleCard({ p }: { p: DesignPrinciple }) {
-  const sevColors: Record<string, string> = { high: C.red, medium: C.amber, low: C.green }
-  const sevCol = sevColors[p.severity] || C.muted
-  const icon = PRINCIPLE_ICONS[p.icon] || '\u2731'
-
-  return (
-    <div style={{
-      background: p.passed ? `${C.green}06` : `${C.blue}06`,
-      border: `1px solid ${p.passed ? C.greenBorder : `${C.blue}22`}`,
-      borderRadius: 10, padding: 20,
-      borderLeft: `3px solid ${p.passed ? C.green : sevCol}`,
-    }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <span style={{
-          width: 32, height: 32, borderRadius: 8,
-          background: p.passed ? C.greenDim : `${C.blue}12`,
-          border: `1px solid ${p.passed ? C.greenBorder : `${C.blue}33`}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, color: p.passed ? C.green : C.blue,
-        }}>
-          {icon}
-        </span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: syne, fontSize: 14, fontWeight: 700, color: C.text }}>
-            {p.title}
-          </div>
-        </div>
-        <span style={{
-          fontFamily: mono, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-          padding: '3px 10px', borderRadius: 4,
-          color: p.passed ? C.green : C.red,
-          background: p.passed ? C.greenDim : C.redDim,
-          border: `1px solid ${p.passed ? C.greenBorder : `${C.red}33`}`,
-        }}>
-          {p.passed ? 'PASS' : 'FAIL'}
-        </span>
-        {!p.passed && (
+    )
+  }
+  // Spacing bar
+  if (property.startsWith('spacing.')) {
+    const num = parseInt(str, 10)
+    if (!isNaN(num)) {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{
-            fontFamily: mono, fontSize: 9, letterSpacing: '0.08em', padding: '2px 8px',
-            borderRadius: 3, color: sevCol, background: `${sevCol}18`, border: `1px solid ${sevCol}33`,
-            textTransform: 'uppercase',
-          }}>
-            {p.severity}
-          </span>
-        )}
-      </div>
-
-      {/* Rule */}
-      <div style={{
-        fontFamily: mono, fontSize: 12, color: C.text, lineHeight: 1.5,
-        padding: '8px 12px', background: C.bg, borderRadius: 6, border: `1px solid ${C.border}`,
-        marginBottom: 10,
-      }}>
-        {p.rule}
-      </div>
-
-      {/* Reason — WHY it matters */}
-      <p style={{ fontFamily: mono, fontSize: 11, color: C.muted, lineHeight: 1.6, margin: '0 0 8px 0' }}>
-        {p.reason}
-      </p>
-
-      {/* Contrast meter bar (for contrast principle) */}
-      {p.contrastRatio && p.contrastRequired && (
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <span style={{ fontFamily: mono, fontSize: 10, color: C.muted }}>Contrast Ratio</span>
-            <span style={{ fontFamily: mono, fontSize: 10, color: C.red }}>
-              {p.contrastRatio}:1 / {p.contrastRequired}:1 required
-            </span>
-          </div>
-          <div style={{
-            height: 8, borderRadius: 4, background: C.border, overflow: 'hidden',
-            position: 'relative',
-          }}>
-            {/* Required threshold marker */}
-            <div style={{
-              position: 'absolute', left: `${(parseFloat(p.contrastRequired) / 7) * 100}%`,
-              top: 0, bottom: 0, width: 2, background: C.amber, zIndex: 2,
-            }} />
-            {/* Current ratio fill */}
-            <div style={{
-              height: '100%', borderRadius: 4,
-              width: `${Math.min((parseFloat(p.contrastRatio) / 7) * 100, 100)}%`,
-              background: parseFloat(p.contrastRatio) >= parseFloat(p.contrastRequired) ? C.green : C.red,
-              transition: 'width 0.5s ease',
-            }} />
-          </div>
-        </div>
-      )}
-
-      {/* Fix suggestion */}
-      {!p.passed && p.fix && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '6px 10px', borderRadius: 4,
-          background: `${C.green}08`, border: `1px solid ${C.greenBorder}`,
-        }}>
-          <span style={{ fontFamily: mono, fontSize: 10, color: C.green, fontWeight: 600 }}>FIX:</span>
-          <span style={{ fontFamily: mono, fontSize: 11, color: C.green }}>{p.fix}</span>
-        </div>
-      )}
-    </div>
-  )
+            display: 'inline-block', width: Math.min(num * 1.5, 80), height: 8,
+            background: T.blue, borderRadius: 2, opacity: 0.7,
+          }} />
+          <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{str}</span>
+        </span>
+      )
+    }
+  }
+  return <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{str}</span>
 }
 
 // ─── Main Page Component ─────────────────────────────────────
 export default function PlaygroundPage() {
-  // State
-  const [yamlText, setYamlText] = useState(RULESET_YAML)
-  const [disabledRules, setDisabledRules] = useState<Record<string, boolean>>({})
-  const [activePreset, setActivePreset] = useState<string>('checkout')
-  const [result, setResult] = useState<ValidationResult | null>(null)
-  const [score, setScore] = useState<number | null>(null)
-  const [violations, setViolations] = useState<Violation[]>([])
-  const [fixedIds, setFixedIds] = useState<Record<string, boolean>>({})
+  const [yamlText, setYamlText] = useState(DEFAULT_YAML)
+  const [selectedFixture, setSelectedFixture] = useState<string>('checkout')
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null)
+  const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
-  const [scanDone, setScanDone] = useState(false)
-  const [governed, setGoverned] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [fixing, setFixing] = useState(false)
 
-  // Build effective config
-  const getEffectiveConfig = useCallback((): MuteformConfig => {
-    var filtered = BASE_CONFIG.rules.filter(function (r) {
-      return !disabledRules[r.id]
-    })
-    return {
-      name: BASE_CONFIG.name,
-      version: BASE_CONFIG.version,
-      tokens: BASE_CONFIG.tokens,
-      rules: filtered,
-    }
-  }, [disabledRules])
-
-  // Run scan
-  const runScan = useCallback(function () {
+  const handleScan = useCallback(() => {
     setScanning(true)
-    setScanDone(false)
-    setFixedIds({})
-    setExpandedId(null)
-    setGoverned(false)
-    setCopied(false)
+    setError(null)
+    setRewriteResult(null)
+    setScanResult(null)
 
-    setTimeout(function () {
-      var config = getEffectiveConfig()
-      var iface = SAMPLE_INTERFACES[activePreset].def
-      var res = validate(iface, config)
-
-      // Add manual violations for checkout preset
-      var allViolations = res.violations.slice()
-      if (activePreset === 'checkout') {
-        var manual = getManualViolations()
-        for (var i = 0; i < manual.length; i++) {
-          allViolations.push(manual[i])
+    // Use setTimeout to let UI update before blocking
+    setTimeout(() => {
+      try {
+        const policy = loadConfig(yamlText)
+        const fixture = getFixture(selectedFixture)
+        if (!fixture) {
+          setError(`Fixture "${selectedFixture}" not found.`)
+          setScanning(false)
+          return
         }
+        const result = scanArtifact(fixture.artifact, policy)
+        setScanResult(result)
+      } catch (e: any) {
+        setError(e.message || 'Failed to parse YAML or run scan.')
+      } finally {
+        setScanning(false)
       }
+    }, 50)
+  }, [yamlText, selectedFixture])
 
-      var combinedResult: ValidationResult = {
-        passed: allViolations.length === 0,
-        violations: allViolations,
-        nodesScanned: res.nodesScanned,
-        rulesEvaluated: res.rulesEvaluated + (activePreset === 'checkout' ? 2 : 0),
-        scanDurationMs: res.scanDurationMs,
+  const handleFixAll = useCallback(() => {
+    if (!scanResult) return
+    setFixing(true)
+
+    setTimeout(() => {
+      try {
+        const policy = loadConfig(yamlText)
+        const fixture = getFixture(selectedFixture)
+        if (!fixture) return
+        const result = rewriteArtifact(fixture.artifact, scanResult.violations, policy)
+        setRewriteResult(result)
+      } catch (e: any) {
+        setError(e.message || 'Failed to apply fixes.')
+      } finally {
+        setFixing(false)
       }
+    }, 50)
+  }, [scanResult, yamlText, selectedFixture])
 
-      var scoreData = calculateScore(combinedResult)
-      setResult(combinedResult)
-      setViolations(allViolations)
-      setScore(scoreData.overall)
-      setScanning(false)
-      setScanDone(true)
-    }, 500)
-  }, [getEffectiveConfig, activePreset])
+  const fixture = getFixture(selectedFixture)
+  const violationNodeIds = new Set(scanResult?.violations.map(v => v.nodeId) || [])
+  const fixedNodeIds = new Set(rewriteResult?.appliedFixes.map(f => f.nodeId) || [])
+  const autoFixCount = rewriteResult?.appliedFixes.length ?? 0
+  const manualCount = scanResult
+    ? scanResult.violations.filter(v => !v.autoFixAvailable).length
+    : 0
 
-  // Fix one violation
-  function fixOne(violation: Violation) {
-    var key = violation.nodeId + ':' + violation.ruleId
-    var newFixed: Record<string, boolean> = {}
-    var keys = Object.keys(fixedIds)
-    for (var i = 0; i < keys.length; i++) {
-      newFixed[keys[i]] = fixedIds[keys[i]]
-    }
-    newFixed[key] = true
-    setFixedIds(newFixed)
-
-    var remaining = violations.filter(function (v) {
-      return !newFixed[v.nodeId + ':' + v.ruleId]
-    })
-    if (remaining.length === 0) {
-      setScore(100)
-    } else {
-      var fakeResult: ValidationResult = {
-        passed: false, violations: remaining,
-        nodesScanned: result ? result.nodesScanned : 0,
-        rulesEvaluated: result ? result.rulesEvaluated : 0,
-        scanDurationMs: 0,
-      }
-      var s = calculateScore(fakeResult)
-      setScore(s.overall)
-    }
-  }
-
-  // APPLY GOVERNANCE — fix all at once
-  function applyGovernance() {
-    var newFixed: Record<string, boolean> = {}
-    for (var i = 0; i < violations.length; i++) {
-      newFixed[violations[i].nodeId + ':' + violations[i].ruleId] = true
-    }
-    setFixedIds(newFixed)
-    setScore(100)
-    setGoverned(true)
-  }
-
-  // Copy governed output
-  function copyGoverned() {
-    var output = JSON.stringify(GOVERNED_ARTIFACT, null, 2)
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(output).catch(function () {})
-    }
-    setCopied(true)
-    setTimeout(function () { setCopied(false) }, 2000)
-  }
-
-  // Toggle rule
-  function toggleRule(ruleId: string) {
-    var next: Record<string, boolean> = {}
-    var keys = Object.keys(disabledRules)
-    for (var i = 0; i < keys.length; i++) {
-      next[keys[i]] = disabledRules[keys[i]]
-    }
-    if (next[ruleId]) {
-      delete next[ruleId]
-    } else {
-      next[ruleId] = true
-    }
-    setDisabledRules(next)
-  }
-
-  var presetKeys = Object.keys(SAMPLE_INTERFACES)
-  var unfixedCount = violations.filter(function (v) {
-    return !fixedIds[v.nodeId + ':' + v.ruleId]
-  }).length
+  // Nav items
+  const navItems = [
+    { label: 'Demo', href: '/demo' },
+    { label: 'Playground', href: '/playground' },
+    { label: 'Rules', href: '/rules' },
+    { label: 'Governance', href: '/governance' },
+  ]
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, color: C.text }}>
-      {/* ─── Top Bar ─── */}
-      <header style={{
+    <div style={{
+      minHeight: '100vh', background: T.bg, color: T.text,
+      fontFamily: sans,
+    }}>
+      {/* ─── Top Nav ─────────────────────────────────────────── */}
+      <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 24px', borderBottom: `1px solid ${C.border}`,
-        background: C.surface,
+        padding: '0 32px', height: 56,
+        borderBottom: `1px solid ${T.border}`,
+        background: T.surface,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <a href="/" style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, color: C.textBright, fontStyle: 'italic', letterSpacing: '-0.02em', textDecoration: 'none' }}>
-            muteform
-          </a>
-          <span style={{
-            fontFamily: mono, fontSize: 10, padding: '3px 8px', borderRadius: 4,
-            background: C.greenDim, color: C.green, fontWeight: 600,
-            letterSpacing: '0.1em',
-          }}>
-            PLAYGROUND
-          </span>
+        <a href="/" style={{
+          fontFamily: serif, fontStyle: 'italic', fontSize: 22,
+          color: T.textBright, textDecoration: 'none', fontWeight: 400,
+        }}>muteform</a>
+        <div style={{ display: 'flex', gap: 28 }}>
+          {navItems.map(n => (
+            <a key={n.label} href={n.href} style={{
+              fontFamily: sans, fontSize: 14, fontWeight: 500,
+              color: n.label === 'Playground' ? T.green : T.muted,
+              textDecoration: 'none',
+              transition: 'color 0.2s',
+            }}>{n.label}</a>
+          ))}
         </div>
-        <nav style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          {[
-            { label: 'Demo', href: '/demo' },
-            { label: 'Governance', href: '/governance' },
-            { label: 'Dashboard', href: '/dashboard' },
-          ].map(function (l) {
-            return (
-              <a key={l.label} href={l.href} style={{
-                fontFamily: mono, fontSize: 11, color: C.muted, textDecoration: 'none',
-                padding: '4px 8px', borderRadius: 4, transition: 'color 0.2s',
-              }}>
-                {l.label}
-              </a>
-            )
-          })}
-        </nav>
-      </header>
+      </nav>
 
-      {/* ─── Two-Column Layout ─── */}
+      {/* ─── Two-column Layout ───────────────────────────────── */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr',
-        minHeight: 'calc(100vh - 53px)',
+        display: 'flex', gap: 0,
+        maxWidth: 1440, margin: '0 auto',
+        minHeight: 'calc(100vh - 56px)',
       }}>
-        {/* ══════════ LEFT COLUMN ══════════ */}
+        {/* ─── LEFT COLUMN: Editor + Fixtures ─────────────── */}
         <div style={{
-          borderRight: `1px solid ${C.border}`,
-          padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 53px)',
+          width: '60%', padding: '28px 24px 28px 32px',
+          borderRight: `1px solid ${T.border}`,
+          display: 'flex', flexDirection: 'column', gap: 20,
+          overflow: 'auto',
         }}>
-          {/* Ruleset Editor */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h2 style={{
-                fontFamily: syne, fontSize: 13, fontWeight: 700, color: C.muted, margin: 0,
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-              }}>
-                Ruleset Editor
-              </h2>
-              <span style={{ fontFamily: mono, fontSize: 11, color: C.dim }}>YAML (visual)</span>
-            </div>
+          {/* Section label */}
+          <div style={{
+            fontFamily: mono, fontSize: 11, color: T.muted,
+            textTransform: 'uppercase', letterSpacing: 2,
+          }}>Policy Editor</div>
+
+          {/* YAML Editor */}
+          <div style={{
+            position: 'relative', borderRadius: 8,
+            border: `1px solid ${T.border}`,
+            background: T.surface,
+          }}>
             <textarea
               value={yamlText}
-              onChange={function (e) { setYamlText(e.target.value) }}
+              onChange={e => setYamlText(e.target.value)}
               spellCheck={false}
               style={{
-                width: '100%', height: 360, padding: 16, borderRadius: 8,
-                background: C.surface, border: `1px solid ${C.border}`,
-                color: C.text, fontFamily: mono, fontSize: 12, lineHeight: 1.6,
-                resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+                width: '100%', minHeight: 420,
+                background: 'transparent', color: T.text,
+                fontFamily: mono, fontSize: 13, lineHeight: 1.7,
+                border: 'none', outline: 'none',
+                padding: '16px 20px',
+                resize: 'vertical',
+                caretColor: T.green,
               }}
             />
           </div>
 
-          {/* Rules List */}
+          {/* Fixture Selector */}
           <div>
-            <h2 style={{
-              fontFamily: syne, fontSize: 13, fontWeight: 700, color: C.muted, margin: '0 0 12px 0',
-              textTransform: 'uppercase', letterSpacing: '0.08em',
-            }}>
-              Rules ({BASE_CONFIG.rules.length})
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {BASE_CONFIG.rules.map(function (rule) {
-                var disabled = !!disabledRules[rule.id]
+            <div style={{
+              fontFamily: mono, fontSize: 11, color: T.muted,
+              textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10,
+            }}>Select Fixture</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {FIXTURES.map(f => {
+                const active = f.id === selectedFixture
                 return (
-                  <div key={rule.id} style={{
-                    padding: '12px 16px', borderRadius: 8,
-                    background: disabled ? C.bg : C.surface,
-                    border: `1px solid ${disabled ? C.dim : C.border}`,
-                    opacity: disabled ? 0.5 : 1, transition: 'all 0.2s', cursor: 'pointer',
-                  }}
-                    onClick={function () { toggleRule(rule.id) }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{
-                          width: 32, height: 18, borderRadius: 9,
-                          background: disabled ? C.dim : C.green,
-                          position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                        }}>
-                          <div style={{
-                            width: 14, height: 14, borderRadius: '50%', background: C.textBright,
-                            position: 'absolute', top: 2, left: disabled ? 2 : 16, transition: 'left 0.2s',
-                          }} />
-                        </div>
-                        <code style={{ fontFamily: mono, fontSize: 12, color: C.textBright }}>{rule.id}</code>
-                      </div>
-                      <span style={{
-                        fontFamily: mono, fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                        background: `${C.red}18`, color: C.red, letterSpacing: '0.05em',
-                        textTransform: 'uppercase',
-                      }}>
-                        {rule.severity}
-                      </span>
-                    </div>
-                    <p style={{ margin: '0 0 4px 40px', fontSize: 12, fontFamily: mono, color: C.muted, lineHeight: 1.4 }}>
-                      {rule.description}
-                    </p>
-                    <div style={{ marginLeft: 40, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontFamily: mono, fontSize: 10, color: rule.auto_fix ? C.green : C.dim }}>
-                        {rule.auto_fix ? 'AUTO-FIX: ' + rule.auto_fix : 'NO AUTO-FIX'}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* ══════════ RIGHT COLUMN ══════════ */}
-        <div style={{ padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 53px)' }}>
-          {/* Interface Preset Selector */}
-          <div style={{ marginBottom: 20 }}>
-            <h2 style={{
-              fontFamily: syne, fontSize: 13, fontWeight: 700, color: C.muted, margin: '0 0 12px 0',
-              textTransform: 'uppercase', letterSpacing: '0.08em',
-            }}>
-              Interface Under Test
-            </h2>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {presetKeys.map(function (key) {
-                var active = key === activePreset
-                return (
-                  <button key={key} onClick={function () {
-                    setActivePreset(key)
-                    setScanDone(false)
-                    setResult(null)
-                    setViolations([])
-                    setScore(null)
-                    setFixedIds({})
-                    setGoverned(false)
-                    setCopied(false)
-                  }}
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      setSelectedFixture(f.id)
+                      setScanResult(null)
+                      setRewriteResult(null)
+                      setError(null)
+                    }}
                     style={{
-                      fontFamily: mono, fontSize: 12, padding: '8px 16px',
-                      borderRadius: 6, border: `1px solid ${active ? C.green : C.border}`,
-                      background: active ? C.greenDim : C.surface,
-                      color: active ? C.green : C.muted,
-                      cursor: 'pointer', transition: 'all 0.2s', outline: 'none',
+                      flex: 1, padding: '12px 16px',
+                      background: active ? T.greenDim : T.surface,
+                      border: `1px solid ${active ? T.green : T.border}`,
+                      borderRadius: 8, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                      transition: 'all 0.2s',
                     }}
                   >
-                    {SAMPLE_INTERFACES[key].label}
+                    <span style={{
+                      fontFamily: sans, fontSize: 13, fontWeight: 600,
+                      color: active ? T.green : T.text,
+                    }}>{f.name}</span>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}>
+                      <span style={{
+                        fontFamily: mono, fontSize: 10,
+                        background: active ? `${T.green}22` : T.surface2,
+                        color: active ? T.green : T.muted,
+                        padding: '2px 6px', borderRadius: 4,
+                        border: `1px solid ${active ? `${T.green}44` : T.border}`,
+                      }}>{f.nodeCount} nodes</span>
+                    </span>
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Interface summary */}
-          <div style={{
-            padding: 12, borderRadius: 8, background: C.surface, border: `1px solid ${C.border}`,
-            marginBottom: 20, fontFamily: mono, fontSize: 11, color: C.dim,
-          }}>
-            <span style={{ color: C.muted }}>nodes:</span>{' '}
-            {SAMPLE_INTERFACES[activePreset].def.nodes.length}{' | '}
-            <span style={{ color: C.muted }}>platform:</span>{' '}
-            {SAMPLE_INTERFACES[activePreset].def.metadata.platform}{' | '}
-            <span style={{ color: C.muted }}>source:</span>{' '}
-            {SAMPLE_INTERFACES[activePreset].def.metadata.source}
-          </div>
-
           {/* RUN SCAN button */}
-          <button onClick={runScan} disabled={scanning}
+          <button
+            onClick={handleScan}
+            disabled={scanning}
             style={{
-              width: '100%', padding: '14px 0', borderRadius: 8,
-              background: scanning ? C.surface2 : C.blue,
-              color: '#fff',
+              width: '100%', padding: '14px 0',
+              background: scanning
+                ? T.dim
+                : `linear-gradient(135deg, ${T.green}, #00c070)`,
+              border: 'none', borderRadius: 8,
               fontFamily: mono, fontSize: 14, fontWeight: 700,
-              border: 'none', cursor: scanning ? 'wait' : 'pointer',
-              letterSpacing: '0.08em', transition: 'all 0.2s',
-              marginBottom: 24,
-              boxShadow: scanning ? 'none' : `0 4px 20px ${C.blue}33`,
+              color: scanning ? T.muted : T.bg,
+              cursor: scanning ? 'wait' : 'pointer',
+              letterSpacing: 1.5, textTransform: 'uppercase',
+              transition: 'all 0.2s',
+              boxShadow: scanning ? 'none' : `0 0 24px ${T.greenGlow}`,
             }}
-          >
-            {scanning ? 'SCANNING...' : 'RUN SCAN'}
-          </button>
+          >{scanning ? 'Scanning...' : 'Run Scan'}</button>
 
-          {/* ─── Results ─── */}
-          {scanDone && result && (
-            <div>
-              {/* ═══ GOVERNANCE SUCCESS BANNER ═══ */}
-              {governed && (
-                <div style={{
-                  padding: '20px 24px', borderRadius: 10, marginBottom: 24,
-                  background: `linear-gradient(135deg, ${C.green}18, ${C.green}08)`,
-                  border: `1px solid ${C.greenBorder}`,
-                  boxShadow: `0 4px 24px ${C.green}15`,
-                }}>
-                  <div style={{
-                    fontFamily: syne, fontSize: 18, fontWeight: 700, color: C.green,
-                    marginBottom: 4,
-                  }}>
-                    {violations.length} violations auto-corrected.
-                  </div>
-                  <div style={{ fontFamily: mono, fontSize: 12, color: C.green, opacity: 0.8 }}>
-                    Interface is now design system compliant.
-                  </div>
-                </div>
-              )}
-
-              {/* Stats bar */}
-              <div style={{
-                display: 'flex', gap: 16, marginBottom: 20, fontFamily: mono, fontSize: 11,
-              }}>
-                <span style={{ color: C.muted }}>
-                  Nodes: <span style={{ color: C.textBright }}>{result.nodesScanned}</span>
-                </span>
-                <span style={{ color: C.muted }}>
-                  Rules: <span style={{ color: C.textBright }}>{result.rulesEvaluated}</span>
-                </span>
-                <span style={{ color: C.muted }}>
-                  Violations: <span style={{ color: violations.length > 0 ? C.red : C.green }}>{violations.length}</span>
-                </span>
-                <span style={{ color: C.muted }}>
-                  Time: <span style={{ color: C.textBright }}>{result.scanDurationMs}ms</span>
-                </span>
-              </div>
-
-              {/* Score + APPLY GOVERNANCE row */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 24, marginBottom: 24,
-                padding: 20, borderRadius: 12, background: C.surface, border: `1px solid ${C.border}`,
-              }}>
-                <ScoreRing score={score !== null ? score : 0} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: mono, fontSize: 13, color: C.muted, marginBottom: 10 }}>
-                    {governed
-                      ? 'All violations resolved!'
-                      : unfixedCount + ' violation' + (unfixedCount === 1 ? '' : 's') + ' remaining'}
-                  </div>
-                  {!governed && unfixedCount > 0 && (
-                    <button onClick={applyGovernance} style={{
-                      padding: '12px 28px', borderRadius: 8,
-                      background: `linear-gradient(135deg, ${C.green}, #1aad4a)`,
-                      color: '#fff',
-                      fontFamily: syne, fontSize: 15, fontWeight: 700,
-                      border: 'none', cursor: 'pointer',
-                      letterSpacing: '0.04em',
-                      boxShadow: `0 4px 24px ${C.green}33`,
-                      transition: 'transform 0.15s, box-shadow 0.15s',
-                    }}>
-                      APPLY GOVERNANCE
-                    </button>
-                  )}
-                  {governed && (
-                    <div style={{
-                      fontFamily: mono, fontSize: 12, color: C.green,
-                      padding: '8px 16px', borderRadius: 6,
-                      background: C.greenDim, display: 'inline-block',
-                      border: `1px solid ${C.greenBorder}`,
-                    }}>
-                      COMPLIANT
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ═══ BEFORE / AFTER CARDS (post-governance) ═══ */}
-              {governed && (
-                <div style={{ marginBottom: 24 }}>
-                  <h3 style={{
-                    fontFamily: syne, fontSize: 13, fontWeight: 700, color: C.muted, margin: '0 0 12px 0',
-                    textTransform: 'uppercase', letterSpacing: '0.08em',
-                  }}>
-                    Applied Fixes
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {violations.map(function (v, idx) {
-                      return <BeforeAfterCard key={idx} v={v} />
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* ═══ COPY GOVERNED OUTPUT ═══ */}
-              {governed && (
-                <div style={{
-                  marginBottom: 24, padding: 20, borderRadius: 10,
-                  background: C.surface, border: `1px solid ${C.border}`,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <h3 style={{
-                      fontFamily: syne, fontSize: 13, fontWeight: 700, color: C.muted, margin: 0,
-                      textTransform: 'uppercase', letterSpacing: '0.08em',
-                    }}>
-                      Governed Output
-                    </h3>
-                    <button onClick={copyGoverned} style={{
-                      padding: '8px 20px', borderRadius: 6,
-                      background: copied ? C.greenDim : C.blue,
-                      color: copied ? C.green : '#fff',
-                      fontFamily: mono, fontSize: 11, fontWeight: 600,
-                      border: copied ? `1px solid ${C.greenBorder}` : 'none',
-                      cursor: 'pointer', letterSpacing: '0.06em',
-                      transition: 'all 0.2s',
-                    }}>
-                      {copied ? 'COPIED ✓' : 'COPY GOVERNED OUTPUT'}
-                    </button>
-                  </div>
-                  <pre style={{
-                    fontFamily: mono, fontSize: 11, color: C.green, lineHeight: 1.6,
-                    padding: 16, borderRadius: 8, background: C.bg,
-                    border: `1px solid ${C.greenBorder}`, overflow: 'auto',
-                    maxHeight: 240, margin: 0,
-                  }}>
-                    {JSON.stringify(GOVERNED_ARTIFACT, null, 2)}
-                  </pre>
-                  <div style={{
-                    fontFamily: mono, fontSize: 12, color: C.muted,
-                    marginTop: 14, textAlign: 'center', letterSpacing: '0.02em',
-                  }}>
-                    This is what Muteform returns to Claude Code.
-                  </div>
-                </div>
-              )}
-
-              {/* ═══ VIOLATION CARDS (pre-governance) ═══ */}
-              {!governed && violations.length > 0 && (
-                <>
-                  <h3 style={{
-                    fontFamily: syne, fontSize: 13, fontWeight: 700, color: C.muted, margin: '0 0 12px 0',
-                    textTransform: 'uppercase', letterSpacing: '0.08em',
-                  }}>
-                    Token Violations
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {violations.map(function (v, idx) {
-                      var vKey = v.nodeId + ':' + v.ruleId
-                      return (
-                        <ViolationCard
-                          key={vKey + '-' + String(idx)}
-                          v={v}
-                          isFixed={!!fixedIds[vKey]}
-                          onFix={function () { fixOne(v) }}
-                        />
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-
-              {violations.length === 0 && !governed && (
-                <div style={{
-                  padding: 32, borderRadius: 8, background: C.surface,
-                  border: `1px solid ${C.border}`, textAlign: 'center',
-                }}>
-                  <div style={{ fontFamily: mono, fontSize: 14, color: C.green, marginBottom: 4 }}>
-                    No violations found
-                  </div>
-                  <div style={{ fontFamily: mono, fontSize: 12, color: C.muted }}>
-                    All nodes pass the active ruleset.
-                  </div>
-                </div>
-              )}
-
-              {/* ═══ PART 4: DESIGN PRINCIPLES ANALYSIS ═══ */}
-              {activePreset === 'checkout' && (
-                <div style={{ marginTop: 32 }}>
-                  <h3 style={{
-                    fontFamily: syne, fontSize: 15, fontWeight: 700, color: C.text, margin: '0 0 4px 0',
-                    textTransform: 'uppercase', letterSpacing: '0.08em',
-                  }}>
-                    Design Principles Analysis
-                  </h3>
-                  <p style={{
-                    fontFamily: mono, fontSize: 11, color: C.muted, margin: '0 0 16px 0',
-                  }}>
-                    Beyond token compliance — evaluating design intent and accessibility.
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {DESIGN_PRINCIPLES.map(function (p) {
-                      return <PrincipleCard key={p.id} p={p} />
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* ═══ LINK TO GOVERNANCE ═══ */}
-              <div style={{ marginTop: 24, textAlign: 'center' }}>
-                <a href="/governance" style={{
-                  fontFamily: mono, fontSize: 12, color: C.blue,
-                  textDecoration: 'none', padding: '8px 16px', borderRadius: 6,
-                  border: `1px solid ${C.blue}33`, transition: 'all 0.2s',
-                  display: 'inline-block',
-                }}>
-                  Customize your governance rules &rarr;
-                </a>
-              </div>
-            </div>
-          )}
-
-          {/* Empty state before scan */}
-          {!scanDone && !scanning && (
+          {/* Error display */}
+          {error && (
             <div style={{
-              padding: 48, borderRadius: 8, border: `1px dashed ${C.border}`,
-              textAlign: 'center',
+              padding: '12px 16px', borderRadius: 8,
+              background: T.redDim,
+              border: `1px solid ${T.red}44`,
+              fontFamily: mono, fontSize: 12, color: T.red,
+              whiteSpace: 'pre-wrap',
             }}>
-              <div style={{ fontFamily: mono, fontSize: 14, color: C.dim, marginBottom: 8 }}>
-                Select an interface and run scan
-              </div>
-              <div style={{ fontFamily: mono, fontSize: 12, color: C.dim }}>
-                Toggle rules on the left, choose a preset above, then hit RUN SCAN.
-              </div>
+              <strong>Error:</strong> {error}
             </div>
           )}
         </div>
+
+        {/* ─── RIGHT COLUMN: Results ─────────────────────── */}
+        <div style={{
+          width: '40%', padding: '28px 32px 28px 24px',
+          display: 'flex', flexDirection: 'column', gap: 20,
+          overflow: 'auto',
+        }}>
+          <div style={{
+            fontFamily: mono, fontSize: 11, color: T.muted,
+            textTransform: 'uppercase', letterSpacing: 2,
+          }}>Results</div>
+
+          {!scanResult && !error && (
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', gap: 12, minHeight: 300,
+            }}>
+              <div style={{
+                fontFamily: serif, fontStyle: 'italic', fontSize: 28,
+                color: T.dim, opacity: 0.5,
+              }}>muteform</div>
+              <div style={{
+                fontFamily: mono, fontSize: 12, color: T.dim,
+              }}>Edit policy, select fixture, then run scan</div>
+            </div>
+          )}
+
+          {scanResult && (
+            <>
+              {/* Stats bar */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
+              }}>
+                {[
+                  { label: 'Nodes', value: scanResult.nodesScanned },
+                  { label: 'Rules', value: scanResult.rulesEvaluated },
+                  { label: 'Violations', value: scanResult.violations.length },
+                  { label: 'Time', value: `${scanResult.scanDurationMs}ms` },
+                ].map(s => (
+                  <div key={s.label} style={{
+                    background: T.surface, border: `1px solid ${T.border}`,
+                    borderRadius: 6, padding: '10px 12px', textAlign: 'center',
+                  }}>
+                    <div style={{
+                      fontFamily: mono, fontSize: 18, fontWeight: 700,
+                      color: T.textBright,
+                    }}>{s.value}</div>
+                    <div style={{
+                      fontFamily: mono, fontSize: 9, color: T.muted,
+                      textTransform: 'uppercase', letterSpacing: 1,
+                    }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Health Score */}
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: 10, padding: '16px 0',
+              }}>
+                <ScoreRing
+                  score={rewriteResult ? rewriteResult.afterScore : scanResult.score}
+                />
+                {/* Deterministic badge */}
+                <div style={{
+                  fontFamily: mono, fontSize: 10,
+                  color: T.green, border: `1px solid ${T.green}44`,
+                  borderRadius: 20, padding: '4px 14px',
+                  background: T.greenDim,
+                  letterSpacing: 0.5,
+                }}>Deterministic evaluation &middot; No AI in the loop</div>
+              </div>
+
+              {/* Violations list */}
+              {scanResult.violations.length > 0 && !rewriteResult && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                }}>
+                  <div style={{
+                    fontFamily: mono, fontSize: 11, color: T.muted,
+                    textTransform: 'uppercase', letterSpacing: 2,
+                  }}>Violations ({scanResult.violations.length})</div>
+                  {scanResult.violations.map((v, i) => (
+                    <div key={`${v.ruleId}-${v.nodeId}-${i}`} style={{
+                      background: T.surface, border: `1px solid ${T.border}`,
+                      borderRadius: 8, padding: '12px 14px',
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                      animation: `fadeSlideIn 0.3s ease ${i * 0.05}s both`,
+                    }}>
+                      {/* Top row: severity + rule + auto-fix badge */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        flexWrap: 'wrap',
+                      }}>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10, fontWeight: 700,
+                          textTransform: 'uppercase',
+                          color: severityColor(v.severity),
+                          background: severityBg(v.severity),
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>{v.severity}</span>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10,
+                          color: T.blue, background: T.blueDim,
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>{v.ruleId}</span>
+                        <span style={{ flex: 1 }} />
+                        {v.autoFixAvailable ? (
+                          <span style={{
+                            fontFamily: mono, fontSize: 9, fontWeight: 700,
+                            color: T.green, background: T.greenDim,
+                            padding: '2px 8px', borderRadius: 4,
+                            border: `1px solid ${T.green}33`,
+                          }}>AUTO-FIX</span>
+                        ) : (
+                          <span style={{
+                            fontFamily: mono, fontSize: 9, fontWeight: 700,
+                            color: T.amber, background: T.amberDim,
+                            padding: '2px 8px', borderRadius: 4,
+                            border: `1px solid ${T.amber}33`,
+                          }}>MANUAL REVIEW</span>
+                        )}
+                      </div>
+                      {/* Node path */}
+                      <div style={{
+                        fontFamily: mono, fontSize: 11, color: T.muted,
+                      }}>{v.nodePath}</div>
+                      {/* Current → Suggested */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        flexWrap: 'wrap',
+                      }}>
+                        <ValuePreview property={v.property} value={v.currentValue} />
+                        {v.suggestedValue != null && (
+                          <>
+                            <span style={{
+                              fontFamily: mono, fontSize: 12, color: T.dim,
+                            }}>&rarr;</span>
+                            <ValuePreview property={v.property} value={v.suggestedValue} />
+                          </>
+                        )}
+                      </div>
+                      {/* Message */}
+                      <div style={{
+                        fontFamily: sans, fontSize: 12, color: T.muted,
+                        lineHeight: 1.4,
+                      }}>{v.message}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* FIX ALL button */}
+              {scanResult.violations.length > 0 && !rewriteResult && (
+                <button
+                  onClick={handleFixAll}
+                  disabled={fixing}
+                  style={{
+                    width: '100%', padding: '12px 0',
+                    background: fixing ? T.dim : T.green,
+                    border: 'none', borderRadius: 8,
+                    fontFamily: mono, fontSize: 13, fontWeight: 700,
+                    color: T.bg, cursor: fixing ? 'wait' : 'pointer',
+                    letterSpacing: 1.5, textTransform: 'uppercase',
+                    transition: 'all 0.2s',
+                  }}
+                >{fixing ? 'Applying fixes...' : 'Fix All'}</button>
+              )}
+
+              {/* Rewrite result */}
+              {rewriteResult && fixture && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 16,
+                }}>
+                  {/* Summary */}
+                  <div style={{
+                    fontFamily: mono, fontSize: 12, color: T.text,
+                    background: T.greenDim, border: `1px solid ${T.green}33`,
+                    borderRadius: 8, padding: '12px 16px',
+                    lineHeight: 1.6,
+                  }}>
+                    <strong style={{ color: T.green }}>{autoFixCount}</strong> violation{autoFixCount !== 1 ? 's' : ''} fixed
+                    {manualCount > 0 && (
+                      <>, <strong style={{ color: T.amber }}>{manualCount}</strong> require human review</>
+                    )}
+                  </div>
+
+                  {/* Before/After wireframes */}
+                  <div style={{
+                    fontFamily: mono, fontSize: 11, color: T.muted,
+                    textTransform: 'uppercase', letterSpacing: 2,
+                  }}>Visual Comparison</div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <WireframeView
+                      wireframe={fixture.wireframe}
+                      violationNodeIds={violationNodeIds}
+                      fixedNodeIds={new Set()}
+                      label="Before"
+                    />
+                    <WireframeView
+                      wireframe={fixture.wireframe}
+                      violationNodeIds={new Set()}
+                      fixedNodeIds={fixedNodeIds}
+                      label="After"
+                    />
+                  </div>
+
+                  {/* Applied fixes list */}
+                  <div style={{
+                    fontFamily: mono, fontSize: 11, color: T.muted,
+                    textTransform: 'uppercase', letterSpacing: 2,
+                  }}>Applied Fixes ({rewriteResult.appliedFixes.length})</div>
+                  {rewriteResult.appliedFixes.map((fix, i) => (
+                    <div key={`${fix.ruleId}-${fix.nodeId}-${i}`} style={{
+                      background: T.surface, border: `1px solid ${T.border}`,
+                      borderRadius: 6, padding: '10px 12px',
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                    }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10,
+                          color: T.green, background: T.greenDim,
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>FIXED</span>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10,
+                          color: T.blue, background: T.blueDim,
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>{fix.ruleId}</span>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10, color: T.muted,
+                        }}>{fix.nodeId}</span>
+                      </div>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}>
+                        <ValuePreview property={fix.property} value={fix.currentValue} />
+                        <span style={{
+                          fontFamily: mono, fontSize: 12, color: T.dim,
+                        }}>&rarr;</span>
+                        <ValuePreview property={fix.property} value={fix.suggestedValue} />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Manual review items */}
+                  {manualCount > 0 && (
+                    <>
+                      <div style={{
+                        fontFamily: mono, fontSize: 11, color: T.muted,
+                        textTransform: 'uppercase', letterSpacing: 2,
+                      }}>Requires Manual Review ({manualCount})</div>
+                      {scanResult.violations.filter(v => !v.autoFixAvailable).map((v, i) => (
+                        <div key={`manual-${v.ruleId}-${v.nodeId}-${i}`} style={{
+                          background: T.surface, border: `1px solid ${T.amber}33`,
+                          borderRadius: 6, padding: '10px 12px',
+                          display: 'flex', flexDirection: 'column', gap: 6,
+                        }}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                          }}>
+                            <span style={{
+                              fontFamily: mono, fontSize: 10, fontWeight: 700,
+                              color: T.amber, background: T.amberDim,
+                              padding: '2px 8px', borderRadius: 4,
+                            }}>MANUAL</span>
+                            <span style={{
+                              fontFamily: mono, fontSize: 10,
+                              color: T.blue, background: T.blueDim,
+                              padding: '2px 8px', borderRadius: 4,
+                            }}>{v.ruleId}</span>
+                          </div>
+                          <div style={{
+                            fontFamily: mono, fontSize: 11, color: T.muted,
+                          }}>{v.nodePath}</div>
+                          <div style={{
+                            fontFamily: sans, fontSize: 12, color: T.muted,
+                          }}>{v.message}</div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* No violations */}
+              {scanResult.violations.length === 0 && (
+                <div style={{
+                  textAlign: 'center', padding: '32px 0',
+                }}>
+                  <div style={{
+                    fontFamily: sans, fontSize: 16, color: T.green,
+                    fontWeight: 600, marginBottom: 6,
+                  }}>All clear</div>
+                  <div style={{
+                    fontFamily: mono, fontSize: 12, color: T.muted,
+                  }}>No violations found. Design is fully compliant.</div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* ─── Animation keyframes ─────────────────────────────── */}
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }

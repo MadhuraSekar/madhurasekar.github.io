@@ -15,6 +15,7 @@ export interface TokenDefinitions {
     families?: Record<string, string>
     scale_ratio?: number
     min_body_size?: number
+    allowed_styles?: string[]
   }
   motion?: {
     max_duration?: number
@@ -23,6 +24,10 @@ export interface TokenDefinitions {
   layout?: {
     grid_columns?: number[]
   }
+  components?: Record<string, {
+    allowed_variants?: string[]
+    allowed_sizes?: string[]
+  }>
 }
 
 export interface RuleDefinition {
@@ -45,6 +50,7 @@ export interface InterfaceNode {
       size?: number
       weight?: number
       lineHeight?: number
+      style?: string
     }
     layout?: {
       display?: string
@@ -59,6 +65,10 @@ export interface InterfaceNode {
       foreground: string
       background: string
       ratio?: number
+    }
+    component?: {
+      name: string
+      variant: string
     }
     [key: string]: any
   }
@@ -96,11 +106,36 @@ export interface ValidationResult {
   scanDurationMs: number
 }
 
+export interface Fix {
+  ruleId: string
+  nodeId: string
+  property: string
+  currentValue: any
+  suggestedValue: any
+  autoApplicable: boolean
+}
+
 export interface RemediationResult {
   applied: Violation[]
   skipped: Violation[]
   totalFixed: number
   totalSkipped: number
+}
+
+export interface RewriteResult {
+  rewrittenArtifact: InterfaceDefinition
+  appliedFixes: Fix[]
+  beforeScore: number
+  afterScore: number
+}
+
+export interface ScanResult {
+  violations: Violation[]
+  fixes: Fix[]
+  score: number
+  nodesScanned: number
+  rulesEvaluated: number
+  scanDurationMs: number
 }
 
 export interface HealthScore {
