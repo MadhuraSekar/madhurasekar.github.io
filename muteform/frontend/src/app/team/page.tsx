@@ -20,6 +20,7 @@ const MEMBERS = [
 ]
 
 export default function TeamPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [invited, setInvited] = useState(false)
 
@@ -51,9 +52,19 @@ export default function TeamPage() {
           </span>
         </div>
         <a href="/dashboard" style={{ fontFamily: mono, fontSize: 11, color: T.muted, textDecoration: 'none' }}>← Dashboard</a>
+          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
+      </div>
+      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
+        <a href="/dashboard" style={{ fontFamily: sans }}>Dashboard</a>
+        <a href="/scan" style={{ fontFamily: sans }}>Scan</a>
+        <a href="/rules" style={{ fontFamily: sans }}>Rules</a>
+        <a href="/governance" style={{ fontFamily: sans }}>Governance</a>
+        <a href="/integrate" style={{ fontFamily: sans }}>Integrate</a>
+        <a href="/team" style={{ fontFamily: sans, color: T.green }}>Team</a>
       </div>
 
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 80px' }}>
+      <div className="page-container" style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 80px' }}>
         <h1 style={{ fontFamily: sans, fontSize: 24, fontWeight: 700, color: T.textBright, marginBottom: 24 }}>
           Team
         </h1>

@@ -130,6 +130,7 @@ export default function LandingPage() {
   const [formState, setFormState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [waitlistCount, setWaitlistCount] = useState(347)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     fetch('/api/waitlist').then(r => r.json()).then(d => {
@@ -189,6 +190,12 @@ export default function LandingPage() {
         }
         a { color: inherit; text-decoration: none; }
         ::selection { background: ${T.green}; color: ${T.bg}; }
+        @media (max-width: 768px) {
+          .hero-heading { font-size: 30px !important; }
+          .hero-sub { font-size: 15px !important; }
+          .section-pad { padding: 60px 16px !important; }
+          .footer-inner { flex-direction: column; text-align: center; }
+        }
       `}</style>
 
       {/* ════════════════════════════════════════════
@@ -217,8 +224,8 @@ export default function LandingPage() {
             </span>
           </a>
 
-          {/* links */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          {/* links (desktop) */}
+          <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
             <a href="/demo" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Demo</a>
             <a href="/playground" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Playground</a>
             <a href="#waitlist" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Waitlist</a>
@@ -229,15 +236,34 @@ export default function LandingPage() {
               Get Started &rarr;
             </a>
           </div>
+          {/* hamburger (mobile) */}
+          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          </button>
         </div>
       </nav>
+
+      {/* mobile menu */}
+      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
+        <a href="/demo" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Demo</a>
+        <a href="/playground" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Playground</a>
+        <a href="#waitlist" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Waitlist</a>
+        <a href="/playground" onClick={() => setMobileMenuOpen(false)} style={{
+          fontFamily: sans, fontWeight: 600, color: T.bg, background: T.green,
+          borderRadius: 8, textAlign: 'center', marginTop: 8, border: 'none',
+        }}>Get Started &rarr;</a>
+      </div>
 
       {/* ════════════════════════════════════════════
           2. HERO
       ════════════════════════════════════════════ */}
       <section style={{ ...section, paddingTop: 80, paddingBottom: 60, textAlign: 'center' }}>
         <FadeIn>
-          <h1 style={{
+          <h1 className="hero-heading" style={{
             fontFamily: serif, fontSize: 44, fontWeight: 400, lineHeight: 1.2,
             color: T.textBright, margin: '0 auto 20px', maxWidth: 700,
           }}>

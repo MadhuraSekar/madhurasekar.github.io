@@ -35,6 +35,7 @@ const SEV: Record<string, { color: string; dim: string; label: string }> = {
 }
 
 export default function ScanPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [code, setCode] = useState('')
   const [scanning, setScanning] = useState(false)
   const [violations, setViolations] = useState<ScanViolation[]>([])
@@ -85,9 +86,19 @@ export default function ScanPage() {
           </span>
         </div>
         <a href="/dashboard" style={{ fontFamily: mono, fontSize: 11, color: T.muted, textDecoration: 'none' }}>← Dashboard</a>
+          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
+      </div>
+      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
+        <a href="/dashboard" style={{ fontFamily: sans }}>Dashboard</a>
+        <a href="/scan" style={{ fontFamily: sans, color: T.green }}>Scan</a>
+        <a href="/rules" style={{ fontFamily: sans }}>Rules</a>
+        <a href="/governance" style={{ fontFamily: sans }}>Governance</a>
+        <a href="/integrate" style={{ fontFamily: sans }}>Integrate</a>
+        <a href="/team" style={{ fontFamily: sans }}>Team</a>
       </div>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 80px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="page-container grid-2" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 80px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Left: Code editor */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontFamily: sans, fontSize: 16, fontWeight: 700, color: T.textBright }}>

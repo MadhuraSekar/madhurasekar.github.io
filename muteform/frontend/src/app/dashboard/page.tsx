@@ -63,6 +63,16 @@ function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
 
 export default function DashboardPage() {
   const overallScore = 94
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const navItems = [
+    { label: 'Dashboard', href: '/dashboard', active: true },
+    { label: 'Scan', href: '/scan', active: false },
+    { label: 'Rules', href: '/rules', active: false },
+    { label: 'Governance', href: '/governance', active: false },
+    { label: 'Integrate', href: '/integrate', active: false },
+    { label: 'Team', href: '/team', active: false },
+  ]
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text }}>
@@ -79,15 +89,8 @@ export default function DashboardPage() {
           </div>
           <span style={{ fontFamily: sans, fontSize: 15, fontWeight: 700, color: T.textBright }}>muteform</span>
         </div>
-        <nav style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-          {[
-            { label: 'Dashboard', href: '/dashboard', active: true },
-            { label: 'Scan', href: '/scan', active: false },
-            { label: 'Rules', href: '/rules', active: false },
-            { label: 'Governance', href: '/governance', active: false },
-            { label: 'Integrate', href: '/integrate', active: false },
-            { label: 'Team', href: '/team', active: false },
-          ].map(l => (
+        <nav className="nav-links" style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          {navItems.map(l => (
             <a key={l.label} href={l.href} style={{
               fontFamily: mono, fontSize: 11, color: l.active ? T.green : T.muted,
               textDecoration: 'none', letterSpacing: '0.02em',
@@ -96,11 +99,26 @@ export default function DashboardPage() {
             }}>{l.label}</a>
           ))}
         </nav>
+        <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)}
+          aria-label="Open menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
       </div>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 80px' }}>
+      {/* mobile menu */}
+      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
+        {navItems.map(l => (
+          <a key={l.label} href={l.href} onClick={() => setMobileMenuOpen(false)}
+            style={{ fontFamily: sans, color: l.active ? T.green : undefined }}>{l.label}</a>
+        ))}
+      </div>
+
+      <div className="page-container" style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 80px' }}>
         {/* Health Score Section */}
-        <div style={{
+        <div className="grid-3-auto" style={{
           display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 24, alignItems: 'center',
           padding: '24px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, marginBottom: 20,
         }}>
@@ -112,7 +130,7 @@ export default function DashboardPage() {
             <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, marginTop: 4 }}>
               Acme Core v8 · Last scan: 2 minutes ago
             </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+            <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
               {CATEGORY_SCORES.map(c => (
                 <div key={c.name} style={{
                   display: 'flex', alignItems: 'center', gap: 4,
@@ -134,7 +152,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        <div className="grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
           {[
             { label: 'Paste & Scan', href: '/scan', icon: '⊕' },
             { label: 'Edit Rules', href: '/rules', icon: '⊞' },
@@ -152,7 +170,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           {/* Recent Scans */}
           <div style={{
             background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden',
