@@ -16,20 +16,12 @@ import {
 import { loadConfig, scanArtifact } from '@/lib/engine'
 import { getFixture } from '@/lib/fixtures'
 
-/* ---------- theme tokens ---------- */
+import Header from '@/components/Header'
+import { tokens } from '@/lib/design-tokens'
 
-const T = {
-  bg: '#080909', surface: '#0c0d0f', surface2: '#101214',
-  border: '#161819', border2: '#1e2226',
-  blue: '#0055FF', text: '#f0f1f3', muted: '#6b7280', dim: '#374151',
-  green: '#22c55e', greenDim: '#22c55e18',
-  amber: '#f59e0b', amberDim: '#f59e0b18',
-  red: '#ef4444', redDim: '#ef444418',
-  blueDim: '#0055FF18',
-}
-
-const syne = "'Syne', sans-serif"
-const mono = "'DM Mono', monospace"
+const T = tokens
+const syne = T.fontDisplay
+const mono = T.fontMono
 
 /* ---------- severity helpers ---------- */
 
@@ -37,14 +29,14 @@ const sevColor: Record<string, string> = {
   critical: T.red,
   high: T.red,
   medium: T.amber,
-  low: T.muted,
+  low: T.textMuted,
 }
 
 const sevBg: Record<string, string> = {
   critical: T.redDim,
   high: T.redDim,
   medium: T.amberDim,
-  low: `${T.muted}18`,
+  low: `${T.textMuted}18`,
 }
 
 /* ---------- helper components ---------- */
@@ -58,7 +50,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
         fontWeight: 700,
         letterSpacing: '0.14em',
         textTransform: 'uppercase',
-        color: T.muted,
+        color: T.textMuted,
         marginBottom: 24,
         paddingBottom: 10,
         borderBottom: `1px solid ${T.border}`,
@@ -78,7 +70,7 @@ function SubHeader({ children }: { children: React.ReactNode }) {
         fontWeight: 700,
         letterSpacing: '0.12em',
         textTransform: 'uppercase',
-        color: T.dim,
+        color: T.textDim,
         marginBottom: 12,
       }}
     >
@@ -125,7 +117,7 @@ function Toggle({
         height: 22,
         borderRadius: 11,
         border: 'none',
-        background: checked ? T.green : T.dim,
+        background: checked ? T.green : T.textDim,
         position: 'relative',
         cursor: 'pointer',
         transition: 'background 0.2s',
@@ -164,7 +156,7 @@ function ProgressStepper({ current }: { current: number }) {
         <div key={step.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
           <a href={step.href} style={{
             fontFamily: mono, fontSize: 11, fontWeight: 600, textDecoration: 'none',
-            color: i === current ? '#000' : i < current ? T.green : T.dim,
+            color: i === current ? '#000' : i < current ? T.green : T.textDim,
             background: i === current ? T.green : i < current ? T.greenDim : 'transparent',
             padding: '5px 12px', borderRadius: 6,
             border: i < current ? `1px solid ${T.green}33` : '1px solid transparent',
@@ -331,7 +323,7 @@ export default function GovernancePage() {
   const [rules, setRules] = useState<GovernanceRule[]>(DEFAULT_GOVERNANCE_RULES)
   const [principles, setPrinciples] = useState<DesignPrinciple[]>(DEFAULT_PRINCIPLES)
   const [violationCounts, setViolationCounts] = useState<Record<string, number>>({})
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   const [toast, setToast] = useState<string | null>(null)
 
   /* load from localStorage on mount */
@@ -422,14 +414,7 @@ export default function GovernancePage() {
     })
   }, [])
 
-  /* --- nav --- */
-  const navItems = [
-    { label: 'Import', href: '/import' },
-    { label: 'Demo', href: '/demo' },
-    { label: 'Playground', href: '/playground' },
-    { label: 'Governance', href: '/governance', active: true },
-    { label: 'Integrate', href: '/integrate' },
-  ]
+  /* --- nav is now shared Header --- */
 
   /* --- derived design system display data --- */
   const ds = importedSystem
@@ -465,133 +450,7 @@ export default function GovernancePage() {
         </div>
       )}
 
-      {/* nav */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 20px',
-          height: 52,
-          background: T.surface,
-          borderBottom: `1px solid ${T.border}`,
-        }}
-      >
-        <a
-          href="/"
-          style={{
-            fontFamily: "'Georgia', 'Times New Roman', serif",
-            fontStyle: 'italic',
-            fontSize: 17,
-            fontWeight: 400,
-            color: T.text,
-            textDecoration: 'none',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          muteform
-        </a>
-
-        <nav
-          style={{
-            display: 'flex',
-            gap: 20,
-            alignItems: 'center',
-          }}
-          className="nav-links"
-        >
-          {navItems.map((l) => (
-            <a
-              key={l.label}
-              href={l.href}
-              style={{
-                fontFamily: mono,
-                fontSize: 11,
-                color: l.active ? T.green : T.muted,
-                textDecoration: 'none',
-                letterSpacing: '0.02em',
-                borderBottom: l.active
-                  ? `2px solid ${T.green}`
-                  : '2px solid transparent',
-                paddingBottom: 2,
-                transition: 'color 0.15s',
-              }}
-            >
-              {l.label}
-            </a>
-          ))}
-        </nav>
-
-        <button
-          className="nav-hamburger"
-          onClick={() => setMobileMenuOpen(true)}
-          aria-label="Open menu"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
-            <path d="M3 6h18M3 12h18M3 18h18" />
-          </svg>
-        </button>
-      </header>
-
-      {/* mobile overlay */}
-      {mobileMenuOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 200,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-end',
-          }}
-          onClick={() => setMobileMenuOpen(false)}
-        >
-          <div
-            style={{
-              background: T.surface,
-              width: 240,
-              height: '100%',
-              padding: '24px 20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-              borderLeft: `1px solid ${T.border}`,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              aria-label="Close menu"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 22, alignSelf: 'flex-end', marginBottom: 16 }}
-            >
-              &times;
-            </button>
-            {navItems.map((l) => (
-              <a
-                key={l.label}
-                href={l.href}
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  fontFamily: syne,
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: l.active ? T.green : T.text,
-                  textDecoration: 'none',
-                  padding: '8px 0',
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                {l.label}
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
+      <Header />
 
       {/* page body */}
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 96px' }}>
@@ -611,7 +470,7 @@ export default function GovernancePage() {
           >
             Governance
           </h1>
-          <p style={{ fontFamily: mono, fontSize: 13, color: T.muted, margin: 0 }}>
+          <p style={{ fontFamily: mono, fontSize: 13, color: T.textMuted, margin: 0 }}>
             Baseline from imported design system, rules engine, and design principles.
           </p>
         </div>
@@ -658,7 +517,7 @@ export default function GovernancePage() {
                     justifyContent: 'center',
                   }}
                 >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="1.5">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.textMuted} strokeWidth="1.5">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                   </svg>
                 </div>
@@ -666,7 +525,7 @@ export default function GovernancePage() {
                   <div style={{ fontFamily: syne, fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 6 }}>
                     No design system imported
                   </div>
-                  <div style={{ fontFamily: mono, fontSize: 12, color: T.muted, marginBottom: 20 }}>
+                  <div style={{ fontFamily: mono, fontSize: 12, color: T.textMuted, marginBottom: 20 }}>
                     Import a design system to populate the baseline.
                   </div>
                   <a
@@ -706,7 +565,7 @@ export default function GovernancePage() {
                     style={{
                       fontFamily: mono,
                       fontSize: 11,
-                      color: T.muted,
+                      color: T.textMuted,
                     }}
                   >
                     Imported from:
@@ -778,7 +637,7 @@ export default function GovernancePage() {
                       <div style={{ fontFamily: mono, fontSize: 10, fontWeight: 600, color: T.text, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {name}
                       </div>
-                      <div style={{ fontFamily: mono, fontSize: 9, color: T.muted }}>
+                      <div style={{ fontFamily: mono, fontSize: 9, color: T.textMuted }}>
                         {hex}
                       </div>
                     </div>
@@ -792,7 +651,7 @@ export default function GovernancePage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                   {spacingScale.map((val) => (
                     <div key={val} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontFamily: mono, fontSize: 10, color: T.muted, width: 28, textAlign: 'right', flexShrink: 0 }}>
+                      <span style={{ fontFamily: mono, fontSize: 10, color: T.textMuted, width: 28, textAlign: 'right', flexShrink: 0 }}>
                         {val}
                       </span>
                       <div
@@ -804,7 +663,7 @@ export default function GovernancePage() {
                           transition: 'width 0.3s',
                         }}
                       />
-                      <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>px</span>
+                      <span style={{ fontFamily: mono, fontSize: 9, color: T.textDim }}>px</span>
                     </div>
                   ))}
                 </div>
@@ -894,7 +753,7 @@ export default function GovernancePage() {
                     const col = colors[ci % colors.length]
                     return (
                       <div key={cols}>
-                        <div style={{ fontFamily: mono, fontSize: 10, color: T.muted, marginBottom: 6 }}>
+                        <div style={{ fontFamily: mono, fontSize: 10, color: T.textMuted, marginBottom: 6 }}>
                           {cols}-column grid
                         </div>
                         <div
@@ -946,7 +805,7 @@ export default function GovernancePage() {
                 fontWeight: 700,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: T.muted,
+                color: T.textMuted,
                 margin: 0,
               }}
             >
@@ -956,7 +815,7 @@ export default function GovernancePage() {
               style={{
                 fontFamily: mono,
                 fontSize: 11,
-                color: T.muted,
+                color: T.textMuted,
               }}
             >
               {rules.length} rule{rules.length !== 1 ? 's' : ''}
@@ -1000,12 +859,12 @@ export default function GovernancePage() {
                         style={{
                           fontFamily: mono,
                           fontSize: 11,
-                          color: T.muted,
+                          color: T.textMuted,
                           lineHeight: 1.5,
                         }}
                       >
                         {rule.description || (
-                          <span style={{ color: T.dim, fontStyle: 'italic' }}>No description</span>
+                          <span style={{ color: T.textDim, fontStyle: 'italic' }}>No description</span>
                         )}
                       </div>
                     </div>
@@ -1030,13 +889,13 @@ export default function GovernancePage() {
                             fontFamily: syne,
                             fontSize: 16,
                             fontWeight: 700,
-                            color: vCount > 0 ? sevColor[rule.severity] : T.dim,
+                            color: vCount > 0 ? sevColor[rule.severity] : T.textDim,
                           }}
                         >
                           {vCount}
                         </span>
                       </div>
-                      <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>violations</span>
+                      <span style={{ fontFamily: mono, fontSize: 9, color: T.textDim }}>violations</span>
                     </div>
                   </div>
 
@@ -1051,7 +910,7 @@ export default function GovernancePage() {
                   >
                     {/* severity */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Severity</span>
+                      <span style={{ fontFamily: mono, fontSize: 10, color: T.textMuted }}>Severity</span>
                       <select
                         value={rule.severity}
                         onChange={(e) =>
@@ -1081,7 +940,7 @@ export default function GovernancePage() {
                         checked={rule.autoFix}
                         onChange={(v) => updateRule(rule.id, { autoFix: v })}
                       />
-                      <span style={{ fontFamily: mono, fontSize: 11, color: rule.autoFix ? T.green : T.muted }}>
+                      <span style={{ fontFamily: mono, fontSize: 11, color: rule.autoFix ? T.green : T.textMuted }}>
                         Auto-fix {rule.autoFix ? 'on' : 'off'}
                       </span>
                     </div>
@@ -1108,7 +967,7 @@ export default function GovernancePage() {
                         style={{
                           fontFamily: mono,
                           fontSize: 11,
-                          color: rule.blocked ? T.red : T.muted,
+                          color: rule.blocked ? T.red : T.textMuted,
                         }}
                       >
                         {rule.blocked ? 'Merge-blocking' : 'Non-blocking'}
@@ -1124,7 +983,7 @@ export default function GovernancePage() {
                         background: 'none',
                         border: 'none',
                         cursor: 'pointer',
-                        color: T.dim,
+                        color: T.textDim,
                         padding: 4,
                         borderRadius: 4,
                         display: 'flex',
@@ -1149,7 +1008,7 @@ export default function GovernancePage() {
               fontFamily: mono,
               fontSize: 12,
               fontWeight: 600,
-              color: T.muted,
+              color: T.textMuted,
               background: 'transparent',
               border: `1px dashed ${T.border2}`,
               borderRadius: 8,
@@ -1165,7 +1024,7 @@ export default function GovernancePage() {
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = T.border2
-              e.currentTarget.style.color = T.muted
+              e.currentTarget.style.color = T.textMuted
             }}
           >
             + Add Rule
@@ -1193,13 +1052,13 @@ export default function GovernancePage() {
                 fontWeight: 700,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: T.muted,
+                color: T.textMuted,
                 margin: 0,
               }}
             >
               Section C — Design Principles
             </h2>
-            <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>
+            <span style={{ fontFamily: mono, fontSize: 11, color: T.textMuted }}>
               {principles.length} principle{principles.length !== 1 ? 's' : ''}
             </span>
           </div>
@@ -1243,7 +1102,7 @@ export default function GovernancePage() {
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      color: T.dim,
+                      color: T.textDim,
                       padding: 4,
                       borderRadius: 4,
                       display: 'flex',
@@ -1264,7 +1123,7 @@ export default function GovernancePage() {
                       style={{
                         fontFamily: mono,
                         fontSize: 10,
-                        color: T.muted,
+                        color: T.textMuted,
                         display: 'block',
                         marginBottom: 5,
                         textTransform: 'uppercase',
@@ -1285,7 +1144,7 @@ export default function GovernancePage() {
                       style={{
                         fontFamily: mono,
                         fontSize: 10,
-                        color: T.muted,
+                        color: T.textMuted,
                         display: 'block',
                         marginBottom: 5,
                         textTransform: 'uppercase',
@@ -1307,7 +1166,7 @@ export default function GovernancePage() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
                   {/* severity */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Severity</span>
+                    <span style={{ fontFamily: mono, fontSize: 10, color: T.textMuted }}>Severity</span>
                     <select
                       value={p.severity}
                       onChange={(e) =>
@@ -1337,7 +1196,7 @@ export default function GovernancePage() {
                       checked={p.autoFix}
                       onChange={(v) => updatePrinciple(p.id, { autoFix: v })}
                     />
-                    <span style={{ fontFamily: mono, fontSize: 11, color: p.autoFix ? T.green : T.muted }}>
+                    <span style={{ fontFamily: mono, fontSize: 11, color: p.autoFix ? T.green : T.textMuted }}>
                       Auto-fix {p.autoFix ? 'on' : 'off'}
                     </span>
                   </div>
@@ -1357,7 +1216,7 @@ export default function GovernancePage() {
                       style={{
                         fontFamily: mono,
                         fontSize: 11,
-                        color: T.dim,
+                        color: T.textDim,
                         background: T.surface2,
                         border: `1px solid ${T.border2}`,
                         padding: '4px 12px',
@@ -1380,7 +1239,7 @@ export default function GovernancePage() {
               fontFamily: mono,
               fontSize: 12,
               fontWeight: 600,
-              color: T.muted,
+              color: T.textMuted,
               background: 'transparent',
               border: `1px dashed ${T.border2}`,
               borderRadius: 8,
@@ -1396,7 +1255,7 @@ export default function GovernancePage() {
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = T.border2
-              e.currentTarget.style.color = T.muted
+              e.currentTarget.style.color = T.textMuted
             }}
           >
             + Add Principle
@@ -1414,7 +1273,7 @@ export default function GovernancePage() {
           <div style={{ fontFamily: syne, fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 8 }}>
             Rules configured. Connect Claude Code.
           </div>
-          <p style={{ fontFamily: mono, fontSize: 12, color: T.muted, marginBottom: 24 }}>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T.textMuted, marginBottom: 24 }}>
             Wire the MCP endpoint so every generated component is scanned and patched automatically.
           </p>
           <a

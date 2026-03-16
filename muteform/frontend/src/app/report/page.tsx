@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Stepper from '@/components/Stepper'
+import Header from '@/components/Header'
 import { loadReport, loadSession, markStepComplete } from '@/lib/session'
 import { reportToJSON, type GovernanceReport, type EnrichedViolation } from '@/lib/governance'
 
@@ -189,7 +189,7 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
         alignItems: 'center', justifyContent: 'center',
       }}>
         <span style={{
-          fontFamily: 'var(--font-serif)', fontSize: size * 0.3, fontWeight: 800,
+          fontFamily: 'var(--font-heading)', fontSize: size * 0.3, fontWeight: 800,
           color: scoreColor(score), lineHeight: 1,
         }}>
           {animatedScore}
@@ -323,7 +323,7 @@ function ViolationPreview({ v }: { v: EnrichedViolation }) {
   }
 
   return (
-    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
       {v.fixDescription}
     </div>
   )
@@ -369,7 +369,7 @@ function AutoFixedCard({ v, index }: { v: EnrichedViolation; index: number }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
             color: 'var(--text-primary)', lineHeight: 1.3,
           }}>
             {v.ruleName}
@@ -412,7 +412,7 @@ function WarningCard({ v, index }: { v: EnrichedViolation; index: number }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
             color: 'var(--text-primary)', lineHeight: 1.3,
           }}>
             {v.ruleName}
@@ -436,13 +436,13 @@ function WarningCard({ v, index }: { v: EnrichedViolation; index: number }) {
       </div>
 
       <div style={{
-        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+        fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
         marginTop: 10, lineHeight: 1.6,
       }}>
         <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Found: </span>{v.evidence}
       </div>
       <div style={{
-        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+        fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
         marginTop: 4, lineHeight: 1.6,
       }}>
         <span style={{ color: 'var(--warning)', fontWeight: 600 }}>Recommended: </span>{v.fixDescription}
@@ -465,7 +465,7 @@ function BlockedCard({ v, index }: { v: EnrichedViolation; index: number }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
             color: 'var(--text-primary)', lineHeight: 1.3,
           }}>
             {v.ruleName}
@@ -489,13 +489,13 @@ function BlockedCard({ v, index }: { v: EnrichedViolation; index: number }) {
       </div>
 
       <div style={{
-        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+        fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
         marginTop: 10, lineHeight: 1.6,
       }}>
         <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Issue: </span>{v.evidence}
       </div>
       <div style={{
-        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+        fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
         marginTop: 4, lineHeight: 1.6,
       }}>
         <span style={{ color: 'var(--error)', fontWeight: 600 }}>Action required: </span>{v.fixDescription}
@@ -543,7 +543,7 @@ function CategoryBar({ name, score, delay }: { name: string; score: number; dela
       marginBottom: 14,
     }}>
       <span style={{
-        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+        fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
         width: 140, flexShrink: 0,
       }}>
         {name}
@@ -594,20 +594,20 @@ export default function ReportPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
         <style>{keyframesCSS}</style>
-        <Stepper />
+        <Header />
         <div style={{
           maxWidth: 900, margin: '0 auto', padding: '120px 20px',
           textAlign: 'center',
           animation: 'fadeInPage 0.5s ease both',
         }}>
           <div style={{
-            fontFamily: 'var(--font-sans)', fontSize: 20, fontWeight: 700,
+            fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700,
             color: 'var(--text-primary)', marginBottom: 8,
           }}>
             No report yet.
           </div>
           <div style={{
-            fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-muted)', marginBottom: 28,
+            fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text-muted)', marginBottom: 28,
           }}>
             Run a governance scan first.
           </div>
@@ -641,7 +641,7 @@ export default function ReportPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
       <style>{keyframesCSS}</style>
-      <Stepper />
+      <Header />
 
       <div style={{
         maxWidth: 900, margin: '0 auto', padding: '32px 20px 120px',
@@ -654,7 +654,7 @@ export default function ReportPage() {
           borderRadius: 4, padding: '32px 36px', marginBottom: 24,
         }}>
           <h1 style={{
-            fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 800,
+            fontFamily: 'var(--font-heading)', fontSize: 24, fontWeight: 800,
             color: 'var(--text-primary)', marginBottom: 20, marginTop: 0,
           }}>
             Governance Report
@@ -664,18 +664,18 @@ export default function ReportPage() {
             display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 20px',
           }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>Company</span>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>{company}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>{company}</span>
 
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>Design System</span>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>Acme Design System</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>Acme Design System</span>
 
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>Fixture</span>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>
               {report.fixtureName} <span style={{ color: 'var(--text-muted)' }}>from</span> {report.fixtureSource}
             </span>
 
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>Date</span>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>{formatDate(report.timestamp)}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>{formatDate(report.timestamp)}</span>
           </div>
         </div>
 
@@ -748,7 +748,7 @@ export default function ReportPage() {
           borderRadius: 4, padding: '28px 36px', marginBottom: 24,
         }}>
           <div style={{
-            fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+            fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
             color: 'var(--text-primary)', marginBottom: 20,
             letterSpacing: '0.02em',
           }}>
@@ -843,13 +843,13 @@ export default function ReportPage() {
         >
           <div>
             <div style={{
-              fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700,
+              fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700,
               color: 'var(--text-primary)', marginBottom: 6,
             }}>
               Set up MCP integration
             </div>
             <div style={{
-              fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
+              fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
             }}>
               Enforce governance automatically in your AI coding workflow.
             </div>

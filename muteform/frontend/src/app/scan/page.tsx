@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import Stepper from '@/components/Stepper'
+import Header from '@/components/Header'
 import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
 import type { MuteformConfig, ScanResult, RewriteResult, InterfaceDefinition } from '@/lib/engine'
 import { getFixture, FIXTURES } from '@/lib/fixtures'
@@ -204,7 +204,7 @@ function ScoreRing({
           flexDirection: 'column',
         }}>
           <span style={{
-            fontFamily: 'var(--font-serif)', fontSize: size * 0.3, fontWeight: 700,
+            fontFamily: 'var(--font-heading)', fontSize: size * 0.3, fontWeight: 700,
             color: color, lineHeight: 1,
           }}>
             {displayScore}
@@ -297,7 +297,7 @@ function ViolationCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Rule name */}
           <div style={{
-            fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
             marginBottom: 4,
           }}>
             {violation.ruleName}
@@ -311,7 +311,7 @@ function ViolationCard({
           </div>
           {/* Evidence */}
           <div style={{
-            fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5,
+            fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5,
           }}>
             {violation.evidence}
           </div>
@@ -361,7 +361,7 @@ function ViolationCard({
 
           {isTypographyType && (
             <div style={{
-              fontFamily: 'var(--font-sans)', fontSize: 13, fontStyle: 'italic',
+              fontFamily: 'var(--font-mono)', fontSize: 13, fontStyle: 'italic',
               color: violation.fixApplied ? 'var(--success)' : 'var(--warning)',
               marginTop: 8, padding: '4px 8px',
               background: violation.fixApplied ? 'var(--success-dim)' : 'var(--warning-dim)',
@@ -640,12 +640,12 @@ export default function ScanPage() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
-      <Stepper />
+      <Header />
       <div style={{
         minHeight: '100vh',
         background: 'var(--bg)',
         color: 'var(--text-primary)',
-        fontFamily: 'var(--font-sans)',
+        fontFamily: 'var(--font-mono)',
       }}>
         {/* Context Banner */}
         <div style={{
@@ -674,14 +674,14 @@ export default function ScanPage() {
             <div style={{ animation: 'fadeIn 300ms ease' }}>
               <div style={{ marginBottom: 40 }}>
                 <h1 style={{
-                  fontFamily: 'var(--font-serif)', fontSize: 32, fontWeight: 700,
+                  fontFamily: 'var(--font-heading)', fontSize: 32, fontWeight: 700,
                   color: 'var(--text-primary)', margin: 0, marginBottom: 8,
                   lineHeight: 1.2,
                 }}>
                   Scan Artifact
                 </h1>
                 <p style={{
-                  fontFamily: 'var(--font-sans)', fontSize: 15, color: 'var(--text-secondary)', margin: 0,
+                  fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--text-secondary)', margin: 0,
                 }}>
                   Choose an AI-generated UI fixture or paste your own code to scan against the active ruleset.
                 </p>
@@ -719,7 +719,7 @@ export default function ScanPage() {
                       }}
                     >
                       <div style={{
-                        fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+                        fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 600,
                         color: 'var(--text-primary)', marginBottom: 6,
                       }}>
                         {f.name}
@@ -738,7 +738,7 @@ export default function ScanPage() {
                         <span>{f.nodeCount} nodes</span>
                       </div>
                       <div style={{
-                        fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
+                        fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
                       }}>
                         {f.description}
                       </div>
@@ -772,13 +772,13 @@ export default function ScanPage() {
                   }}
                 >
                   <div style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+                    fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 600,
                     color: customExpanded ? 'var(--accent)' : 'var(--text-muted)', marginBottom: 6,
                   }}>
                     + Paste your own
                   </div>
                   <div style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
+                    fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
                   }}>
                     JSON (InterfaceDefinition or nodes array) or HTML
                   </div>
@@ -826,7 +826,7 @@ export default function ScanPage() {
                     disabled={!customInput.trim()}
                     style={{
                       marginTop: 12,
-                      fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
+                      fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
                       color: 'var(--bg)',
                       background: !customInput.trim() ? 'var(--border)' : 'var(--accent)',
                       border: 'none', borderRadius: 4,
@@ -852,7 +852,7 @@ export default function ScanPage() {
               justifyContent: 'center', minHeight: 400,
             }}>
               <div style={{
-                fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 700,
+                fontFamily: 'var(--font-heading)', fontSize: 24, fontWeight: 700,
                 color: 'var(--text-primary)', marginBottom: 32,
               }}>
                 Scanning interface
@@ -925,7 +925,7 @@ export default function ScanPage() {
                 borderRadius: 4, padding: 24, marginBottom: 24,
               }}>
                 <div style={{
-                  fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+                  fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 600,
                   color: 'var(--text-primary)', marginBottom: 16,
                 }}>
                   Category Breakdown
@@ -947,7 +947,7 @@ export default function ScanPage() {
                           marginBottom: 6,
                         }}>
                           <span style={{
-                            fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500,
+                            fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500,
                           }}>
                             {label}
                           </span>
@@ -1046,7 +1046,7 @@ export default function ScanPage() {
                 disabled={applyingGovernance}
                 style={{
                   width: '100%',
-                  fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700,
+                  fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700,
                   color: 'var(--bg)', background: 'var(--accent)',
                   border: 'none', borderRadius: 4,
                   padding: '16px 32px',
@@ -1081,13 +1081,13 @@ export default function ScanPage() {
                 border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
               }}>
                 <div style={{
-                  fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+                  fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
                   color: 'var(--success)', marginBottom: 4,
                 }}>
                   Governed &mdash; ready to ship
                 </div>
                 <div style={{
-                  fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                  fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
                 }}>
                   {report.autoFixedCount} fixes applied &middot; {report.warningCount} warning{report.warningCount !== 1 ? 's' : ''} &middot; {report.blockedCount} blocked
                 </div>
@@ -1109,7 +1109,7 @@ export default function ScanPage() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                 }}>
                   <span style={{
-                    fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 700,
+                    fontFamily: 'var(--font-heading)', fontSize: 24, fontWeight: 700,
                     color: 'var(--success)',
                   }}>
                     +{report.afterScore - report.overallScore}
@@ -1332,7 +1332,7 @@ export default function ScanPage() {
                 marginBottom: 24, textAlign: 'center',
               }}>
                 <div style={{
-                  fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+                  fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
                   color: 'var(--success)', marginBottom: 6,
                 }}>
                   Governed {'\u2014'} ready to ship
@@ -1350,7 +1350,7 @@ export default function ScanPage() {
                   href="/report"
                   style={{
                     flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 4,
-                    fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+                    fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
                     color: 'var(--bg)', background: 'var(--accent)',
                     textDecoration: 'none', transition: 'all 150ms ease',
                   }}
@@ -1373,7 +1373,7 @@ export default function ScanPage() {
                   }}
                   style={{
                     flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 4,
-                    fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+                    fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
                     color: 'var(--text-primary)', background: 'var(--surface)',
                     border: '1px solid var(--border)',
                     cursor: 'pointer', transition: 'all 150ms ease',
@@ -1392,7 +1392,7 @@ export default function ScanPage() {
                   onMouseEnter={() => setHoveredBtn('report')}
                   onMouseLeave={() => setHoveredBtn(null)}
                   style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+                    fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 600,
                     color: 'var(--accent)', textDecoration: 'none',
                     display: 'flex', alignItems: 'center', gap: 8,
                     transition: 'all 200ms ease',
@@ -1417,7 +1417,7 @@ export default function ScanPage() {
                   onMouseEnter={() => setHoveredBtn('another')}
                   onMouseLeave={() => setHoveredBtn(null)}
                   style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
+                    fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600,
                     color: 'var(--text-secondary)', background: 'transparent',
                     border: '1px solid var(--border-strong)',
                     borderRadius: 4, padding: '10px 20px',

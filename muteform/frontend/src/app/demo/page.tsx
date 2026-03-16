@@ -1,10 +1,14 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import Header from '@/components/Header'
+import { tokens } from '@/lib/design-tokens'
 import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
 import type { MuteformConfig, ScanResult, RewriteResult, InterfaceDefinition } from '@/lib/engine'
 import { getFixture } from '@/lib/fixtures'
 import { buildGovernanceReport, reportToJSON, type GovernanceReport, type EnrichedViolation, type GovernanceSeverity } from '@/lib/governance'
+
+const T = tokens
 
 const DEMO_YAML = `name: "Acme Design System"
 version: "1.0.0"
@@ -97,7 +101,7 @@ function ScoreRing({ score, size = 120, animate = false, label }: { score: numbe
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: size * 0.28, fontWeight: 700, color: col, lineHeight: 1 }}>{displayed}</span>
-        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 3 }}>{label || 'health'}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 3 }}>{label || 'health'}</span>
       </div>
     </div>
   )
@@ -109,7 +113,7 @@ function ViolationCard({ v }: { v: EnrichedViolation }) {
     <div style={{ padding: '14px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, borderLeft: `3px solid ${sev.color}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: sev.color, background: sev.dim, padding: '2px 6px', borderRadius: 3, letterSpacing: '0.06em' }}>{sev.label}</span>
-        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{v.ruleName}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{v.ruleName}</span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)' }}>{v.ruleSource}</span>
       </div>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{v.nodePath}</div>
@@ -150,7 +154,7 @@ function ViolationCard({ v }: { v: EnrichedViolation }) {
         </div>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--text-muted)' }}>{'\u2192'}</span>
         <div style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--success-dim)', border: '1px solid var(--success)' }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 18, fontWeight: 700, color: 'var(--success)' }}>Aa</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--success)' }}>Aa</span>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--success)', marginTop: 2 }}>{v.suggestedFix || 'approved'}</div>
         </div>
       </div>)}
@@ -201,7 +205,7 @@ function NodeCard({ node, violations, isGoverned }: { node: any; violations: Enr
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>{v}</span>
         </div>))}
       </div>)}
-      {node.properties.component && (<span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#a855f7', background: 'var(--accent-dim)', padding: '1px 6px', borderRadius: 3, marginTop: 4, display: 'inline-block' }}>{node.properties.component.name}: {node.properties.component.variant}</span>)}
+      {node.properties.component && (<span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: T.blue, background: T.blueDim, padding: '1px 6px', borderRadius: 3, marginTop: 4, display: 'inline-block' }}>{node.properties.component.name}: {node.properties.component.variant}</span>)}
       {hasViolation && nodeViolations.map(v => (<div key={v.id} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--error)', marginTop: 4, padding: '4px 8px', background: 'var(--error-dim)', borderRadius: 4 }}>{v.ruleName}: {v.evidence}</div>))}
       {wasFixed && nodeViolations.filter(v => v.fixApplied).map(v => (<div key={v.id} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--success)', marginTop: 4, padding: '4px 8px', background: 'var(--success-dim)', borderRadius: 4 }}>{v.fixDescription}</div>))}
     </div>
@@ -232,7 +236,6 @@ function runInitialScan() {
 }
 
 export default function DemoPage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [initial] = useState(runInitialScan)
   const [scanResult, setScanResult] = useState<ScanResult | null>(initial?.result ?? null)
   const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null)
@@ -268,35 +271,9 @@ export default function DemoPage() {
         @keyframes spin { to { transform: rotate(360deg) } }
         @media (max-width: 768px) { .demo-hero h1 { font-size: 26px !important; } .demo-grid { grid-template-columns: 1fr !important; } }
       `}</style>
-      {/* ── Nav — matches landing page ── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
-          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 4, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 700, fontSize: 15, color: '#fff' }}>M</span>
-            </div>
-            <span style={{ fontFamily: 'var(--font-heading)', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>muteform</span>
-          </a>
-          <div className="nav-links" style={{ gap: 28 }}>
-            <a href="/demo" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600, textDecoration: 'none' }}>Demo</a>
-            <a href="/integrate" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)', textDecoration: 'none' }}>Docs</a>
-          </div>
-          <div className="nav-links" style={{ gap: 10 }}>
-            <a href="/#waitlist" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: '#fff', background: 'var(--accent)', padding: '7px 18px', borderRadius: 4, textDecoration: 'none' }}>Get beta access</a>
-          </div>
-          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
-          </button>
-        </div>
-      </nav>
-      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
-        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
-        <a href="/demo" onClick={() => setMobileMenuOpen(false)}>Demo</a>
-        <a href="/integrate" onClick={() => setMobileMenuOpen(false)}>Docs</a>
-        <a href="/#waitlist" onClick={() => setMobileMenuOpen(false)} style={{ fontWeight: 600, color: '#fff', background: 'var(--accent)', borderRadius: 4, textAlign: 'center', marginTop: 8, padding: '12px 0', border: 'none' }}>Get beta access</a>
-      </div>
+      <Header />
       <div className="demo-hero" style={{ padding: '36px 20px 24px', maxWidth: 1200, margin: '0 auto', textAlign: 'center' }}>
-        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 38, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.15, margin: 0 }}>Live governance demo</h1>
+        <h1 style={{ fontFamily: T.fontDisplay, fontSize: 38, fontWeight: 700, color: T.text, letterSpacing: '-0.02em', lineHeight: 1.15, margin: 0 }}>Live governance demo</h1>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.6 }}>Scanning: <strong style={{ color: 'var(--text-primary)' }}>Onboarding Flow</strong> from <strong style={{ color: 'var(--warning)' }}>Cursor AI</strong> {'\u2014'} {violationCount} violations detected</p>
       </div>
       <div className="demo-grid" style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -304,7 +281,7 @@ export default function DemoPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '20px 24px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12 }}>
             <ScoreRing score={score} size={100} animate />
             <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{fixture?.name || 'Onboarding Flow'}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{fixture?.name || 'Onboarding Flow'}</div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>Source: {fixture?.source || 'Cursor AI output'}</div>
               {report && (<div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                 {report.categories.map(c => (<div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 6px', borderRadius: 4, background: 'var(--surface-elevated)', border: '1px solid var(--border)' }}>
@@ -361,8 +338,8 @@ export default function DemoPage() {
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--success)', letterSpacing: '0.1em' }}>GOVERNED {'\u2014'} READY TO SHIP</div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <a href="/report" style={{ flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 4, fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--bg)', background: 'var(--accent)', textDecoration: 'none', transition: 'all 150ms ease' }}>View full report {'\u2192'}</a>
-              <a href="/demo" style={{ flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 4, fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', background: 'var(--surface)', border: '1px solid var(--border)', textDecoration: 'none', transition: 'all 150ms ease' }} onClick={(e) => { e.preventDefault(); window.location.reload() }}>Scan another {'\u2192'}</a>
+              <a href="/report" style={{ flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--bg)', background: 'var(--accent)', textDecoration: 'none', transition: 'all 150ms ease' }}>View full report {'\u2192'}</a>
+              <a href="/demo" style={{ flex: 1, textAlign: 'center', padding: '12px 0', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', background: 'var(--surface)', border: '1px solid var(--border)', textDecoration: 'none', transition: 'all 150ms ease' }} onClick={(e) => { e.preventDefault(); window.location.reload() }}>Scan another {'\u2192'}</a>
             </div>
           </>)}
         </div>
@@ -375,11 +352,11 @@ export default function DemoPage() {
           </div>
           <div style={{ padding: '16px', maxHeight: 500, overflow: 'auto' }}>
             {diffTab === 'original' && (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Raw Fixture {'\u2014'} violations highlighted in red</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Raw Fixture {'\u2014'} violations highlighted in red</div>
               {fixture.artifact.nodes.map(node => (<NodeCard key={node.id} node={node} violations={report.violations} isGoverned={false} />))}
             </div>)}
             {diffTab === 'violations' && (<div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>All Violations {'\u2014'} visual comparison</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>All Violations {'\u2014'} visual comparison</div>
               {(['color_token', 'spacing', 'typography', 'component', 'layout', 'accessibility'] as const).map(type => {
                 const group = report.violations.filter(v => v.type === type); if (group.length === 0) return null
                 const typeLabels: Record<string, string> = { color_token: 'COLOR', spacing: 'SPACING', typography: 'TYPOGRAPHY', component: 'COMPONENT', layout: 'LAYOUT', accessibility: 'ACCESSIBILITY' }
@@ -390,7 +367,7 @@ export default function DemoPage() {
               })}
             </div>)}
             {diffTab === 'governed' && rewriteResult && (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Governed Output {'\u2014'} fixes highlighted in green</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Governed Output {'\u2014'} fixes highlighted in green</div>
               {rewriteResult.rewrittenArtifact.nodes.map(node => (<NodeCard key={node.id} node={node} violations={report.violations} isGoverned={true} />))}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={() => copyText(JSON.stringify(rewriteResult.rewrittenArtifact, null, 2), 'governed')} style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, padding: '10px', borderRadius: 6, cursor: 'pointer', background: copied === 'governed' ? 'var(--success-dim)' : 'var(--surface-elevated)', color: copied === 'governed' ? 'var(--success)' : 'var(--text-primary)', border: copied === 'governed' ? '1px solid var(--success)' : '1px solid var(--border)', letterSpacing: '0.06em' }}>{copied === 'governed' ? 'COPIED \u2713' : 'Copy Governed Output'}</button>
@@ -403,7 +380,7 @@ export default function DemoPage() {
       {phase === 'governed' && report && (<div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 80px' }}>
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', background: 'linear-gradient(180deg, var(--surface-elevated) 0%, var(--surface) 100%)' }}>
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Enterprise Governance Report</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Enterprise Governance Report</div>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               <span style={{ color: 'var(--text-muted)' }}>Screen: <span style={{ color: 'var(--text-primary)' }}>{report.fixtureName}</span></span>
               <span style={{ color: 'var(--text-muted)' }}>Source: <span style={{ color: 'var(--warning)' }}>{report.fixtureSource}</span></span>
@@ -419,9 +396,9 @@ export default function DemoPage() {
             </div>
           </div>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>Category Scores</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>Category Scores</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
-              {[...report.categories, { name: 'Design Principles', key: 'principles', score: 85, color: '#a855f7' }].map(c => (<div key={c.key} style={{ padding: '12px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              {report.categories.map(c => (<div key={c.key} style={{ padding: '12px', background: T.surface2, borderRadius: T.radius.md, border: `1px solid ${T.border}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>{c.name}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: c.score >= 90 ? 'var(--success)' : c.score >= 60 ? 'var(--warning)' : 'var(--error)' }}>{c.score}</span>
@@ -433,7 +410,7 @@ export default function DemoPage() {
             </div>
           </div>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--success)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>{'\u2713'} AUTO-FIXED ({report.autoFixedCount})</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--success)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>{'\u2713'} AUTO-FIXED ({report.autoFixedCount})</div>
             {report.violations.filter(v => v.fixApplied).map(v => (<div key={v.id} style={{ padding: '10px 14px', marginBottom: 8, background: 'var(--success-dim)', borderRadius: 8, border: '1px solid var(--success)' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--success)', marginBottom: 4 }}>{v.ruleName}</div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{v.nodePath}</div>
@@ -442,7 +419,7 @@ export default function DemoPage() {
             {report.autoFixedCount === 0 && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>No auto-fixes applied</div>}
           </div>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--warning)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>{'\u26a0'} WARNINGS ({report.warningCount} {'\u2014'} review recommended)</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--warning)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>{'\u26a0'} WARNINGS ({report.warningCount} {'\u2014'} review recommended)</div>
             {report.violations.filter(v => !v.fixApplied && v.severity === 'warn').map(v => (<div key={v.id} style={{ padding: '10px 14px', marginBottom: 8, background: 'var(--warning-dim)', borderRadius: 8, border: '1px solid var(--warning)' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--warning)', marginBottom: 4 }}>{v.ruleName}</div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{v.nodePath}</div>
@@ -452,7 +429,7 @@ export default function DemoPage() {
             {report.warningCount === 0 && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>No warnings</div>}
           </div>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--error)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>{'\u2715'} BLOCKED ({report.blockedCount} {'\u2014'} cannot ship)</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--error)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>{'\u2715'} BLOCKED ({report.blockedCount} {'\u2014'} cannot ship)</div>
             {report.violations.filter(v => !v.fixApplied && v.severity === 'block').map(v => (<div key={v.id} style={{ padding: '10px 14px', marginBottom: 8, background: 'var(--error-dim)', borderRadius: 8, border: '1px solid var(--error)' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--error)', marginBottom: 4 }}>{v.ruleName}</div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{v.nodePath}</div>
@@ -470,7 +447,7 @@ export default function DemoPage() {
       </div>)}
       {phase !== 'governed' && (<div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 80px', textAlign: 'center' }}>
         <div style={{ padding: '48px 24px', background: 'linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%)', borderRadius: 16, border: '1px solid var(--border)' }}>
-          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 8 }}>Ready to govern your own system?</h2>
+          <h2 style={{ fontFamily: T.fontDisplay, fontSize: 28, fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 8 }}>Ready to govern your own system?</h2>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 28, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>Import your tokens, define rules, scan any AI output.</p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <a href="/import" style={{ display: 'inline-block', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: '#fff', background: 'var(--accent)', padding: '12px 28px', borderRadius: 4, textDecoration: 'none' }}>Start with your design system &rarr;</a>
