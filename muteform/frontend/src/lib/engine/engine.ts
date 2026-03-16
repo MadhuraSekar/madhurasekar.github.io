@@ -7,7 +7,7 @@ import type {
   Violation,
   TokenDefinitions,
 } from './types'
-import { contrastRatio, deltaE2000, findNearestColor } from './color'
+import { contrastRatio, deltaE2000, findNearestColor, adjustForegroundForContrast } from './color'
 
 /** Flatten nested color tokens into a flat Record<string, string> */
 export function flattenColors(obj: any, prefix = ''): Record<string, string> {
@@ -24,91 +24,83 @@ export function flattenColors(obj: any, prefix = ''): Record<string, string> {
   return out
 }
 
-/** Parse a YAML string into MuteformConfig (uses js-yaml if available, else simple parser) */
+/** Parse a YAML string into MuteformConfig */
 export function loadConfig(yamlString: string): MuteformConfig {
-  // Simple YAML-like parser for browser use without js-yaml dependency
-  // Handles the structured format we need
   try {
-    // Try JSON first (for testing convenience)
     return JSON.parse(yamlString) as MuteformConfig
   } catch {
-    // Basic YAML parsing — for production, integrate js-yaml
-    return parseSimpleYaml(yamlString)
+    // Use js-yaml
+    const yaml = require('js-yaml')
+    const raw = yaml.load(yamlString) as any
+    return normalizeConfig(raw)
   }
 }
 
-function parseSimpleYaml(yaml: string): MuteformConfig {
-  const lines = yaml.split('\n')
-  const config: any = { name: '', version: '', tokens: {}, rules: [] }
-  let currentSection = ''
-  let currentSubSection = ''
-  let currentRule: any = null
+/** Normalize raw YAML object into MuteformConfig */
+function normalizeConfig(raw: any): MuteformConfig {
+  const config: MuteformConfig = {
+    name: raw.name || '',
+    version: raw.version || '',
+    tokens: {},
+    rules: [],
+  }
 
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) continue
-
-    const indent = line.search(/\S/)
-
-    if (indent === 0 && trimmed.includes(':')) {
-      const [key, ...rest] = trimmed.split(':')
-      const val = rest.join(':').trim().replace(/^["']|["']$/g, '')
-      if (key === 'name') config.name = val
-      else if (key === 'version') config.version = val
-      else if (key === 'tokens') currentSection = 'tokens'
-      else if (key === 'rules') currentSection = 'rules'
-    } else if (currentSection === 'tokens' && indent >= 2) {
-      // Simplified token parsing
-      const [key, ...rest] = trimmed.split(':')
-      const k = key.trim()
-      const val = rest.join(':').trim().replace(/^["']|["']$/g, '')
-      if (indent === 2) {
-        currentSubSection = k
-        if (!config.tokens[currentSubSection]) config.tokens[currentSubSection] = {}
-      } else if (val) {
-        if (k === 'scale' && val.startsWith('[')) {
-          config.tokens[currentSubSection].scale = JSON.parse(val)
-        } else if (k === 'tolerance') {
-          config.tokens[currentSubSection].tolerance = parseInt(val)
-        } else if (k === 'max_duration') {
-          config.tokens[currentSubSection] = config.tokens[currentSubSection] || {}
-          config.tokens[currentSubSection].max_duration = parseInt(val)
-        } else if (k === 'easing_allowed' && val.startsWith('[')) {
-          config.tokens[currentSubSection] = config.tokens[currentSubSection] || {}
-          config.tokens[currentSubSection].easing_allowed = JSON.parse(val)
-        } else if (k === 'grid_columns' && val.startsWith('[')) {
-          config.tokens[currentSubSection] = config.tokens[currentSubSection] || {}
-          config.tokens[currentSubSection].grid_columns = JSON.parse(val)
-        } else if (k === 'scale_ratio') {
-          config.tokens[currentSubSection] = config.tokens[currentSubSection] || {}
-          config.tokens[currentSubSection].scale_ratio = parseFloat(val)
-        } else if (k === 'min_body_size') {
-          config.tokens[currentSubSection] = config.tokens[currentSubSection] || {}
-          config.tokens[currentSubSection].min_body_size = parseInt(val)
-        } else {
-          // Nested color or font value
-          if (typeof config.tokens[currentSubSection] !== 'object') config.tokens[currentSubSection] = {}
-          config.tokens[currentSubSection][k] = val.startsWith('#') ? val : val
-        }
+  if (raw.tokens) {
+    const t = raw.tokens
+    if (t.colors) config.tokens.colors = t.colors
+    if (t.spacing) {
+      config.tokens.spacing = {
+        scale: Array.isArray(t.spacing.scale) ? t.spacing.scale : [],
+        tolerance: t.spacing.tolerance ?? 0,
       }
-    } else if (currentSection === 'rules') {
-      if (trimmed.startsWith('- id:')) {
-        if (currentRule) config.rules.push(currentRule)
-        currentRule = { id: trimmed.replace('- id:', '').trim().replace(/^["']|["']$/g, '') }
-      } else if (currentRule && trimmed.includes(':')) {
-        const [key, ...rest] = trimmed.split(':')
-        const k = key.trim()
-        const val = rest.join(':').trim().replace(/^["']|["']$/g, '')
-        if (k === 'severity') currentRule.severity = val
-        else if (k === 'description') currentRule.description = val
-        else if (k === 'check') currentRule.check = val
-        else if (k === 'auto_fix') currentRule.auto_fix = val === 'false' ? false : val
+    }
+    if (t.typography) {
+      config.tokens.typography = {
+        families: t.typography.families || {},
+        scale_ratio: t.typography.scale_ratio,
+        min_body_size: t.typography.min_body_size,
+        allowed_styles: Array.isArray(t.typography.allowed_styles)
+          ? t.typography.allowed_styles.map(String)
+          : undefined,
+      }
+    }
+    if (t.motion) {
+      config.tokens.motion = {
+        max_duration: t.motion.max_duration,
+        easing_allowed: t.motion.easing_allowed,
+      }
+    }
+    if (t.layout) {
+      config.tokens.layout = {
+        grid_columns: Array.isArray(t.layout.grid_columns) ? t.layout.grid_columns : [],
+      }
+    }
+    if (t.components) {
+      config.tokens.components = {}
+      for (const [name, def] of Object.entries(t.components as Record<string, any>)) {
+        config.tokens.components[name] = {
+          allowed_variants: Array.isArray(def.allowed_variants)
+            ? def.allowed_variants.map(String)
+            : undefined,
+          allowed_sizes: Array.isArray(def.allowed_sizes)
+            ? def.allowed_sizes.map(String)
+            : undefined,
+        }
       }
     }
   }
-  if (currentRule) config.rules.push(currentRule)
 
-  return config as MuteformConfig
+  if (Array.isArray(raw.rules)) {
+    config.rules = raw.rules.map((r: any) => ({
+      id: String(r.id || ''),
+      severity: r.severity || 'medium',
+      description: r.description || '',
+      check: r.check || '',
+      auto_fix: r.auto_fix === false || r.auto_fix === 'false' ? false : String(r.auto_fix || ''),
+    }))
+  }
+
+  return config
 }
 
 /** Run all rules against all nodes */
@@ -122,8 +114,8 @@ export function validate(
 
   for (const node of interfaceDef.nodes) {
     for (const rule of config.rules) {
-      const v = evaluateRule(rule, node, config, colorPalette)
-      if (v) violations.push(v)
+      const vList = evaluateRule(rule, node, config, colorPalette)
+      for (const v of vList) violations.push(v)
     }
   }
 
@@ -141,17 +133,19 @@ function evaluateRule(
   node: InterfaceNode,
   config: MuteformConfig,
   colorPalette: Record<string, string>
-): Violation | null {
+): Violation[] {
   const check: string = rule.check || ''
+  const results: Violation[] = []
 
   // Color token compliance
-  if (rule.id.includes('color') && check.includes('color')) {
+  if (rule.id.includes('color') && (check.includes('color') || check.includes('token'))) {
     if (node.properties.colors) {
+      const allColors = Object.values(colorPalette).map(c => c.toLowerCase())
       for (const [prop, val] of Object.entries(node.properties.colors)) {
-        const allColors = Object.values(colorPalette).map(c => c.toLowerCase())
+        if (!val.startsWith('#')) continue
         if (!allColors.includes(val.toLowerCase())) {
           const nearest = findNearestColor(val, colorPalette)
-          return {
+          results.push({
             ruleId: rule.id,
             severity: rule.severity,
             nodeId: node.id,
@@ -162,20 +156,20 @@ function evaluateRule(
             message: `Color ${val} not in approved palette (nearest: ${nearest.name} ${nearest.hex}, ΔE=${nearest.distance.toFixed(1)})`,
             autoFixAvailable: !!rule.auto_fix,
             detail: rule.description,
-          }
+          })
         }
       }
     }
   }
 
   // Spacing scale compliance
-  if (rule.id.includes('spacing') && check.includes('spacing')) {
+  if (rule.id.includes('spacing') && (check.includes('spacing') || check.includes('scale'))) {
     const scale = config.tokens.spacing?.scale || []
     if (scale.length && node.properties.spacing) {
       for (const [prop, val] of Object.entries(node.properties.spacing)) {
         if (!scale.includes(val)) {
           const nearest = scale.reduce((a, b) => Math.abs(b - val) < Math.abs(a - val) ? b : a)
-          return {
+          results.push({
             ruleId: rule.id,
             severity: rule.severity,
             nodeId: node.id,
@@ -186,40 +180,43 @@ function evaluateRule(
             message: `Spacing ${val}px not on approved scale [${scale.join(',')}] (nearest: ${nearest}px)`,
             autoFixAvailable: !!rule.auto_fix,
             detail: rule.description,
-          }
+          })
         }
       }
     }
   }
 
   // WCAG contrast
-  if (rule.id.includes('contrast') && check.includes('contrast')) {
+  if (rule.id.includes('contrast') && (check.includes('contrast') || check.includes('wcag'))) {
     if (node.properties.contrast) {
       const { foreground, background } = node.properties.contrast
       const ratio = contrastRatio(foreground, background)
-      const targetRatio = 4.5
+      const isLargeText = (node.properties.typography?.size || 16) >= 18 ||
+        ((node.properties.typography?.size || 16) >= 14 && (node.properties.typography?.weight || 400) >= 700)
+      const targetRatio = isLargeText ? 3.0 : 4.5
       if (ratio < targetRatio) {
-        return {
+        const adjusted = adjustForegroundForContrast(foreground, background, targetRatio)
+        results.push({
           ruleId: rule.id,
           severity: rule.severity,
           nodeId: node.id,
           nodePath: node.path,
           property: 'contrast.ratio',
           currentValue: `${ratio.toFixed(1)}:1`,
-          suggestedValue: `≥${targetRatio}:1`,
-          message: `Contrast ratio ${ratio.toFixed(1)}:1 fails WCAG AA (min ${targetRatio}:1)`,
+          suggestedValue: adjusted,
+          message: `Contrast ratio ${ratio.toFixed(1)}:1 fails WCAG AA (min ${targetRatio}:1${isLargeText ? ' for large text' : ''})`,
           autoFixAvailable: !!rule.auto_fix,
           detail: rule.description,
-        }
+        })
       }
     }
   }
 
   // Motion duration
-  if (rule.id.includes('motion') && check.includes('motion')) {
+  if (rule.id.includes('motion') && (check.includes('motion') || check.includes('duration'))) {
     const maxDuration = config.tokens.motion?.max_duration || 300
     if (node.properties.motion?.duration && node.properties.motion.duration > maxDuration) {
-      return {
+      results.push({
         ruleId: rule.id,
         severity: rule.severity,
         nodeId: node.id,
@@ -230,18 +227,18 @@ function evaluateRule(
         message: `Transition ${node.properties.motion.duration}ms exceeds ${maxDuration}ms max`,
         autoFixAvailable: !!rule.auto_fix,
         detail: rule.description,
-      }
+      })
     }
   }
 
   // Typography family
-  if (rule.id.includes('typography-family') || (rule.id.includes('typography') && check.includes('family'))) {
+  if (rule.id.includes('typography') && (check.includes('family') || check.includes('font'))) {
     const families = config.tokens.typography?.families
     if (families && node.properties.typography?.family) {
       const allowed = Object.values(families).map(f => f.toLowerCase())
       if (!allowed.includes(node.properties.typography.family.toLowerCase())) {
         const categories = Object.keys(families)
-        return {
+        results.push({
           ruleId: rule.id,
           severity: rule.severity,
           nodeId: node.id,
@@ -252,26 +249,64 @@ function evaluateRule(
           message: `Font "${node.properties.typography.family}" not in approved families [${Object.values(families).join(', ')}]`,
           autoFixAvailable: !!rule.auto_fix,
           detail: rule.description,
-        }
+        })
       }
     }
   }
 
-  // Typography scale ratio
-  if (rule.id.includes('typography-scale') || (rule.id.includes('typography') && check.includes('ratio'))) {
-    const minRatio = config.tokens.typography?.scale_ratio || 1.25
-    // This would check adjacent heading sizes — simplified for now
+  // Typography style compliance
+  if (rule.id.includes('typography-style') && (check.includes('style') || check.includes('typography'))) {
+    const allowedStyles = config.tokens.typography?.allowed_styles
+    if (allowedStyles && node.properties.typography?.style) {
+      if (!allowedStyles.includes(node.properties.typography.style)) {
+        results.push({
+          ruleId: rule.id,
+          severity: rule.severity,
+          nodeId: node.id,
+          nodePath: node.path,
+          property: 'typography.style',
+          currentValue: node.properties.typography.style,
+          suggestedValue: 'body',
+          message: `Typography style "${node.properties.typography.style}" not in allowed styles [${allowedStyles.join(', ')}]`,
+          autoFixAvailable: !!rule.auto_fix,
+          detail: rule.description,
+        })
+      }
+    }
+  }
+
+  // Component variant compliance
+  if (rule.id.includes('component') && (check.includes('variant') || check.includes('component'))) {
+    if (node.properties.component) {
+      const compName = node.properties.component.name
+      const variant = node.properties.component.variant
+      const compDef = config.tokens.components?.[compName]
+      if (compDef?.allowed_variants && !compDef.allowed_variants.includes(variant)) {
+        results.push({
+          ruleId: rule.id,
+          severity: rule.severity,
+          nodeId: node.id,
+          nodePath: node.path,
+          property: 'component.variant',
+          currentValue: variant,
+          suggestedValue: compDef.allowed_variants[0],
+          message: `${compName} variant "${variant}" not allowed. Approved: [${compDef.allowed_variants.join(', ')}]`,
+          autoFixAvailable: !!rule.auto_fix,
+          detail: rule.description,
+        })
+      }
+    }
   }
 
   // Layout grid columns
-  if (rule.id.includes('layout') || check.includes('grid')) {
+  if (rule.id.includes('layout') && (check.includes('grid') || check.includes('column') || check.includes('layout'))) {
     const allowedCols = config.tokens.layout?.grid_columns || []
     if (allowedCols.length && node.properties.layout?.columns) {
       if (!allowedCols.includes(node.properties.layout.columns)) {
         const nearest = allowedCols.reduce((a, b) =>
           Math.abs(b - node.properties.layout!.columns!) < Math.abs(a - node.properties.layout!.columns!) ? b : a
         )
-        return {
+        results.push({
           ruleId: rule.id,
           severity: rule.severity,
           nodeId: node.id,
@@ -280,12 +315,12 @@ function evaluateRule(
           currentValue: `${node.properties.layout.columns} columns`,
           suggestedValue: `${nearest} columns`,
           message: `${node.properties.layout.columns}-column grid not in approved set [${allowedCols.join(',')}]`,
-          autoFixAvailable: !!rule.auto_fix,
+          autoFixAvailable: false, // requires human review
           detail: rule.description,
-        }
+        })
       }
     }
   }
 
-  return null
+  return results
 }

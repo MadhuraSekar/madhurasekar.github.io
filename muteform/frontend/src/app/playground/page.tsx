@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { validate, calculateScore, remediate } from '@/lib/engine'
-import type { MuteformConfig, InterfaceDefinition, Violation, ValidationResult } from '@/lib/engine'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
+import type { MuteformConfig, Violation, ScanResult, RewriteResult } from '@/lib/engine'
+import { FIXTURES, getFixture, type FixtureEntry } from '@/lib/fixtures'
 
 // ─── Design Tokens ───────────────────────────────────────────
 const T = {
@@ -16,804 +17,768 @@ const T = {
   text: '#e8eaf0', textBright: '#f8f9fb',
 }
 const mono = "'JetBrains Mono', 'DM Mono', monospace"
-const sans = "'DM Sans', system-ui, sans-serif"
+const sans = "'DM Sans', 'Inter', system-ui, sans-serif"
 const serif = "'Instrument Serif', Georgia, serif"
 
-// ─── Hardcoded YAML (visual only) ───────────────────────────
-const RULESET_YAML = `name: "Acme Core v8"
-version: "8.0.0"
+// ─── Default YAML ────────────────────────────────────────────
+const DEFAULT_YAML = `name: "Acme Design System"
+version: "1.0.0"
 
 tokens:
   colors:
-    brand:
-      primary: "#00e087"
-      secondary: "#0a1628"
-    semantic:
-      success: "#00e087"
-      warning: "#ffb830"
-      error: "#ff4070"
-      info: "#4090ff"
-    neutral:
-      white: "#ffffff"
-      gray-100: "#f0f1f3"
-      gray-400: "#9ca3af"
-      gray-900: "#111827"
-      black: "#000000"
+    primary: "#0055FF"
+    neutral900: "#111111"
+    success: "#22c55e"
+    warning: "#f59e0b"
+    accent: "#9ca3af"
   spacing:
     scale: [4, 8, 12, 16, 24, 32, 48, 64]
-    tolerance: 0
   typography:
     families:
       display: "Instrument Serif"
       body: "DM Sans"
       mono: "JetBrains Mono"
-    scale_ratio: 1.25
-    min_body_size: 14
-  motion:
-    max_duration: 300
-    easing_allowed: ["ease-out", "ease-in-out"]
+    allowed_styles: [h1, h2, h3, body, body-sm, caption, label]
+  components:
+    button:
+      allowed_variants: [primary, secondary]
+      allowed_sizes: [sm, md, lg]
   layout:
-    grid_columns: [1, 2, 3, 4, 6, 12]
+    grid_columns: [4, 8, 12]
 
 rules:
-  - id: "contrast-wcag-aa"
-    severity: critical
-    description: "Interactive elements must meet WCAG AA"
-    check: "contrast.ratio >= 4.5"
-    auto_fix: "adjust_foreground"
   - id: "color-token-compliance"
     severity: high
-    description: "All colors must reference approved tokens"
+    description: "All colors must reference approved design tokens"
     check: "color.value IN tokens.colors.*"
     auto_fix: "snap_nearest_delta_e"
   - id: "spacing-scale-compliance"
     severity: medium
-    description: "Spacing values must use approved scale"
+    description: "Spacing values must use the approved scale"
     check: "spacing.value IN tokens.spacing.scale"
     auto_fix: "snap_nearest"
-  - id: "motion-performance"
-    severity: low
-    description: "Transitions must not exceed max duration"
-    check: "motion.duration <= tokens.motion.max_duration"
-    auto_fix: "clamp"
-  - id: "typography-family-compliance"
+  - id: "contrast-wcag-aa"
+    severity: critical
+    description: "All text must meet WCAG AA contrast requirements"
+    check: "contrast.ratio >= 4.5"
+    auto_fix: "adjust_foreground"
+  - id: "typography-style-compliance"
     severity: high
-    description: "Fonts must use approved type families"
-    check: "typography.family IN tokens.typography.families.*"
-    auto_fix: "snap_nearest_category"`
-
-// ─── Config (JS object — source of truth) ────────────────────
-const BASE_CONFIG: MuteformConfig = {
-  name: 'Acme Core v8',
-  version: '8.0.0',
-  tokens: {
-    colors: {
-      brand: { primary: '#00e087', secondary: '#0a1628' },
-      semantic: { success: '#00e087', warning: '#ffb830', error: '#ff4070', info: '#4090ff' },
-      neutral: { white: '#ffffff', 'gray-100': '#f0f1f3', 'gray-400': '#9ca3af', 'gray-900': '#111827', black: '#000000' },
-    },
-    spacing: { scale: [4, 8, 12, 16, 24, 32, 48, 64], tolerance: 0 },
-    typography: {
-      families: { display: 'Instrument Serif', body: 'DM Sans', mono: 'JetBrains Mono' },
-      scale_ratio: 1.25,
-      min_body_size: 14,
-    },
-    motion: { max_duration: 300, easing_allowed: ['ease-out', 'ease-in-out'] },
-    layout: { grid_columns: [1, 2, 3, 4, 6, 12] },
-  },
-  rules: [
-    { id: 'contrast-wcag-aa', severity: 'critical', description: 'Interactive elements must meet WCAG AA', check: 'contrast.ratio >= 4.5', auto_fix: 'adjust_foreground' },
-    { id: 'color-token-compliance', severity: 'high', description: 'All colors must reference approved tokens', check: 'color.value IN tokens.colors.*', auto_fix: 'snap_nearest_delta_e' },
-    { id: 'spacing-scale-compliance', severity: 'medium', description: 'Spacing values must use approved scale', check: 'spacing.value IN tokens.spacing.scale', auto_fix: 'snap_nearest' },
-    { id: 'motion-performance', severity: 'low', description: 'Transitions must not exceed max duration', check: 'motion.duration <= tokens.motion.max_duration', auto_fix: 'clamp' },
-    { id: 'typography-family-compliance', severity: 'high', description: 'Fonts must use approved type families', check: 'typography.family IN tokens.typography.families.*', auto_fix: 'snap_nearest_category' },
-  ],
-}
-
-// ─── Sample Interfaces ───────────────────────────────────────
-const SAMPLE_INTERFACES: Record<string, { label: string; def: InterfaceDefinition }> = {
-  checkout: {
-    label: 'Checkout Flow',
-    def: {
-      nodes: [
-        {
-          id: 'checkout-header', type: 'container', path: 'Checkout > Header',
-          properties: { colors: { 'background-color': '#0a1628' }, spacing: { padding: 16 } },
-        },
-        {
-          id: 'checkout-helper', type: 'text', path: 'Checkout > PaymentForm > HelperText',
-          properties: {
-            colors: { color: '#6b7280', 'background-color': '#f0f1f3' },
-            contrast: { foreground: '#6b7280', background: '#f0f1f3' },
-            typography: { family: 'DM Sans', size: 13, weight: 400 },
-          },
-        },
-        {
-          id: 'checkout-cta', type: 'interactive', path: 'Checkout > PaymentForm > PrimaryCTA',
-          properties: {
-            colors: { color: '#ffffff', 'background-color': '#3478F6' },
-            spacing: { padding: 16, margin: 22 },
-            motion: { duration: 450, easing: 'ease-out' },
-          },
-        },
-        {
-          id: 'checkout-footer', type: 'container', path: 'Checkout > Footer',
-          properties: { colors: { 'background-color': '#0a1628' }, spacing: { padding: 24 } },
-        },
-      ],
-      metadata: { source: 'playground', platform: 'web', generatedAt: new Date().toISOString() },
-    },
-  },
-  dashboard: {
-    label: 'SaaS Dashboard',
-    def: {
-      nodes: [
-        {
-          id: 'dash-sidebar', type: 'container', path: 'Dashboard > Sidebar',
-          properties: {
-            colors: { 'background-color': '#1e2230', color: '#c8ccd4' },
-            spacing: { padding: 20, gap: 14 },
-          },
-        },
-        {
-          id: 'dash-chart-card', type: 'container', path: 'Dashboard > Main > ChartCard',
-          properties: {
-            colors: { 'background-color': '#15171f', 'border-color': '#2d3140' },
-            spacing: { padding: 18, gap: 10 },
-          },
-        },
-        {
-          id: 'dash-metric', type: 'text', path: 'Dashboard > Main > MetricLabel',
-          properties: {
-            colors: { color: '#8b92a0' },
-            spacing: { margin: 6 },
-          },
-        },
-        {
-          id: 'dash-action-btn', type: 'interactive', path: 'Dashboard > Header > ActionBtn',
-          properties: {
-            colors: { color: '#ffffff', 'background-color': '#2563EB' },
-            spacing: { padding: 12, margin: 16 },
-          },
-        },
-      ],
-      metadata: { source: 'playground', platform: 'web', generatedAt: new Date().toISOString() },
-    },
-  },
-  onboarding: {
-    label: 'Mobile Onboarding',
-    def: {
-      nodes: [
-        {
-          id: 'onboard-hero', type: 'container', path: 'Onboarding > HeroScreen',
-          properties: {
-            colors: { 'background-color': '#0a1628' },
-            spacing: { padding: 32, gap: 24 },
-          },
-        },
-        {
-          id: 'onboard-title', type: 'text', path: 'Onboarding > HeroScreen > Title',
-          properties: {
-            typography: { family: 'Playfair Display', size: 32, weight: 700 },
-            colors: { color: '#ffffff' },
-          },
-        },
-        {
-          id: 'onboard-subtitle', type: 'text', path: 'Onboarding > HeroScreen > Subtitle',
-          properties: {
-            colors: { color: '#7a8194', 'background-color': '#e8eaf0' },
-            contrast: { foreground: '#7a8194', background: '#e8eaf0' },
-            typography: { family: 'DM Sans', size: 16, weight: 400 },
-          },
-        },
-        {
-          id: 'onboard-next-btn', type: 'interactive', path: 'Onboarding > NextButton',
-          properties: {
-            colors: { color: '#ffffff', 'background-color': '#00e087' },
-            spacing: { padding: 16, margin: 24 },
-          },
-        },
-      ],
-      metadata: { source: 'playground', platform: 'mobile', generatedAt: new Date().toISOString() },
-    },
-  },
-}
+    description: "Typography styles must be from approved list"
+    check: "typography.style IN tokens.typography.allowed_styles"
+    auto_fix: "snap_nearest_category"
+  - id: "component-variant-compliance"
+    severity: critical
+    description: "Component variants must be from approved list"
+    check: "component.variant IN tokens.components.*.allowed_variants"
+    auto_fix: "snap_nearest_category"
+  - id: "layout-grid-compliance"
+    severity: medium
+    description: "Grid columns must use approved column counts"
+    check: "layout.columns IN tokens.layout.grid_columns"
+    auto_fix: false`
 
 // ─── Severity helpers ────────────────────────────────────────
-const SEV_COLORS: Record<string, { fg: string; bg: string }> = {
-  critical: { fg: T.red, bg: T.redDim },
-  high: { fg: T.amber, bg: T.amberDim },
-  medium: { fg: T.blue, bg: T.blueDim },
-  low: { fg: T.muted, bg: '#6b728018' },
+function severityColor(s: string): string {
+  switch (s) {
+    case 'critical': return T.red
+    case 'high': return T.red
+    case 'medium': return T.amber
+    case 'low': return T.muted
+    default: return T.muted
+  }
 }
 
-function SeverityBadge({ severity }: { severity: string }) {
-  const c = SEV_COLORS[severity] || SEV_COLORS.low
-  return (
-    <span style={{
-      display: 'inline-block', padding: '2px 8px', borderRadius: 4,
-      background: c.bg, color: c.fg, fontSize: 11, fontFamily: mono,
-      fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-    }}>
-      {severity}
-    </span>
-  )
+function severityBg(s: string): string {
+  switch (s) {
+    case 'critical': return T.redDim
+    case 'high': return T.redDim
+    case 'medium': return T.amberDim
+    case 'low': return `${T.muted}18`
+    default: return `${T.muted}18`
+  }
 }
 
-// ─── Health Score Ring ────────────────────────────────────────
-function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
-  const stroke = 8
-  const radius = (size - stroke) / 2
-  const circ = 2 * Math.PI * radius
-  const [animatedScore, setAnimatedScore] = useState(0)
-  const [offset, setOffset] = useState(circ)
+function scoreColor(score: number): string {
+  if (score < 50) return T.red
+  if (score < 80) return T.amber
+  return T.green
+}
+
+// ─── Animated Score Ring ─────────────────────────────────────
+function ScoreRing({ score, size = 160 }: { score: number; size?: number }) {
+  const [displayed, setDisplayed] = useState(0)
+  const animRef = useRef<number>()
 
   useEffect(() => {
-    const target = circ - (circ * score) / 100
-    const timer = setTimeout(() => {
-      setOffset(target)
-      setAnimatedScore(score)
-    }, 50)
-    return () => clearTimeout(timer)
-  }, [score, circ])
+    setDisplayed(0)
+    const start = performance.now()
+    const duration = 1200
+    const animate = (now: number) => {
+      const t = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setDisplayed(Math.round(eased * score))
+      if (t < 1) animRef.current = requestAnimationFrame(animate)
+    }
+    animRef.current = requestAnimationFrame(animate)
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current) }
+  }, [score])
 
-  const color = score >= 80 ? T.green : score >= 50 ? T.amber : T.red
+  const r = (size - 16) / 2
+  const circ = 2 * Math.PI * r
+  const offset = circ - (circ * displayed) / 100
+  const color = scoreColor(displayed)
 
   return (
-    <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
+    <div style={{ position: 'relative', width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={T.border} strokeWidth={stroke} />
-        <circle cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={color} strokeWidth={stroke}
+        <circle cx={size / 2} cy={size / 2} r={r}
+          stroke={T.border} strokeWidth={8} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r}
+          stroke={color} strokeWidth={8} fill="none"
           strokeDasharray={circ} strokeDashoffset={offset}
           strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 1s ease-out, stroke 0.5s ease' }} />
+          style={{ transition: 'stroke 0.3s ease' }} />
       </svg>
       <div style={{
-        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
       }}>
-        <span style={{ fontFamily: mono, fontSize: 36, fontWeight: 700, color: color, lineHeight: 1 }}>
-          {animatedScore}
-        </span>
-        <span style={{ fontFamily: sans, fontSize: 11, color: T.muted, marginTop: 4 }}>
-          HEALTH
-        </span>
+        <span style={{
+          fontFamily: mono, fontSize: size * 0.3, fontWeight: 700,
+          color, lineHeight: 1,
+        }}>{displayed}</span>
+        <span style={{
+          fontFamily: sans, fontSize: 11, color: T.muted,
+          textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 4,
+        }}>health</span>
       </div>
     </div>
   )
 }
 
+// ─── Wireframe Visualizer ────────────────────────────────────
+function WireframeView({
+  wireframe,
+  violationNodeIds,
+  fixedNodeIds,
+  label,
+}: {
+  wireframe: { id: string; label: string; x: number; y: number; w: number; h: number; color: string }[]
+  violationNodeIds: Set<string>
+  fixedNodeIds: Set<string>
+  label: string
+}) {
+  return (
+    <div style={{
+      flex: 1, background: T.surface, border: `1px solid ${T.border}`,
+      borderRadius: 8, padding: 12, minWidth: 0,
+    }}>
+      <div style={{
+        fontFamily: mono, fontSize: 10, color: T.muted,
+        textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8,
+      }}>{label}</div>
+      <div style={{
+        position: 'relative', width: '100%', paddingBottom: '85%',
+        background: T.bg, borderRadius: 6, overflow: 'hidden',
+      }}>
+        {wireframe.map(block => {
+          const isViolation = violationNodeIds.has(block.id)
+          const isFixed = fixedNodeIds.has(block.id)
+          let borderColor = 'transparent'
+          if (isViolation) borderColor = T.red
+          if (isFixed) borderColor = T.green
+          return (
+            <div key={block.id} style={{
+              position: 'absolute',
+              left: `${block.x}%`, top: `${block.y * 1.15}%`,
+              width: `${block.w}%`, height: `${block.h * 1.15}%`,
+              background: isFixed ? `${T.green}18` : isViolation ? `${T.red}18` : `${block.color}40`,
+              border: `2px solid ${borderColor}`,
+              borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.3s ease',
+            }}>
+              <span style={{
+                fontFamily: mono, fontSize: 8, color: isFixed ? T.green : isViolation ? T.red : T.muted,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                padding: '0 2px',
+              }}>{block.label}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Value Preview (colors, spacing, text) ───────────────────
+function ValuePreview({ property, value }: { property: string; value: any }) {
+  const str = typeof value === 'string' ? value : JSON.stringify(value)
+  // Color swatch
+  if (property.startsWith('colors.') && typeof value === 'string' && value.startsWith('#')) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span style={{
+          display: 'inline-block', width: 14, height: 14,
+          background: value, borderRadius: 3,
+          border: `1px solid ${T.border2}`,
+        }} />
+        <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{value}</span>
+      </span>
+    )
+  }
+  // Spacing bar
+  if (property.startsWith('spacing.')) {
+    const num = parseInt(str, 10)
+    if (!isNaN(num)) {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            display: 'inline-block', width: Math.min(num * 1.5, 80), height: 8,
+            background: T.blue, borderRadius: 2, opacity: 0.7,
+          }} />
+          <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{str}</span>
+        </span>
+      )
+    }
+  }
+  return <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{str}</span>
+}
+
 // ─── Main Page Component ─────────────────────────────────────
 export default function PlaygroundPage() {
-  // State
-  const [yamlText, setYamlText] = useState(RULESET_YAML)
-  const [disabledRules, setDisabledRules] = useState<Record<string, boolean>>({})
-  const [activePreset, setActivePreset] = useState<string>('checkout')
-  const [result, setResult] = useState<ValidationResult | null>(null)
-  const [score, setScore] = useState<number | null>(null)
-  const [violations, setViolations] = useState<Violation[]>([])
-  const [fixedIds, setFixedIds] = useState<Record<string, boolean>>({})
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [yamlText, setYamlText] = useState(DEFAULT_YAML)
+  const [selectedFixture, setSelectedFixture] = useState<string>('checkout')
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null)
+  const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
-  const [scanDone, setScanDone] = useState(false)
+  const [fixing, setFixing] = useState(false)
 
-  // Build effective config by filtering out disabled rules
-  const getEffectiveConfig = useCallback((): MuteformConfig => {
-    const filtered = BASE_CONFIG.rules.filter(function (r) {
-      return !disabledRules[r.id]
-    })
-    return {
-      name: BASE_CONFIG.name,
-      version: BASE_CONFIG.version,
-      tokens: BASE_CONFIG.tokens,
-      rules: filtered,
-    }
-  }, [disabledRules])
-
-  // Run scan
-  const runScan = useCallback(function () {
+  const handleScan = useCallback(() => {
     setScanning(true)
-    setScanDone(false)
-    setFixedIds({})
-    setExpandedId(null)
+    setError(null)
+    setRewriteResult(null)
+    setScanResult(null)
 
-    // Small delay for visual effect
-    setTimeout(function () {
-      var config = getEffectiveConfig()
-      var iface = SAMPLE_INTERFACES[activePreset].def
-      var res = validate(iface, config)
-      var scoreData = calculateScore(res)
-      setResult(res)
-      setViolations(res.violations)
-      setScore(scoreData.overall)
-      setScanning(false)
-      setScanDone(true)
-    }, 600)
-  }, [getEffectiveConfig, activePreset])
-
-  // Auto-fix a single violation
-  const fixOne = useCallback(function (violation: Violation) {
-    var config = getEffectiveConfig()
-    var res = remediate([violation], config)
-    if (res.totalFixed > 0) {
-      var newFixed: Record<string, boolean> = {}
-      var keys = Object.keys(fixedIds)
-      for (var i = 0; i < keys.length; i++) {
-        newFixed[keys[i]] = fixedIds[keys[i]]
-      }
-      newFixed[violation.nodeId + ':' + violation.ruleId] = true
-      setFixedIds(newFixed)
-
-      // Recalculate score based on remaining unfixed violations
-      var remaining = violations.filter(function (v) {
-        return !newFixed[v.nodeId + ':' + v.ruleId]
-      })
-      if (remaining.length === 0) {
-        setScore(100)
-      } else {
-        var fakeResult: ValidationResult = {
-          passed: remaining.length === 0,
-          violations: remaining,
-          nodesScanned: result ? result.nodesScanned : 0,
-          rulesEvaluated: result ? result.rulesEvaluated : 0,
-          scanDurationMs: 0,
+    // Use setTimeout to let UI update before blocking
+    setTimeout(() => {
+      try {
+        const policy = loadConfig(yamlText)
+        const fixture = getFixture(selectedFixture)
+        if (!fixture) {
+          setError(`Fixture "${selectedFixture}" not found.`)
+          setScanning(false)
+          return
         }
-        var s = calculateScore(fakeResult)
-        setScore(s.overall)
+        const result = scanArtifact(fixture.artifact, policy)
+        setScanResult(result)
+      } catch (e: any) {
+        setError(e.message || 'Failed to parse YAML or run scan.')
+      } finally {
+        setScanning(false)
       }
-    }
-  }, [getEffectiveConfig, fixedIds, violations, result])
+    }, 50)
+  }, [yamlText, selectedFixture])
 
-  // Fix all
-  const fixAll = useCallback(function () {
-    var newFixed: Record<string, boolean> = {}
-    for (var i = 0; i < violations.length; i++) {
-      var v = violations[i]
-      if (v.autoFixAvailable) {
-        newFixed[v.nodeId + ':' + v.ruleId] = true
+  const handleFixAll = useCallback(() => {
+    if (!scanResult) return
+    setFixing(true)
+
+    setTimeout(() => {
+      try {
+        const policy = loadConfig(yamlText)
+        const fixture = getFixture(selectedFixture)
+        if (!fixture) return
+        const result = rewriteArtifact(fixture.artifact, scanResult.violations, policy)
+        setRewriteResult(result)
+      } catch (e: any) {
+        setError(e.message || 'Failed to apply fixes.')
+      } finally {
+        setFixing(false)
       }
-    }
-    setFixedIds(newFixed)
-    setScore(100)
-  }, [violations])
+    }, 50)
+  }, [scanResult, yamlText, selectedFixture])
 
-  // Toggle rule
-  const toggleRule = useCallback(function (ruleId: string) {
-    var next: Record<string, boolean> = {}
-    var keys = Object.keys(disabledRules)
-    for (var i = 0; i < keys.length; i++) {
-      next[keys[i]] = disabledRules[keys[i]]
-    }
-    if (next[ruleId]) {
-      delete next[ruleId]
-    } else {
-      next[ruleId] = true
-    }
-    setDisabledRules(next)
-  }, [disabledRules])
+  const fixture = getFixture(selectedFixture)
+  const violationNodeIds = new Set(scanResult?.violations.map(v => v.nodeId) || [])
+  const fixedNodeIds = new Set(rewriteResult?.appliedFixes.map(f => f.nodeId) || [])
+  const autoFixCount = rewriteResult?.appliedFixes.length ?? 0
+  const manualCount = scanResult
+    ? scanResult.violations.filter(v => !v.autoFixAvailable).length
+    : 0
 
-  // Presets
-  var presetKeys = Object.keys(SAMPLE_INTERFACES)
-
-  // Count unfixed violations
-  var unfixedCount = violations.filter(function (v) {
-    return !fixedIds[v.nodeId + ':' + v.ruleId]
-  }).length
+  // Nav items
+  const navItems = [
+    { label: 'Demo', href: '/demo' },
+    { label: 'Playground', href: '/playground' },
+    { label: 'Rules', href: '/rules' },
+    { label: 'Governance', href: '/governance' },
+  ]
 
   return (
     <div style={{
-      minHeight: '100vh', background: T.bg, color: T.text, fontFamily: sans,
+      minHeight: '100vh', background: T.bg, color: T.text,
+      fontFamily: sans,
     }}>
-      {/* ─── Top Bar ─────────────────────────────────────────── */}
-      <header style={{
+      {/* ─── Top Nav ─────────────────────────────────────────── */}
+      <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 24px', borderBottom: '1px solid ' + T.border,
+        padding: '0 32px', height: 56,
+        borderBottom: `1px solid ${T.border}`,
         background: T.surface,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Logo */}
-          <span style={{ fontFamily: serif, fontSize: 22, color: T.textBright, fontStyle: 'italic', letterSpacing: '-0.02em' }}>
-            muteform
-          </span>
-          <span style={{
-            fontFamily: mono, fontSize: 10, padding: '3px 8px', borderRadius: 4,
-            background: T.greenDim, color: T.green, fontWeight: 600,
-            letterSpacing: '0.1em',
-          }}>
-            PLAYGROUND
-          </span>
+        <a href="/" style={{
+          fontFamily: serif, fontStyle: 'italic', fontSize: 22,
+          color: T.textBright, textDecoration: 'none', fontWeight: 400,
+        }}>muteform</a>
+        <div style={{ display: 'flex', gap: 28 }}>
+          {navItems.map(n => (
+            <a key={n.label} href={n.href} style={{
+              fontFamily: sans, fontSize: 14, fontWeight: 500,
+              color: n.label === 'Playground' ? T.green : T.muted,
+              textDecoration: 'none',
+              transition: 'color 0.2s',
+            }}>{n.label}</a>
+          ))}
         </div>
-        <a href="/demo" style={{
-          fontFamily: mono, fontSize: 12, color: T.muted, textDecoration: 'none',
-          padding: '6px 12px', borderRadius: 6, border: '1px solid ' + T.border,
-          transition: 'all 0.2s',
-        }}
-          onMouseEnter={function (e) { (e.target as HTMLElement).style.borderColor = T.green; (e.target as HTMLElement).style.color = T.green }}
-          onMouseLeave={function (e) { (e.target as HTMLElement).style.borderColor = T.border; (e.target as HTMLElement).style.color = T.muted }}
-        >
-          &larr; Back to Demo
-        </a>
-      </header>
+      </nav>
 
-      {/* ─── Two-Column Layout ───────────────────────────────── */}
+      {/* ─── Two-column Layout ───────────────────────────────── */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr',
-        minHeight: 'calc(100vh - 53px)',
+        display: 'flex', gap: 0,
+        maxWidth: 1440, margin: '0 auto',
+        minHeight: 'calc(100vh - 56px)',
       }}>
-        {/* ══════════ LEFT COLUMN ══════════ */}
+        {/* ─── LEFT COLUMN: Editor + Fixtures ─────────────── */}
         <div style={{
-          borderRight: '1px solid ' + T.border,
-          padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 53px)',
+          width: '60%', padding: '28px 24px 28px 32px',
+          borderRight: `1px solid ${T.border}`,
+          display: 'flex', flexDirection: 'column', gap: 20,
+          overflow: 'auto',
         }}>
-          {/* Ruleset Editor */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              marginBottom: 12,
-            }}>
-              <h2 style={{
-                fontFamily: mono, fontSize: 13, color: T.muted, margin: 0,
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-              }}>
-                Ruleset Editor
-              </h2>
-              <span style={{
-                fontFamily: mono, fontSize: 11, color: T.dim,
-              }}>
-                YAML (visual)
-              </span>
-            </div>
+          {/* Section label */}
+          <div style={{
+            fontFamily: mono, fontSize: 11, color: T.muted,
+            textTransform: 'uppercase', letterSpacing: 2,
+          }}>Policy Editor</div>
+
+          {/* YAML Editor */}
+          <div style={{
+            position: 'relative', borderRadius: 8,
+            border: `1px solid ${T.border}`,
+            background: T.surface,
+          }}>
             <textarea
               value={yamlText}
-              onChange={function (e) { setYamlText(e.target.value) }}
+              onChange={e => setYamlText(e.target.value)}
               spellCheck={false}
               style={{
-                width: '100%', height: 360, padding: 16, borderRadius: 8,
-                background: T.surface, border: '1px solid ' + T.border,
-                color: T.text, fontFamily: mono, fontSize: 12.5, lineHeight: 1.6,
-                resize: 'vertical', outline: 'none',
-                boxSizing: 'border-box',
+                width: '100%', minHeight: 420,
+                background: 'transparent', color: T.text,
+                fontFamily: mono, fontSize: 13, lineHeight: 1.7,
+                border: 'none', outline: 'none',
+                padding: '16px 20px',
+                resize: 'vertical',
+                caretColor: T.green,
               }}
-              onFocus={function (e) { e.target.style.borderColor = T.border2 }}
-              onBlur={function (e) { e.target.style.borderColor = T.border }}
             />
           </div>
 
-          {/* Rules List */}
+          {/* Fixture Selector */}
           <div>
-            <h2 style={{
-              fontFamily: mono, fontSize: 13, color: T.muted, margin: '0 0 12px 0',
-              textTransform: 'uppercase', letterSpacing: '0.08em',
-            }}>
-              Rules ({BASE_CONFIG.rules.length})
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {BASE_CONFIG.rules.map(function (rule) {
-                var disabled = !!disabledRules[rule.id]
+            <div style={{
+              fontFamily: mono, fontSize: 11, color: T.muted,
+              textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10,
+            }}>Select Fixture</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {FIXTURES.map(f => {
+                const active = f.id === selectedFixture
                 return (
-                  <div key={rule.id} style={{
-                    padding: '12px 16px', borderRadius: 8,
-                    background: disabled ? T.bg : T.surface,
-                    border: '1px solid ' + (disabled ? T.dim : T.border),
-                    opacity: disabled ? 0.5 : 1,
-                    transition: 'all 0.2s',
-                    cursor: 'pointer',
-                  }}
-                    onClick={function () { toggleRule(rule.id) }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {/* Toggle indicator */}
-                        <div style={{
-                          width: 32, height: 18, borderRadius: 9,
-                          background: disabled ? T.dim : T.green,
-                          position: 'relative', transition: 'background 0.2s',
-                          flexShrink: 0,
-                        }}>
-                          <div style={{
-                            width: 14, height: 14, borderRadius: '50%',
-                            background: T.textBright,
-                            position: 'absolute', top: 2,
-                            left: disabled ? 2 : 16,
-                            transition: 'left 0.2s',
-                          }} />
-                        </div>
-                        <code style={{ fontFamily: mono, fontSize: 12, color: T.textBright }}>
-                          {rule.id}
-                        </code>
-                      </div>
-                      <SeverityBadge severity={rule.severity} />
-                    </div>
-                    <p style={{ margin: '0 0 4px 40px', fontSize: 12.5, color: T.muted, lineHeight: 1.4 }}>
-                      {rule.description}
-                    </p>
-                    <div style={{ marginLeft: 40, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{
-                        fontFamily: mono, fontSize: 10, color: rule.auto_fix ? T.green : T.dim,
-                      }}>
-                        {rule.auto_fix ? 'AUTO-FIX: ' + rule.auto_fix : 'NO AUTO-FIX'}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* ══════════ RIGHT COLUMN ══════════ */}
-        <div style={{
-          padding: 24, overflowY: 'auto', maxHeight: 'calc(100vh - 53px)',
-        }}>
-          {/* Interface Preset Selector */}
-          <div style={{ marginBottom: 20 }}>
-            <h2 style={{
-              fontFamily: mono, fontSize: 13, color: T.muted, margin: '0 0 12px 0',
-              textTransform: 'uppercase', letterSpacing: '0.08em',
-            }}>
-              Interface Under Test
-            </h2>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {presetKeys.map(function (key) {
-                var active = key === activePreset
-                return (
-                  <button key={key} onClick={function () {
-                    setActivePreset(key)
-                    setScanDone(false)
-                    setResult(null)
-                    setViolations([])
-                    setScore(null)
-                    setFixedIds({})
-                  }}
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      setSelectedFixture(f.id)
+                      setScanResult(null)
+                      setRewriteResult(null)
+                      setError(null)
+                    }}
                     style={{
-                      fontFamily: mono, fontSize: 12, padding: '8px 16px',
-                      borderRadius: 6, border: '1px solid ' + (active ? T.green : T.border),
+                      flex: 1, padding: '12px 16px',
                       background: active ? T.greenDim : T.surface,
-                      color: active ? T.green : T.muted,
-                      cursor: 'pointer', transition: 'all 0.2s',
-                      outline: 'none',
+                      border: `1px solid ${active ? T.green : T.border}`,
+                      borderRadius: 8, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                      transition: 'all 0.2s',
                     }}
                   >
-                    {SAMPLE_INTERFACES[key].label}
+                    <span style={{
+                      fontFamily: sans, fontSize: 13, fontWeight: 600,
+                      color: active ? T.green : T.text,
+                    }}>{f.name}</span>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}>
+                      <span style={{
+                        fontFamily: mono, fontSize: 10,
+                        background: active ? `${T.green}22` : T.surface2,
+                        color: active ? T.green : T.muted,
+                        padding: '2px 6px', borderRadius: 4,
+                        border: `1px solid ${active ? `${T.green}44` : T.border}`,
+                      }}>{f.nodeCount} nodes</span>
+                    </span>
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Interface preview summary */}
-          <div style={{
-            padding: 12, borderRadius: 8, background: T.surface, border: '1px solid ' + T.border,
-            marginBottom: 20, fontFamily: mono, fontSize: 11, color: T.dim,
-          }}>
-            <span style={{ color: T.muted }}>nodes:</span>{' '}
-            {SAMPLE_INTERFACES[activePreset].def.nodes.length}{' | '}
-            <span style={{ color: T.muted }}>platform:</span>{' '}
-            {SAMPLE_INTERFACES[activePreset].def.metadata.platform}{' | '}
-            <span style={{ color: T.muted }}>source:</span>{' '}
-            {SAMPLE_INTERFACES[activePreset].def.metadata.source}
-          </div>
-
           {/* RUN SCAN button */}
-          <button onClick={runScan} disabled={scanning}
+          <button
+            onClick={handleScan}
+            disabled={scanning}
             style={{
-              width: '100%', padding: '14px 0', borderRadius: 8,
-              background: scanning ? T.surface2 : T.green,
-              color: scanning ? T.muted : T.bg,
+              width: '100%', padding: '14px 0',
+              background: scanning
+                ? T.dim
+                : `linear-gradient(135deg, ${T.green}, #00c070)`,
+              border: 'none', borderRadius: 8,
               fontFamily: mono, fontSize: 14, fontWeight: 700,
-              border: 'none', cursor: scanning ? 'wait' : 'pointer',
-              letterSpacing: '0.08em', transition: 'all 0.2s',
-              marginBottom: 24,
+              color: scanning ? T.muted : T.bg,
+              cursor: scanning ? 'wait' : 'pointer',
+              letterSpacing: 1.5, textTransform: 'uppercase',
+              transition: 'all 0.2s',
+              boxShadow: scanning ? 'none' : `0 0 24px ${T.greenGlow}`,
             }}
-          >
-            {scanning ? 'SCANNING...' : 'RUN SCAN'}
-          </button>
+          >{scanning ? 'Scanning...' : 'Run Scan'}</button>
 
-          {/* ─── Results ─────────────────────────────────────── */}
-          {scanDone && result && (
-            <div>
-              {/* Stats bar */}
-              <div style={{
-                display: 'flex', gap: 16, marginBottom: 20, fontFamily: mono, fontSize: 11,
-              }}>
-                <span style={{ color: T.muted }}>
-                  Nodes: <span style={{ color: T.textBright }}>{result.nodesScanned}</span>
-                </span>
-                <span style={{ color: T.muted }}>
-                  Rules: <span style={{ color: T.textBright }}>{result.rulesEvaluated}</span>
-                </span>
-                <span style={{ color: T.muted }}>
-                  Violations: <span style={{ color: violations.length > 0 ? T.red : T.green }}>{violations.length}</span>
-                </span>
-                <span style={{ color: T.muted }}>
-                  Time: <span style={{ color: T.textBright }}>{result.scanDurationMs}ms</span>
-                </span>
-              </div>
-
-              {/* Score + Fix All row */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 24, marginBottom: 24,
-                padding: 20, borderRadius: 12, background: T.surface, border: '1px solid ' + T.border,
-              }}>
-                <ScoreRing score={score !== null ? score : 0} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: sans, fontSize: 14, color: T.muted, marginBottom: 8 }}>
-                    {unfixedCount === 0
-                      ? 'All violations resolved!'
-                      : unfixedCount + ' violation' + (unfixedCount === 1 ? '' : 's') + ' remaining'}
-                  </div>
-                  {unfixedCount > 0 && (
-                    <button onClick={fixAll} style={{
-                      padding: '10px 24px', borderRadius: 6,
-                      background: T.green, color: T.bg,
-                      fontFamily: mono, fontSize: 12, fontWeight: 700,
-                      border: 'none', cursor: 'pointer',
-                      letterSpacing: '0.06em',
-                    }}>
-                      FIX ALL ({unfixedCount})
-                    </button>
-                  )}
-                  {unfixedCount === 0 && (
-                    <div style={{
-                      fontFamily: mono, fontSize: 12, color: T.green,
-                      padding: '8px 16px', borderRadius: 6,
-                      background: T.greenDim, display: 'inline-block',
-                    }}>
-                      SHIP IT
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Violations list */}
-              <h3 style={{
-                fontFamily: mono, fontSize: 13, color: T.muted, margin: '0 0 12px 0',
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-              }}>
-                Violations
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {violations.map(function (v, idx) {
-                  var vKey = v.nodeId + ':' + v.ruleId
-                  var isFixed = !!fixedIds[vKey]
-                  var isExpanded = expandedId === vKey
-
-                  return (
-                    <div key={vKey + '-' + String(idx)} style={{
-                      borderRadius: 8, background: T.surface,
-                      border: '1px solid ' + (isFixed ? T.greenDim : T.border),
-                      opacity: isFixed ? 0.55 : 1,
-                      transition: 'all 0.3s',
-                      overflow: 'hidden',
-                    }}>
-                      {/* Violation header */}
-                      <div
-                        style={{
-                          padding: '12px 16px', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        }}
-                        onClick={function () {
-                          setExpandedId(isExpanded ? null : vKey)
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                          <SeverityBadge severity={v.severity} />
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{
-                              fontFamily: mono, fontSize: 12, color: isFixed ? T.green : T.textBright,
-                              textDecoration: isFixed ? 'line-through' : 'none',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {v.ruleId}
-                            </div>
-                            <div style={{ fontFamily: mono, fontSize: 11, color: T.dim, marginTop: 2 }}>
-                              {v.nodePath}
-                            </div>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                          {/* Current → Suggested */}
-                          <div style={{ fontFamily: mono, fontSize: 11, textAlign: 'right' }}>
-                            <span style={{ color: T.red }}>{v.currentValue}</span>
-                            <span style={{ color: T.dim }}>{' \u2192 '}</span>
-                            <span style={{ color: T.green }}>{v.suggestedValue || '?'}</span>
-                          </div>
-                          {/* Expand arrow */}
-                          <span style={{
-                            color: T.dim, fontSize: 14,
-                            transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.2s', display: 'inline-block',
-                          }}>
-                            &#9654;
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Expanded detail */}
-                      {isExpanded && (
-                        <div style={{
-                          padding: '0 16px 14px 16px',
-                          borderTop: '1px solid ' + T.border,
-                          paddingTop: 12,
-                        }}>
-                          <p style={{
-                            margin: '0 0 8px 0', fontFamily: sans, fontSize: 12.5,
-                            color: T.muted, lineHeight: 1.5,
-                          }}>
-                            {v.message}
-                          </p>
-                          <div style={{
-                            fontFamily: mono, fontSize: 11, color: T.dim,
-                            marginBottom: 10, lineHeight: 1.6,
-                          }}>
-                            <div>Property: <span style={{ color: T.text }}>{v.property}</span></div>
-                            <div>Node: <span style={{ color: T.text }}>{v.nodeId}</span></div>
-                            <div>Detail: <span style={{ color: T.text }}>{v.detail}</span></div>
-                          </div>
-                          {v.autoFixAvailable && !isFixed && (
-                            <button onClick={function (e) {
-                              e.stopPropagation()
-                              fixOne(v)
-                            }}
-                              style={{
-                                padding: '6px 16px', borderRadius: 4,
-                                background: T.greenDim, color: T.green,
-                                fontFamily: mono, fontSize: 11, fontWeight: 600,
-                                border: '1px solid ' + T.greenGlow,
-                                cursor: 'pointer', letterSpacing: '0.04em',
-                              }}
-                            >
-                              AUTO-FIX
-                            </button>
-                          )}
-                          {isFixed && (
-                            <span style={{
-                              fontFamily: mono, fontSize: 11, color: T.green,
-                            }}>
-                              Fixed
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {violations.length === 0 && (
-                <div style={{
-                  padding: 32, borderRadius: 8, background: T.surface,
-                  border: '1px solid ' + T.border, textAlign: 'center',
-                }}>
-                  <div style={{ fontFamily: mono, fontSize: 14, color: T.green, marginBottom: 4 }}>
-                    No violations found
-                  </div>
-                  <div style={{ fontFamily: sans, fontSize: 12, color: T.muted }}>
-                    All nodes pass the active ruleset.
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Empty state before scan */}
-          {!scanDone && !scanning && (
+          {/* Error display */}
+          {error && (
             <div style={{
-              padding: 48, borderRadius: 8, border: '1px dashed ' + T.border,
-              textAlign: 'center',
+              padding: '12px 16px', borderRadius: 8,
+              background: T.redDim,
+              border: `1px solid ${T.red}44`,
+              fontFamily: mono, fontSize: 12, color: T.red,
+              whiteSpace: 'pre-wrap',
             }}>
-              <div style={{ fontFamily: mono, fontSize: 14, color: T.dim, marginBottom: 8 }}>
-                Select an interface and run scan
-              </div>
-              <div style={{ fontFamily: sans, fontSize: 12, color: T.dim }}>
-                Toggle rules on the left, choose a preset above, then hit RUN SCAN.
-              </div>
+              <strong>Error:</strong> {error}
             </div>
           )}
         </div>
+
+        {/* ─── RIGHT COLUMN: Results ─────────────────────── */}
+        <div style={{
+          width: '40%', padding: '28px 32px 28px 24px',
+          display: 'flex', flexDirection: 'column', gap: 20,
+          overflow: 'auto',
+        }}>
+          <div style={{
+            fontFamily: mono, fontSize: 11, color: T.muted,
+            textTransform: 'uppercase', letterSpacing: 2,
+          }}>Results</div>
+
+          {!scanResult && !error && (
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', gap: 12, minHeight: 300,
+            }}>
+              <div style={{
+                fontFamily: serif, fontStyle: 'italic', fontSize: 28,
+                color: T.dim, opacity: 0.5,
+              }}>muteform</div>
+              <div style={{
+                fontFamily: mono, fontSize: 12, color: T.dim,
+              }}>Edit policy, select fixture, then run scan</div>
+            </div>
+          )}
+
+          {scanResult && (
+            <>
+              {/* Stats bar */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
+              }}>
+                {[
+                  { label: 'Nodes', value: scanResult.nodesScanned },
+                  { label: 'Rules', value: scanResult.rulesEvaluated },
+                  { label: 'Violations', value: scanResult.violations.length },
+                  { label: 'Time', value: `${scanResult.scanDurationMs}ms` },
+                ].map(s => (
+                  <div key={s.label} style={{
+                    background: T.surface, border: `1px solid ${T.border}`,
+                    borderRadius: 6, padding: '10px 12px', textAlign: 'center',
+                  }}>
+                    <div style={{
+                      fontFamily: mono, fontSize: 18, fontWeight: 700,
+                      color: T.textBright,
+                    }}>{s.value}</div>
+                    <div style={{
+                      fontFamily: mono, fontSize: 9, color: T.muted,
+                      textTransform: 'uppercase', letterSpacing: 1,
+                    }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Health Score */}
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: 10, padding: '16px 0',
+              }}>
+                <ScoreRing
+                  score={rewriteResult ? rewriteResult.afterScore : scanResult.score}
+                />
+                {/* Deterministic badge */}
+                <div style={{
+                  fontFamily: mono, fontSize: 10,
+                  color: T.green, border: `1px solid ${T.green}44`,
+                  borderRadius: 20, padding: '4px 14px',
+                  background: T.greenDim,
+                  letterSpacing: 0.5,
+                }}>Deterministic evaluation &middot; No AI in the loop</div>
+              </div>
+
+              {/* Violations list */}
+              {scanResult.violations.length > 0 && !rewriteResult && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                }}>
+                  <div style={{
+                    fontFamily: mono, fontSize: 11, color: T.muted,
+                    textTransform: 'uppercase', letterSpacing: 2,
+                  }}>Violations ({scanResult.violations.length})</div>
+                  {scanResult.violations.map((v, i) => (
+                    <div key={`${v.ruleId}-${v.nodeId}-${i}`} style={{
+                      background: T.surface, border: `1px solid ${T.border}`,
+                      borderRadius: 8, padding: '12px 14px',
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                      animation: `fadeSlideIn 0.3s ease ${i * 0.05}s both`,
+                    }}>
+                      {/* Top row: severity + rule + auto-fix badge */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        flexWrap: 'wrap',
+                      }}>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10, fontWeight: 700,
+                          textTransform: 'uppercase',
+                          color: severityColor(v.severity),
+                          background: severityBg(v.severity),
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>{v.severity}</span>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10,
+                          color: T.blue, background: T.blueDim,
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>{v.ruleId}</span>
+                        <span style={{ flex: 1 }} />
+                        {v.autoFixAvailable ? (
+                          <span style={{
+                            fontFamily: mono, fontSize: 9, fontWeight: 700,
+                            color: T.green, background: T.greenDim,
+                            padding: '2px 8px', borderRadius: 4,
+                            border: `1px solid ${T.green}33`,
+                          }}>AUTO-FIX</span>
+                        ) : (
+                          <span style={{
+                            fontFamily: mono, fontSize: 9, fontWeight: 700,
+                            color: T.amber, background: T.amberDim,
+                            padding: '2px 8px', borderRadius: 4,
+                            border: `1px solid ${T.amber}33`,
+                          }}>MANUAL REVIEW</span>
+                        )}
+                      </div>
+                      {/* Node path */}
+                      <div style={{
+                        fontFamily: mono, fontSize: 11, color: T.muted,
+                      }}>{v.nodePath}</div>
+                      {/* Current → Suggested */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        flexWrap: 'wrap',
+                      }}>
+                        <ValuePreview property={v.property} value={v.currentValue} />
+                        {v.suggestedValue != null && (
+                          <>
+                            <span style={{
+                              fontFamily: mono, fontSize: 12, color: T.dim,
+                            }}>&rarr;</span>
+                            <ValuePreview property={v.property} value={v.suggestedValue} />
+                          </>
+                        )}
+                      </div>
+                      {/* Message */}
+                      <div style={{
+                        fontFamily: sans, fontSize: 12, color: T.muted,
+                        lineHeight: 1.4,
+                      }}>{v.message}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* FIX ALL button */}
+              {scanResult.violations.length > 0 && !rewriteResult && (
+                <button
+                  onClick={handleFixAll}
+                  disabled={fixing}
+                  style={{
+                    width: '100%', padding: '12px 0',
+                    background: fixing ? T.dim : T.green,
+                    border: 'none', borderRadius: 8,
+                    fontFamily: mono, fontSize: 13, fontWeight: 700,
+                    color: T.bg, cursor: fixing ? 'wait' : 'pointer',
+                    letterSpacing: 1.5, textTransform: 'uppercase',
+                    transition: 'all 0.2s',
+                  }}
+                >{fixing ? 'Applying fixes...' : 'Fix All'}</button>
+              )}
+
+              {/* Rewrite result */}
+              {rewriteResult && fixture && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 16,
+                }}>
+                  {/* Summary */}
+                  <div style={{
+                    fontFamily: mono, fontSize: 12, color: T.text,
+                    background: T.greenDim, border: `1px solid ${T.green}33`,
+                    borderRadius: 8, padding: '12px 16px',
+                    lineHeight: 1.6,
+                  }}>
+                    <strong style={{ color: T.green }}>{autoFixCount}</strong> violation{autoFixCount !== 1 ? 's' : ''} fixed
+                    {manualCount > 0 && (
+                      <>, <strong style={{ color: T.amber }}>{manualCount}</strong> require human review</>
+                    )}
+                  </div>
+
+                  {/* Before/After wireframes */}
+                  <div style={{
+                    fontFamily: mono, fontSize: 11, color: T.muted,
+                    textTransform: 'uppercase', letterSpacing: 2,
+                  }}>Visual Comparison</div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <WireframeView
+                      wireframe={fixture.wireframe}
+                      violationNodeIds={violationNodeIds}
+                      fixedNodeIds={new Set()}
+                      label="Before"
+                    />
+                    <WireframeView
+                      wireframe={fixture.wireframe}
+                      violationNodeIds={new Set()}
+                      fixedNodeIds={fixedNodeIds}
+                      label="After"
+                    />
+                  </div>
+
+                  {/* Applied fixes list */}
+                  <div style={{
+                    fontFamily: mono, fontSize: 11, color: T.muted,
+                    textTransform: 'uppercase', letterSpacing: 2,
+                  }}>Applied Fixes ({rewriteResult.appliedFixes.length})</div>
+                  {rewriteResult.appliedFixes.map((fix, i) => (
+                    <div key={`${fix.ruleId}-${fix.nodeId}-${i}`} style={{
+                      background: T.surface, border: `1px solid ${T.border}`,
+                      borderRadius: 6, padding: '10px 12px',
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                    }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10,
+                          color: T.green, background: T.greenDim,
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>FIXED</span>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10,
+                          color: T.blue, background: T.blueDim,
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>{fix.ruleId}</span>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10, color: T.muted,
+                        }}>{fix.nodeId}</span>
+                      </div>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}>
+                        <ValuePreview property={fix.property} value={fix.currentValue} />
+                        <span style={{
+                          fontFamily: mono, fontSize: 12, color: T.dim,
+                        }}>&rarr;</span>
+                        <ValuePreview property={fix.property} value={fix.suggestedValue} />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Manual review items */}
+                  {manualCount > 0 && (
+                    <>
+                      <div style={{
+                        fontFamily: mono, fontSize: 11, color: T.muted,
+                        textTransform: 'uppercase', letterSpacing: 2,
+                      }}>Requires Manual Review ({manualCount})</div>
+                      {scanResult.violations.filter(v => !v.autoFixAvailable).map((v, i) => (
+                        <div key={`manual-${v.ruleId}-${v.nodeId}-${i}`} style={{
+                          background: T.surface, border: `1px solid ${T.amber}33`,
+                          borderRadius: 6, padding: '10px 12px',
+                          display: 'flex', flexDirection: 'column', gap: 6,
+                        }}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                          }}>
+                            <span style={{
+                              fontFamily: mono, fontSize: 10, fontWeight: 700,
+                              color: T.amber, background: T.amberDim,
+                              padding: '2px 8px', borderRadius: 4,
+                            }}>MANUAL</span>
+                            <span style={{
+                              fontFamily: mono, fontSize: 10,
+                              color: T.blue, background: T.blueDim,
+                              padding: '2px 8px', borderRadius: 4,
+                            }}>{v.ruleId}</span>
+                          </div>
+                          <div style={{
+                            fontFamily: mono, fontSize: 11, color: T.muted,
+                          }}>{v.nodePath}</div>
+                          <div style={{
+                            fontFamily: sans, fontSize: 12, color: T.muted,
+                          }}>{v.message}</div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* No violations */}
+              {scanResult.violations.length === 0 && (
+                <div style={{
+                  textAlign: 'center', padding: '32px 0',
+                }}>
+                  <div style={{
+                    fontFamily: sans, fontSize: 16, color: T.green,
+                    fontWeight: 600, marginBottom: 6,
+                  }}>All clear</div>
+                  <div style={{
+                    fontFamily: mono, fontSize: 12, color: T.muted,
+                  }}>No violations found. Design is fully compliant.</div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* ─── Animation keyframes ─────────────────────────────── */}
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }
