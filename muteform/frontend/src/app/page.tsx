@@ -219,9 +219,8 @@ export default function LandingPage() {
           {/* links (desktop) */}
           <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
             <a href="/demo" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Demo</a>
-            <a href="/playground" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Playground</a>
-            <a href="#waitlist" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Waitlist</a>
-            <a href="/playground" style={{
+            <a href="#waitlist" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Beta Access</a>
+            <a href="/import" style={{
               fontSize: 13, fontWeight: 600, color: T.bg,
               background: T.green, padding: '7px 16px', borderRadius: 6,
             }}>
@@ -242,9 +241,8 @@ export default function LandingPage() {
       <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
         <a href="/demo" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Demo</a>
-        <a href="/playground" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Playground</a>
-        <a href="#waitlist" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Waitlist</a>
-        <a href="/playground" onClick={() => setMobileMenuOpen(false)} style={{
+        <a href="#waitlist" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Beta Access</a>
+        <a href="/import" onClick={() => setMobileMenuOpen(false)} style={{
           fontFamily: sans, fontWeight: 600, color: T.bg, background: T.green,
           borderRadius: 8, textAlign: 'center', marginTop: 8, border: 'none',
         }}>Get Started &rarr;</a>
@@ -275,12 +273,12 @@ export default function LandingPage() {
 
         <FadeIn delay={240}>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/playground" style={{
+            <a href="/import" style={{
               fontFamily: sans, fontSize: 14, fontWeight: 600, color: T.bg,
               background: T.green, padding: '11px 24px', borderRadius: 7,
               display: 'inline-block',
             }}>
-              Try the Playground &rarr;
+              Start with your design system &rarr;
             </a>
             <a href="/demo" style={{
               fontFamily: sans, fontSize: 14, fontWeight: 600, color: T.text,
@@ -314,27 +312,18 @@ export default function LandingPage() {
           </p>
         </FadeIn>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          {[
-            { val: '9', label: 'violations detected in a single AI-generated screen' },
-            { val: '97', label: 'health score after Muteform auto-fix' },
-            { val: '0', label: 'governance tools for AI output (before Muteform)' },
-          ].map(function (item, i) {
-            return (
-              <FadeIn key={i} delay={i * 120}>
-                <div style={{
-                  background: T.surface, border: '1px solid ' + T.border, borderRadius: 10,
-                  padding: '32px 28px',
-                }}>
-                  <div style={{
-                    fontFamily: mono, fontSize: 36, fontWeight: 700, color: T.green, marginBottom: 8,
-                  }}>{item.val}</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.6, color: T.muted }}>{item.label}</div>
-                </div>
-              </FadeIn>
-            )
-          })}
-        </div>
+        <FadeIn delay={200}>
+          <div style={{
+            background: T.surface, border: '1px solid ' + T.border, borderRadius: 10,
+            padding: '32px 28px', fontFamily: mono, fontSize: 16, lineHeight: 1.8, color: T.muted,
+          }}>
+            <span style={{ color: T.green, fontWeight: 700, fontSize: 20 }}>9</span> violations caught in <span style={{ color: T.green, fontWeight: 700 }}>2ms</span>.{' '}
+            <span style={{ color: T.green, fontWeight: 700, fontSize: 20 }}>8</span> auto-fixed.{' '}
+            <span style={{ color: T.amber, fontWeight: 700, fontSize: 20 }}>3</span> flagged for review.{' '}
+            <br />
+            <span style={{ color: T.textBright }}>Real numbers from a real scan.</span>
+          </div>
+        </FadeIn>
       </section>
 
       {/* ════════════════════════════════════════════
@@ -478,42 +467,26 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════
-          6. FOR DESIGNERS
+          6. FOR DESIGN TEAMS
       ════════════════════════════════════════════ */}
       <section style={section}>
         <FadeIn>
           <h2 style={{ ...heading, maxWidth: 540, marginBottom: 16 }}>
-            Muteform is the skill that defines the next era of design.
+            Built for design teams shipping with AI.
           </h2>
         </FadeIn>
         <FadeIn delay={80}>
-          <p style={{ fontSize: 15, lineHeight: 1.75, color: T.muted, maxWidth: 500, margin: '0 0 8px' }}>
-            Author rules. Govern AI. Ship with confidence.
+          <p style={{ fontSize: 15, lineHeight: 1.75, color: T.muted, maxWidth: 540, margin: '0 0 36px' }}>
+            Import your design system. Set governance rules. Every AI&#8209;generated interface is scanned, scored, and auto&#8209;fixed before it ships.
           </p>
         </FadeIn>
         <FadeIn delay={160}>
-          <p style={{ fontSize: 15, lineHeight: 1.75, color: T.muted, maxWidth: 540, margin: '0 0 36px' }}>
-            Muteform Certified designers ensure every AI&#8209;generated interface meets the bar.
-          </p>
-        </FadeIn>
-        <FadeIn delay={240}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 12,
-            border: '1.5px solid ' + T.green, borderRadius: 8,
-            padding: '14px 24px', background: T.greenDim,
+          <a href="/import" style={{
+            display: 'inline-block', fontFamily: sans, fontSize: 14, fontWeight: 600,
+            color: T.bg, background: T.green, padding: '11px 24px', borderRadius: 7,
           }}>
-            <div style={{
-              width: 22, height: 22, borderRadius: 4,
-              background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: mono, fontWeight: 700, fontSize: 13, color: T.bg,
-            }}>M</div>
-            <span style={{
-              fontFamily: mono, fontSize: 12, fontWeight: 600, letterSpacing: 2,
-              color: T.green,
-            }}>
-              MUTEFORM CERTIFIED
-            </span>
-          </div>
+            Start with your design system &rarr;
+          </a>
         </FadeIn>
       </section>
 
@@ -528,7 +501,7 @@ export default function LandingPage() {
         </FadeIn>
         <FadeIn delay={80}>
           <p style={{ fontSize: 17, color: T.muted, marginBottom: 36 }}>
-            Be one of the first 500.
+            Get early access to design governance.
           </p>
         </FadeIn>
 
@@ -574,7 +547,7 @@ export default function LandingPage() {
                   opacity: formState === 'sending' ? 0.7 : 1,
                 }}
               >
-                {formState === 'sending' ? 'Joining...' : 'Join Waitlist'}
+                {formState === 'sending' ? 'Requesting...' : 'Request beta access'}
               </button>
             </form>
           )}
@@ -588,7 +561,7 @@ export default function LandingPage() {
           <p style={{
             fontFamily: mono, fontSize: 12, color: T.dim, marginTop: 20,
           }}>
-            Early access — limited spots
+            Beta access for design teams
           </p>
         </FadeIn>
       </section>
@@ -617,8 +590,8 @@ export default function LandingPage() {
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
             <a href="/demo" style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>Demo</a>
-            <a href="/playground" style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>Playground</a>
-            <a href="#waitlist" style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>Waitlist</a>
+            <a href="/import" style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>Get Started</a>
+            <a href="#waitlist" style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>Beta Access</a>
           </div>
         </div>
       </footer>

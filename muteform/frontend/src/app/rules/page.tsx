@@ -1,261 +1,585 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import Stepper from '@/components/Stepper'
+import {
+  loadDesignSystem, type ImportedDesignSystem,
+  loadGovernanceRules, saveGovernanceRules,
+  type GovernanceRule, DEFAULT_GOVERNANCE_RULES,
+} from '@/lib/design-system-store'
+import { loadConfig, scanArtifact } from '@/lib/engine'
+import { getFixture } from '@/lib/fixtures'
+import { loadSession, markStepComplete, syncCustomRule } from '@/lib/session'
 
+// ─── Design Tokens ──────────────────────────────────────────
 const T = {
-  bg: '#08090d', surface: '#0c0e12', surface2: '#111318',
-  border: '#1a1d24', border2: '#252830',
-  green: '#00e087', greenDim: '#00e08718',
-  red: '#ff4070', redDim: '#ff407018',
-  amber: '#ffb830', amberDim: '#ffb83018',
-  blue: '#4090ff', blueDim: '#4090ff18',
-  muted: '#6b7280', dim: '#3a3f4a',
-  text: '#e8eaf0', textBright: '#f8f9fb',
+  bg: '#080909', surface: '#0c0d0f', surface2: '#101214',
+  border: '#161819', border2: '#1e2226',
+  blue: '#0055FF', text: '#f0f1f3', muted: '#6b7280', dim: '#374151',
+  green: '#22c55e', greenDim: '#22c55e18',
+  amber: '#f59e0b', amberDim: '#f59e0b18',
+  red: '#ef4444', redDim: '#ef444418',
+  blueDim: '#0055FF18',
 }
-const mono = "'JetBrains Mono', 'DM Mono', monospace"
-const sans = "'DM Sans', system-ui, sans-serif"
+const syne = "'Syne', sans-serif"
+const mono = "'DM Mono', monospace"
 
-const YAML_CONTENT = `name: "Acme Core v8"
-version: "8.0.0"
-
-tokens:
-  colors:
-    brand:
-      primary: "#00e087"
-      secondary: "#0a1628"
-    semantic:
-      success: "#00e087"
-      warning: "#ffb830"
-      error: "#ff4070"
-      info: "#4090ff"
-  spacing:
-    scale: [4, 8, 12, 16, 24, 32, 48, 64]
-    tolerance: 0
-  typography:
-    families:
-      display: "Instrument Serif"
-      body: "DM Sans"
-      mono: "JetBrains Mono"
-  motion:
-    max_duration: 300
-
-rules:
-  - id: "contrast-wcag-aa"
-    severity: critical
-    description: "Interactive elements must meet WCAG AA"
-    auto_fix: "adjust_foreground"
-  - id: "color-token-compliance"
-    severity: high
-    description: "All colors must reference approved tokens"
-    auto_fix: "snap_nearest_delta_e"
-  - id: "spacing-scale-compliance"
-    severity: medium
-    description: "Spacing values must use approved scale"
-    auto_fix: "snap_nearest"
-  - id: "typography-family"
-    severity: high
-    description: "Font families must be from approved list"
-    auto_fix: "snap_nearest_category"
-  - id: "typography-scale"
-    severity: medium
-    description: "Type sizes must maintain minimum scale ratio"
-    auto_fix: false
-  - id: "motion-performance"
-    severity: low
-    description: "Transitions must not exceed max duration"
-    auto_fix: "clamp"`
-
-interface Rule {
-  id: string; severity: string; description: string; autoFix: string | false; enabled: boolean
-}
-
-const INITIAL_RULES: Rule[] = [
-  { id: 'contrast-wcag-aa', severity: 'critical', description: 'Interactive elements must meet WCAG AA', autoFix: 'adjust_foreground', enabled: true },
-  { id: 'color-token-compliance', severity: 'high', description: 'All colors must reference approved tokens', autoFix: 'snap_nearest_delta_e', enabled: true },
-  { id: 'spacing-scale-compliance', severity: 'medium', description: 'Spacing values must use approved scale', autoFix: 'snap_nearest', enabled: true },
-  { id: 'typography-family', severity: 'high', description: 'Font families must be from approved list', autoFix: 'snap_nearest_category', enabled: true },
-  { id: 'typography-scale', severity: 'medium', description: 'Type sizes must maintain minimum scale ratio', autoFix: false, enabled: true },
-  { id: 'motion-performance', severity: 'low', description: 'Transitions must not exceed max duration', autoFix: 'clamp', enabled: true },
-]
-
-const SEV: Record<string, { color: string; dim: string }> = {
+// ─── Severity helpers ───────────────────────────────────────
+const SEV_COLORS: Record<string, { color: string; dim: string }> = {
   critical: { color: T.red, dim: T.redDim },
   high: { color: T.red, dim: T.redDim },
   medium: { color: T.amber, dim: T.amberDim },
   low: { color: T.muted, dim: `${T.muted}18` },
 }
+const SEVERITIES: Array<GovernanceRule['severity']> = ['critical', 'high', 'medium', 'low']
 
-const SEVERITIES = ['critical', 'high', 'medium', 'low']
+// ─── Rule category mapping ──────────────────────────────────
+type CategoryId = 'color' | 'spacing' | 'typography' | 'components' | 'layout' | 'accessibility'
 
+interface CategoryMeta {
+  id: CategoryId
+  label: string
+  icon: string
+  ruleId: string
+  description: string
+  hasAutoFix: boolean
+  severityLocked?: GovernanceRule['severity']
+}
+
+const CATEGORIES: CategoryMeta[] = [
+  { id: 'color', label: 'Color Tokens', icon: '\u25CF', ruleId: 'color-token-compliance', description: 'All colors must reference approved design tokens', hasAutoFix: false },
+  { id: 'spacing', label: 'Spacing Scale', icon: '\u2194', ruleId: 'spacing-scale-compliance', description: 'Spacing values must use the approved scale', hasAutoFix: true },
+  { id: 'typography', label: 'Typography', icon: 'Aa', ruleId: 'typography-style-compliance', description: 'Typography styles must be from approved list', hasAutoFix: false },
+  { id: 'components', label: 'Components', icon: '\u25A1', ruleId: 'component-variant-compliance', description: 'Component variants must be from approved list', hasAutoFix: false },
+  { id: 'layout', label: 'Layout Grid', icon: '\u2591', ruleId: 'layout-grid-compliance', description: 'Grid columns must use approved column counts', hasAutoFix: false },
+  { id: 'accessibility', label: 'Accessibility (WCAG AA)', icon: '\u2714', ruleId: 'contrast-wcag-aa', description: 'All text must meet WCAG AA contrast requirements (4.5:1)', hasAutoFix: false, severityLocked: 'critical' },
+]
+
+const CATEGORY_OPTIONS: { value: CategoryId; label: string }[] = [
+  { value: 'color', label: 'Color' },
+  { value: 'spacing', label: 'Spacing' },
+  { value: 'typography', label: 'Typography' },
+  { value: 'components', label: 'Components' },
+  { value: 'layout', label: 'Layout' },
+  { value: 'accessibility', label: 'Accessibility' },
+]
+
+// ─── Component ──────────────────────────────────────────────
 export default function RulesPage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [yaml, setYaml] = useState(YAML_CONTENT)
-  const [rules, setRules] = useState(INITIAL_RULES)
+  const router = useRouter()
+  const [ds, setDs] = useState<ImportedDesignSystem | null>(null)
+  const [rules, setRules] = useState<GovernanceRule[]>(DEFAULT_GOVERNANCE_RULES)
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
+  const [violationCount, setViolationCount] = useState<number | null>(null)
+  const [companyName, setCompanyName] = useState<string>('your')
 
-  const toggleRule = (id: string) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r))
+  // Custom rule form
+  const [customName, setCustomName] = useState('')
+  const [customCategory, setCustomCategory] = useState<CategoryId>('color')
+  const [customSeverity, setCustomSeverity] = useState<GovernanceRule['severity']>('medium')
+  const [customAutoFix, setCustomAutoFix] = useState(false)
+  const [customDescription, setCustomDescription] = useState('')
+  const [customRules, setCustomRules] = useState<(GovernanceRule & { category: CategoryId })[]>([])
+
+  // ─── Load persisted state ───────────────────────────────
+  useEffect(() => {
+    const loaded = loadDesignSystem()
+    if (loaded) setDs(loaded)
+    const savedRules = loadGovernanceRules()
+    setRules(savedRules)
+    const session = loadSession()
+    if (session.user?.company) setCompanyName(session.user.company)
+  }, [])
+
+  // ─── Background scan ────────────────────────────────────
+  const runBackgroundScan = useCallback(() => {
+    try {
+      const fixture = getFixture('onboarding')
+      if (fixture) {
+        const DEMO_YAML = `name: "Custom Rules"\nversion: "1.0.0"\ntokens:\n  colors:\n    primary: "#0055FF"\n  spacing:\n    scale: [4, 8, 12, 16, 24, 32, 48, 64]\nrules: []`
+        const config = loadConfig(DEMO_YAML)
+        const result = scanArtifact(fixture.artifact, config)
+        setViolationCount((result as any)?.violations?.length ?? (result as any)?.totalViolations ?? 0)
+      }
+    } catch {
+      setViolationCount(null)
+    }
+  }, [])
+
+  // Run scan whenever rules change
+  useEffect(() => {
+    runBackgroundScan()
+  }, [rules, runBackgroundScan])
+
+  // ─── Rule helpers ───────────────────────────────────────
+  const findRule = (ruleId: string) => rules.find(r => r.id === ruleId)
+
+  const updateRule = (ruleId: string, patch: Partial<GovernanceRule>) => {
+    setRules(prev => {
+      const next = prev.map(r => r.id === ruleId ? { ...r, ...patch } : r)
+      saveGovernanceRules(next)
+      return next
+    })
   }
 
-  const changeSeverity = (id: string, severity: string) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, severity } : r))
+  const toggleEnabled = (ruleId: string) => {
+    const rule = findRule(ruleId)
+    if (rule) updateRule(ruleId, { blocked: !rule.blocked })
   }
 
-  const toggleAutoFix = (id: string) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, autoFix: r.autoFix ? false : 'snap_nearest' } : r))
+  const isEnabled = (ruleId: string) => {
+    const rule = findRule(ruleId)
+    return rule ? !rule.blocked : true
   }
 
-  const activeCount = rules.filter(r => r.enabled).length
+  // ─── Design system summary ─────────────────────────────
+  const colorCount = ds ? Object.keys(ds.tokens.color).length : 0
+  const spacingCount = ds ? ds.tokens.spacing.length : 0
+  const typographyCount = ds ? ds.typography.allowedStyles.length : 0
+  const componentCount = ds ? Object.keys(ds.components).length : 0
 
+  // ─── Add custom rule ──────────────────────────────────
+  const handleAddCustomRule = () => {
+    if (!customName.trim()) return
+    const newRule: GovernanceRule & { category: CategoryId } = {
+      id: `custom-${Date.now()}`,
+      name: customName.trim(),
+      description: customDescription.trim(),
+      severity: customSeverity,
+      autoFix: customAutoFix,
+      autoFixStrategy: customAutoFix ? 'manual' : '',
+      blocked: false,
+      category: customCategory,
+    }
+    setCustomRules(prev => [...prev, newRule])
+    // Also save to main rules list
+    setRules(prev => {
+      const next = [...prev, newRule]
+      saveGovernanceRules(next)
+      return next
+    })
+    // Sync to Supabase
+    const session = loadSession()
+    syncCustomRule(session.user?.id ?? null, newRule)
+    // Reset form
+    setCustomName('')
+    setCustomDescription('')
+    setCustomSeverity('medium')
+    setCustomAutoFix(false)
+    setCustomCategory('color')
+  }
+
+  // ─── Toggle switch component ──────────────────────────
+  const Toggle = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
+    <div
+      onClick={onToggle}
+      style={{
+        width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
+        background: on ? T.green : T.dim,
+        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+      }}
+    >
+      <div style={{
+        width: 16, height: 16, borderRadius: '50%', background: '#fff',
+        position: 'absolute', top: 2,
+        left: on ? 18 : 2, transition: 'left 0.2s',
+      }} />
+    </div>
+  )
+
+  // ─── Render ─────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text }}>
-      {/* Top bar */}
-      <div style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 20px', height: 52,
-        background: T.surface, borderBottom: `1px solid ${T.border}`,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <a href="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 6, background: `linear-gradient(135deg, ${T.green}, ${T.green}99)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontFamily: sans, fontSize: 12, fontWeight: 800, color: T.bg }}>M</span>
+      <Stepper />
+
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 100px' }}>
+        {/* Header */}
+        <h1 style={{
+          fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.text,
+          marginBottom: 8, lineHeight: 1.3,
+        }}>
+          Governance rules for {companyName} design system
+        </h1>
+        <p style={{ fontFamily: mono, fontSize: 12, color: T.muted, marginBottom: 32 }}>
+          Configure which rules run during scans, set severity levels, and add custom rules.
+        </p>
+
+        {/* ─── Design System Summary ─────────────────────── */}
+        {ds && (
+          <div style={{
+            padding: '16px 20px', background: T.surface, border: `1px solid ${T.border}`,
+            borderRadius: 10, marginBottom: 28, display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+          }}>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              <StatBadge label="Colors" count={colorCount} color={T.blue} dim={T.blueDim} />
+              <StatBadge label="Spacing" count={spacingCount} color={T.green} dim={T.greenDim} />
+              <StatBadge label="Typography" count={typographyCount} color={T.amber} dim={T.amberDim} />
+              <StatBadge label="Components" count={componentCount} color={T.red} dim={T.redDim} />
             </div>
-            <span style={{ fontFamily: sans, fontSize: 15, fontWeight: 700, color: T.textBright }}>muteform</span>
-          </a>
-          <span style={{ fontFamily: mono, fontSize: 10, color: T.amber, background: T.amberDim, padding: '2px 8px', borderRadius: 4, border: `1px solid ${T.amber}33`, letterSpacing: '0.06em' }}>
-            RULES EDITOR
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{activeCount} rules active</span>
-          <a href="/dashboard" style={{ fontFamily: mono, fontSize: 11, color: T.muted, textDecoration: 'none' }}>← Dashboard</a>
-          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
-        </div>
-      </div>
-      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
-        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
-        <a href="/dashboard" style={{ fontFamily: sans }}>Dashboard</a>
-        <a href="/scan" style={{ fontFamily: sans }}>Scan</a>
-        <a href="/rules" style={{ fontFamily: sans, color: T.green }}>Rules</a>
-        <a href="/governance" style={{ fontFamily: sans }}>Governance</a>
-        <a href="/integrate" style={{ fontFamily: sans }}>Integrate</a>
-        <a href="/team" style={{ fontFamily: sans }}>Team</a>
-      </div>
+            <a href="/import" style={{
+              fontFamily: mono, fontSize: 11, color: T.blue, textDecoration: 'none',
+              padding: '4px 12px', borderRadius: 6, border: `1px solid ${T.blue}33`,
+              background: T.blueDim,
+            }}>
+              Edit
+            </a>
+          </div>
+        )}
 
-      <div className="page-container grid-2" style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px 80px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Left: YAML editor */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontFamily: sans, fontSize: 14, fontWeight: 700, color: T.textBright }}>
-              .muteform.yml
+        {!ds && (
+          <div style={{
+            padding: '16px 20px', background: T.surface, border: `1px solid ${T.border}`,
+            borderRadius: 10, marginBottom: 28,
+          }}>
+            <span style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>
+              No design system imported yet.{' '}
+              <a href="/import" style={{ color: T.blue, textDecoration: 'none' }}>Import one</a>
             </span>
-            <button
-              onClick={() => {
-                const blob = new Blob([yaml], { type: 'text/yaml' })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url; a.download = '.muteform.yml'; a.click()
-                URL.revokeObjectURL(url)
-              }}
-              style={{
-                fontFamily: mono, fontSize: 10, padding: '4px 10px', borderRadius: 4,
-                background: T.surface2, color: T.muted, border: `1px solid ${T.border}`, cursor: 'pointer',
-              }}
-            >
-              Export ↓
-            </button>
           </div>
-          <textarea
-            value={yaml}
-            onChange={e => setYaml(e.target.value)}
-            style={{
-              width: '100%', minHeight: 600, fontFamily: mono, fontSize: 11, lineHeight: 1.7,
-              background: T.bg, color: T.text, border: `1px solid ${T.border}`, borderRadius: 10,
-              padding: 16, resize: 'vertical', outline: 'none',
-            }}
-            onFocus={e => (e.target.style.borderColor = T.green)}
-            onBlur={e => (e.target.style.borderColor = T.border)}
-          />
+        )}
+
+        {/* ─── Rule Categories ───────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 40 }}>
+          {CATEGORIES.map(cat => {
+            const rule = findRule(cat.ruleId)
+            const enabled = isEnabled(cat.ruleId)
+            const expanded = expandedCard === cat.id
+            const sev = rule?.severity || 'medium'
+            const sevStyle = SEV_COLORS[sev] || SEV_COLORS.medium
+
+            return (
+              <div key={cat.id} style={{
+                background: T.surface, border: `1px solid ${expanded ? T.border2 : T.border}`,
+                borderRadius: 10, overflow: 'hidden',
+                opacity: enabled ? 1 : 0.5, transition: 'opacity 0.2s',
+              }}>
+                {/* Card header */}
+                <div
+                  onClick={() => setExpandedCard(expanded ? null : cat.id)}
+                  style={{
+                    padding: '16px 20px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                  }}
+                >
+                  <span style={{
+                    fontFamily: mono, fontSize: 16, color: enabled ? T.text : T.dim,
+                    width: 28, textAlign: 'center', flexShrink: 0,
+                  }}>
+                    {cat.icon}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <span style={{ fontFamily: syne, fontSize: 15, fontWeight: 700, color: T.text }}>
+                        {cat.label}
+                      </span>
+                      <span style={{
+                        fontFamily: mono, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em',
+                        color: sevStyle.color, background: sevStyle.dim,
+                        padding: '2px 8px', borderRadius: 3, border: `1px solid ${sevStyle.color}33`,
+                      }}>
+                        {sev}
+                      </span>
+                      {rule?.autoFix && (
+                        <span style={{
+                          fontFamily: mono, fontSize: 9, color: T.green, background: T.greenDim,
+                          padding: '2px 8px', borderRadius: 3, border: `1px solid ${T.green}33`,
+                        }}>
+                          AUTO-FIX
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>
+                      {cat.description}
+                    </span>
+                  </div>
+                  <Toggle on={enabled} onToggle={() => toggleEnabled(cat.ruleId)} />
+                  <span style={{
+                    fontFamily: mono, fontSize: 14, color: T.dim, transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
+                    transition: 'transform 0.2s', flexShrink: 0,
+                  }}>
+                    {'\u25BC'}
+                  </span>
+                </div>
+
+                {/* Expanded content */}
+                {expanded && (
+                  <div style={{
+                    padding: '0 20px 20px', borderTop: `1px solid ${T.border}`,
+                    paddingTop: 16,
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {/* Severity selector */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontFamily: mono, fontSize: 11, color: T.muted, width: 80 }}>Severity</span>
+                        {cat.severityLocked ? (
+                          <span style={{
+                            fontFamily: mono, fontSize: 11, color: SEV_COLORS[cat.severityLocked].color,
+                            background: SEV_COLORS[cat.severityLocked].dim,
+                            padding: '4px 12px', borderRadius: 4,
+                            border: `1px solid ${SEV_COLORS[cat.severityLocked].color}33`,
+                          }}>
+                            {cat.severityLocked.toUpperCase()} (locked)
+                          </span>
+                        ) : (
+                          <select
+                            value={sev}
+                            onChange={e => updateRule(cat.ruleId, { severity: e.target.value as GovernanceRule['severity'] })}
+                            style={{
+                              fontFamily: mono, fontSize: 11, color: sevStyle.color,
+                              background: T.surface2, border: `1px solid ${T.border2}`,
+                              borderRadius: 4, padding: '4px 10px', cursor: 'pointer',
+                              outline: 'none',
+                            }}
+                          >
+                            {SEVERITIES.map(s => (
+                              <option key={s} value={s}>{s.toUpperCase()}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Auto-fix toggle (only for spacing) */}
+                      {cat.hasAutoFix && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span style={{ fontFamily: mono, fontSize: 11, color: T.muted, width: 80 }}>Auto-fix</span>
+                          <Toggle
+                            on={rule?.autoFix ?? false}
+                            onToggle={() => updateRule(cat.ruleId, { autoFix: !rule?.autoFix })}
+                          />
+                          <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>
+                            {rule?.autoFix ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Rule status */}
+                      <div style={{
+                        fontFamily: mono, fontSize: 10, color: T.dim,
+                        padding: '8px 12px', background: T.surface2, borderRadius: 6,
+                        border: `1px solid ${T.border}`,
+                      }}>
+                        Rule ID: {cat.ruleId} | Strategy: {rule?.autoFixStrategy || 'none'} | Blocked: {rule?.blocked ? 'yes' : 'no'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
-        {/* Right: Rule cards */}
-        <div>
-          <div style={{ fontFamily: sans, fontSize: 14, fontWeight: 700, color: T.textBright, marginBottom: 12 }}>
-            Visual Rule Builder
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {rules.map(r => {
-              const sev = SEV[r.severity] || SEV.low
-              return (
-                <div key={r.id} style={{
-                  padding: '14px 16px', background: T.surface, border: `1px solid ${r.enabled ? T.border : T.border}`,
-                  borderRadius: 10, opacity: r.enabled ? 1 : 0.4, transition: 'opacity 0.2s',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    {/* Toggle */}
-                    <div
-                      onClick={() => toggleRule(r.id)}
-                      style={{
-                        width: 32, height: 18, borderRadius: 9, cursor: 'pointer',
-                        background: r.enabled ? T.green : T.dim,
-                        position: 'relative', transition: 'background 0.2s',
-                      }}
-                    >
-                      <div style={{
-                        width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                        position: 'absolute', top: 2,
-                        left: r.enabled ? 16 : 2, transition: 'left 0.2s',
-                      }} />
+        {/* ─── Custom Rules List ─────────────────────────── */}
+        {customRules.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <h3 style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 12 }}>
+              Custom Rules
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {customRules.map(cr => {
+                const sevC = SEV_COLORS[cr.severity] || SEV_COLORS.medium
+                return (
+                  <div key={cr.id} style={{
+                    padding: '12px 16px', background: T.surface, border: `1px solid ${T.border}`,
+                    borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontFamily: syne, fontSize: 13, fontWeight: 600, color: T.text }}>{cr.name}</span>
+                        <span style={{
+                          fontFamily: mono, fontSize: 9, textTransform: 'uppercase',
+                          color: sevC.color, background: sevC.dim,
+                          padding: '1px 6px', borderRadius: 3, border: `1px solid ${sevC.color}33`,
+                        }}>
+                          {cr.severity}
+                        </span>
+                        <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>{cr.category}</span>
+                      </div>
+                      {cr.description && (
+                        <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>{cr.description}</span>
+                      )}
                     </div>
-                    <span style={{ fontFamily: mono, fontSize: 11, color: T.textBright, flex: 1 }}>{r.id}</span>
-                    <select
-                      value={r.severity}
-                      onChange={e => changeSeverity(r.id, e.target.value)}
-                      style={{
-                        fontFamily: mono, fontSize: 9, color: sev.color, background: sev.dim,
-                        border: `1px solid ${sev.color}33`, borderRadius: 3, padding: '2px 6px',
-                        cursor: 'pointer', outline: 'none', letterSpacing: '0.06em',
-                      }}
-                    >
-                      {SEVERITIES.map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
-                    </select>
-                  </div>
-                  <p style={{ fontFamily: sans, fontSize: 12, color: T.muted, lineHeight: 1.5, marginBottom: 8 }}>
-                    {r.description}
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>AUTO-FIX:</span>
-                    <div
-                      onClick={() => toggleAutoFix(r.id)}
-                      style={{
-                        fontFamily: mono, fontSize: 9, padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
-                        color: r.autoFix ? T.green : T.dim,
-                        background: r.autoFix ? T.greenDim : T.surface2,
-                        border: `1px solid ${r.autoFix ? T.green + '33' : T.border}`,
-                      }}
-                    >
-                      {r.autoFix ? 'ON' : 'OFF'}
-                    </div>
-                    {r.autoFix && (
-                      <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>
-                        strategy: {typeof r.autoFix === 'string' ? r.autoFix : '—'}
+                    {cr.autoFix && (
+                      <span style={{
+                        fontFamily: mono, fontSize: 9, color: T.green, background: T.greenDim,
+                        padding: '2px 8px', borderRadius: 3, border: `1px solid ${T.green}33`,
+                      }}>
+                        AUTO-FIX
                       </span>
                     )}
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
+        )}
 
-          {/* Summary */}
-          <div style={{
-            marginTop: 16, padding: '12px 16px', background: T.surface, border: `1px solid ${T.border}`,
-            borderRadius: 10, fontFamily: mono, fontSize: 10, color: T.muted,
-          }}>
-            {activeCount} rules active · 11 color tokens · 8 spacing values · 3 font families
+        {/* ─── Add Custom Rule ───────────────────────────── */}
+        <div style={{
+          padding: '24px', background: T.surface, border: `1px solid ${T.border}`,
+          borderRadius: 10, marginBottom: 32,
+        }}>
+          <h3 style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 16 }}>
+            Add custom rule
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Rule name */}
+            <div>
+              <label style={{ fontFamily: mono, fontSize: 11, color: T.muted, display: 'block', marginBottom: 6 }}>
+                Rule name
+              </label>
+              <input
+                type="text"
+                value={customName}
+                onChange={e => setCustomName(e.target.value)}
+                placeholder="e.g. Brand color only in headers"
+                style={{
+                  width: '100%', fontFamily: mono, fontSize: 12, color: T.text,
+                  background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: 6,
+                  padding: '10px 14px', outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.target.style.borderColor = T.blue)}
+                onBlur={e => (e.target.style.borderColor = T.border2)}
+              />
+            </div>
+
+            {/* Category + Severity row */}
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontFamily: mono, fontSize: 11, color: T.muted, display: 'block', marginBottom: 6 }}>
+                  Category
+                </label>
+                <select
+                  value={customCategory}
+                  onChange={e => setCustomCategory(e.target.value as CategoryId)}
+                  style={{
+                    width: '100%', fontFamily: mono, fontSize: 12, color: T.text,
+                    background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: 6,
+                    padding: '10px 14px', outline: 'none', cursor: 'pointer',
+                  }}
+                >
+                  {CATEGORY_OPTIONS.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontFamily: mono, fontSize: 11, color: T.muted, display: 'block', marginBottom: 6 }}>
+                  Severity
+                </label>
+                <select
+                  value={customSeverity}
+                  onChange={e => setCustomSeverity(e.target.value as GovernanceRule['severity'])}
+                  style={{
+                    width: '100%', fontFamily: mono, fontSize: 12, color: T.text,
+                    background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: 6,
+                    padding: '10px 14px', outline: 'none', cursor: 'pointer',
+                  }}
+                >
+                  {SEVERITIES.map(s => (
+                    <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Auto-fix toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>Auto-fix</label>
+              <Toggle on={customAutoFix} onToggle={() => setCustomAutoFix(!customAutoFix)} />
+              <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>
+                {customAutoFix ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label style={{ fontFamily: mono, fontSize: 11, color: T.muted, display: 'block', marginBottom: 6 }}>
+                Description
+              </label>
+              <textarea
+                value={customDescription}
+                onChange={e => setCustomDescription(e.target.value)}
+                placeholder="Describe what this rule enforces..."
+                rows={3}
+                style={{
+                  width: '100%', fontFamily: mono, fontSize: 12, color: T.text,
+                  background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: 6,
+                  padding: '10px 14px', outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.target.style.borderColor = T.blue)}
+                onBlur={e => (e.target.style.borderColor = T.border2)}
+              />
+            </div>
+
+            {/* Add button */}
+            <button
+              onClick={handleAddCustomRule}
+              disabled={!customName.trim()}
+              style={{
+                fontFamily: mono, fontSize: 12, fontWeight: 600, color: T.text,
+                background: customName.trim() ? T.blue : T.dim,
+                border: 'none', borderRadius: 6, padding: '10px 20px',
+                cursor: customName.trim() ? 'pointer' : 'not-allowed',
+                alignSelf: 'flex-start', transition: 'background 0.2s',
+              }}
+            >
+              Add rule
+            </button>
           </div>
         </div>
+
+        {/* ─── Violation Preview ─────────────────────────── */}
+        {violationCount !== null && (
+          <div style={{
+            padding: '12px 20px', background: T.amberDim, border: `1px solid ${T.amber}33`,
+            borderRadius: 8, marginBottom: 28,
+            fontFamily: mono, fontSize: 12, color: T.amber,
+          }}>
+            This will affect {violationCount} violation{violationCount !== 1 ? 's' : ''} in your scan
+          </div>
+        )}
+
+        {/* ─── CTA ───────────────────────────────────────── */}
+        <button
+          onClick={() => {
+            markStepComplete(1)
+            router.push('/scan')
+          }}
+          style={{
+            width: '100%', padding: '18px 24px', borderRadius: 10,
+            background: T.green, color: '#000',
+            fontFamily: syne, fontSize: 18, fontWeight: 700,
+            border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            transition: 'opacity 0.2s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+        >
+          Run scan
+          <span style={{ fontSize: 20 }}>{'\u2192'}</span>
+        </button>
       </div>
+    </div>
+  )
+}
+
+// ─── Stat Badge sub-component ─────────────────────────────
+function StatBadge({ label, count, color, dim }: { label: string; count: number; color: string; dim: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{
+        fontFamily: "'DM Mono', monospace", fontSize: 14, fontWeight: 700, color,
+        background: dim, padding: '2px 8px', borderRadius: 4,
+        border: `1px solid ${color}33`, minWidth: 24, textAlign: 'center',
+      }}>
+        {count}
+      </span>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#6b7280' }}>
+        {label}
+      </span>
     </div>
   )
 }

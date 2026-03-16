@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
+import { createBrowserClient } from '@supabase/ssr'
 
-// Simple in-memory waitlist for MVP (resets on deploy)
-const waitlist = new Set<string>()
+function getSupabase() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 export async function POST(req: Request) {
   try {
@@ -12,21 +17,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 })
     }
 
-    if (waitlist.has(email)) {
-      return NextResponse.json({ error: 'Already on the waitlist', count: waitlist.size }, { status: 409 })
-    }
+    // Save to Supabase
+    try {
+      const sb = getSupabase()
+      await sb.from('waitlist').insert({ email, created_at: new Date().toISOString() })
+    } catch { /* continue even if Supabase fails */ }
 
-    waitlist.add(email)
-
-    return NextResponse.json({
-      success: true,
-      count: waitlist.size + 347, // baseline count for demo
-    })
+    return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ count: waitlist.size + 347 })
+  return NextResponse.json({ status: 'active' })
 }
