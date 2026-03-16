@@ -7,19 +7,6 @@ import { getFixture } from '@/lib/fixtures'
 import { buildGovernanceReport, reportToJSON } from '@/lib/governance'
 import { getOrCreateMcpToken, loadSession, syncMcpToken } from '@/lib/session'
 
-// ─── Design Tokens ────────────────────────────────────────────
-const T = {
-  bg: '#080909', surface: '#0c0d0f', surface2: '#101214',
-  border: '#161819', border2: '#1e2226',
-  blue: '#0055FF', text: '#f0f1f3', muted: '#6b7280', dim: '#374151',
-  green: '#22c55e', greenDim: '#22c55e18',
-  amber: '#f59e0b', amberDim: '#f59e0b18',
-  red: '#ef4444', redDim: '#ef444418',
-  blueDim: '#0055FF18',
-}
-const syne = "'Syne', sans-serif"
-const mono = "'DM Mono', monospace"
-
 // ─── Constants ────────────────────────────────────────────────
 const ENDPOINT = 'https://madhurasekar-github-io.vercel.app'
 
@@ -96,19 +83,19 @@ function fmtTs(iso: string) {
   return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-// ─── Glow keyframes (injected once) ──────────────────────────
+// ─── Keyframes (injected once) ───────────────────────────────
 const glowKeyframes = `
 @keyframes glow-green {
-  0%, 100% { box-shadow: 0 0 6px ${T.green}88; }
-  50% { box-shadow: 0 0 14px ${T.green}cc; }
-}
-@keyframes glow-amber {
-  0%, 100% { box-shadow: 0 0 6px ${T.amber}88; }
-  50% { box-shadow: 0 0 14px ${T.amber}cc; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 @keyframes pulse-amber {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+@keyframes fadeInSection {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 `
 
@@ -196,7 +183,7 @@ Only return code where health_score >= 85.`
       }
       setLog(prev => [entry, ...prev])
     } catch (e: any) {
-      setRunError(e?.message ? `Parse error — ${e.message}` : 'Parse error — check your JSON')
+      setRunError(e?.message ? `Parse error \u2014 ${e.message}` : 'Parse error \u2014 check your JSON')
     } finally {
       setRunning(false)
     }
@@ -216,7 +203,10 @@ Only return code where health_score >= 85.`
 
   // ─── Render ─────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: mono }}>
+    <div style={{
+      minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)',
+      fontFamily: 'var(--font-sans)',
+    }}>
       <style dangerouslySetInnerHTML={{ __html: glowKeyframes }} />
       <Stepper />
 
@@ -224,10 +214,16 @@ Only return code where health_score >= 85.`
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '40px 24px 100px' }}>
 
         {/* Page heading */}
-        <h1 style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.text, margin: '0 0 6px' }}>
-          MCP Runtime Console
+        <h1 style={{
+          fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 700,
+          color: 'var(--text-primary)', margin: '0 0 6px',
+        }}>
+          MCP Integration
         </h1>
-        <p style={{ fontFamily: mono, fontSize: 12, color: T.muted, margin: '0 0 40px', lineHeight: 1.6, maxWidth: 600 }}>
+        <p style={{
+          fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)',
+          margin: '0 0 40px', lineHeight: 1.6, maxWidth: 600,
+        }}>
           Connect Claude Code to the Muteform validation engine. Every generated component is scanned and patched before delivery.
         </p>
 
@@ -241,41 +237,41 @@ Only return code where health_score >= 85.`
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '14px 18px',
-              background: T.greenDim, border: `1px solid ${T.green}33`,
-              borderRadius: 8,
+              background: 'var(--success-dim)', border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
+              borderRadius: 6,
             }}>
               <div style={{
                 width: 8, height: 8, borderRadius: '50%',
-                background: T.green,
+                background: 'var(--success)',
                 animation: 'glow-green 2s ease-in-out infinite',
               }} />
-              <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
-                Your governance endpoint is live.
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
+                Endpoint active
               </span>
             </div>
 
             {/* Endpoint URL display */}
             <div style={{
-              padding: '16px 18px', background: T.surface2,
-              border: `1px solid ${T.border}`, borderRadius: 8,
+              padding: '16px 18px', background: 'var(--surface)',
+              border: '1px solid var(--border)', borderRadius: 6,
             }}>
               <div style={{
-                fontFamily: mono, fontSize: 12, color: T.muted, marginBottom: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6,
                 letterSpacing: '0.02em',
               }}>
                 Endpoint
               </div>
               <div style={{
-                fontFamily: mono, fontSize: 13, color: T.text,
-                padding: '10px 14px', background: T.bg,
-                borderRadius: 6, border: `1px solid ${T.border}`,
+                fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)',
+                padding: '10px 14px', background: 'var(--code-bg)',
+                borderRadius: 6, border: '1px solid var(--border)',
                 lineHeight: 1.8, marginBottom: 12,
               }}>
-                <span style={{ color: T.green }}>POST</span>{' '}
-                <span style={{ color: T.text }}>{ENDPOINT}/api/validate</span>
+                <span style={{ color: 'var(--success)' }}>POST</span>{' '}
+                <span style={{ color: 'var(--text-primary)' }}>{ENDPOINT}/api/validate</span>
                 <br />
-                <span style={{ color: T.muted }}>x-muteform-token:</span>{' '}
-                <span style={{ color: T.amber }}>{masked ? `${apiKey.substring(0, 12)}${'*'.repeat(20)}` : apiKey}</span>
+                <span style={{ color: 'var(--text-muted)' }}>x-muteform-token:</span>{' '}
+                <span style={{ color: 'var(--warning)' }}>{masked ? `${apiKey.substring(0, 12)}${'*'.repeat(20)}` : apiKey}</span>
               </div>
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -283,13 +279,11 @@ Only return code where health_score >= 85.`
                   onClick={() => copyText(`${ENDPOINT}/api/validate`, 'endpoint')}
                   label={copied === 'endpoint' ? 'COPIED \u2713' : 'COPY ENDPOINT'}
                   active={copied === 'endpoint'}
-                  activeColor={T.green}
                 />
                 <SmallButton
                   onClick={() => copyText(apiKey, 'token')}
                   label={copied === 'token' ? 'COPIED \u2713' : 'COPY TOKEN'}
                   active={copied === 'token'}
-                  activeColor={T.green}
                 />
                 <SmallButton
                   onClick={() => setMasked(!masked)}
@@ -300,24 +294,27 @@ Only return code where health_score >= 85.`
 
             {/* API Token card */}
             <div style={{
-              padding: '14px 18px', background: T.surface2,
-              border: `1px solid ${T.border}`, borderRadius: 8,
+              padding: '14px 18px', background: 'var(--surface)',
+              border: '1px solid var(--border)', borderRadius: 6,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontFamily: syne, fontSize: 12, fontWeight: 700, color: T.text, letterSpacing: '0.08em' }}>
-                  API TOKEN
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+                  color: 'var(--text-muted)', letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}>
+                  API Token
                 </span>
                 <SmallButton
                   onClick={() => copyText(apiKey, 'key')}
                   label={copied === 'key' ? 'COPIED \u2713' : 'COPY'}
                   active={copied === 'key'}
-                  activeColor={T.green}
                 />
               </div>
               <div style={{
-                fontFamily: mono, fontSize: 12, color: T.text,
-                padding: '8px 12px', background: T.bg,
-                borderRadius: 6, border: `1px solid ${T.border}`,
+                fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)',
+                padding: '8px 12px', background: 'var(--code-bg)',
+                borderRadius: 6, border: '1px solid var(--border)',
                 letterSpacing: '0.04em', wordBreak: 'break-all',
               }}>
                 {masked ? `${apiKey.substring(0, 12)}${'*'.repeat(28)}` : apiKey}
@@ -338,7 +335,7 @@ Only return code where health_score >= 85.`
               completed={completedSteps.has(1)}
               onComplete={() => markStepComplete(1)}
             >
-              <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
                 Open your project in Claude Code.
               </span>
             </StepRow>
@@ -350,13 +347,17 @@ Only return code where health_score >= 85.`
               onComplete={() => markStepComplete(2)}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                 </svg>
-                <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
                   Create or open{' '}
-                  <code style={{ color: T.blue, background: T.blueDim, padding: '1px 6px', borderRadius: 3, fontSize: 12 }}>
+                  <code style={{
+                    color: 'var(--accent)', background: 'var(--accent-dim)',
+                    padding: '1px 6px', borderRadius: 3, fontSize: 12,
+                    fontFamily: 'var(--font-mono)',
+                  }}>
                     CLAUDE.md
                   </code>{' '}
                   in your project root.
@@ -372,7 +373,7 @@ Only return code where health_score >= 85.`
               last={false}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-                <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
                   Paste this at the top:
                 </span>
                 <CodeBlock
@@ -385,7 +386,6 @@ Only return code where health_score >= 85.`
                   }}
                   filename="CLAUDE.md"
                   copyLabel="COPY SNIPPET"
-                  copyActiveColor={T.green}
                 />
               </div>
             </StepRow>
@@ -396,7 +396,7 @@ Only return code where health_score >= 85.`
               completed={completedSteps.has(4)}
               onComplete={() => markStepComplete(4)}
             >
-              <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
                 Generate any UI component.
               </span>
             </StepRow>
@@ -408,7 +408,7 @@ Only return code where health_score >= 85.`
               onComplete={() => markStepComplete(5)}
               last
             >
-              <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)' }}>
                 Come back here to see it governed.
               </span>
             </StepRow>
@@ -422,25 +422,24 @@ Only return code where health_score >= 85.`
           {log.length === 0 ? (
             <div style={{
               padding: '36px 20px', textAlign: 'center',
-              background: T.surface2, border: `1px solid ${T.border}`,
-              borderRadius: 8,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 6,
             }}>
               <div style={{
                 display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                background: T.amber, marginBottom: 14,
+                background: 'var(--warning)', marginBottom: 14,
                 animation: 'pulse-amber 2s ease-in-out infinite',
-                boxShadow: `0 0 8px ${T.amber}`,
               }} />
-              <p style={{ fontFamily: mono, fontSize: 13, color: T.muted, margin: '0 0 8px' }}>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', margin: '0 0 8px' }}>
                 No calls yet.
               </p>
-              <p style={{ fontFamily: mono, fontSize: 11, color: T.dim, margin: 0, lineHeight: 1.6 }}>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
                 Add the snippet to CLAUDE.md and generate your first component.
               </p>
             </div>
           ) : (
             <div style={{
-              border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden',
+              border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden',
               overflowX: 'auto',
             }}>
               {/* Table header */}
@@ -449,12 +448,12 @@ Only return code where health_score >= 85.`
                 gridTemplateColumns: '100px 1fr 90px 70px 70px',
                 minWidth: 480,
                 padding: '10px 16px',
-                background: T.surface2,
-                borderBottom: `1px solid ${T.border}`,
+                background: 'var(--surface-elevated)',
+                borderBottom: '1px solid var(--border)',
               }}>
                 {['Time', 'Source', 'Violations', 'Fixed', 'Score'].map(h => (
                   <span key={h} style={{
-                    fontFamily: mono, fontSize: 9, color: T.dim,
+                    fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)',
                     letterSpacing: '0.08em', textTransform: 'uppercase',
                   }}>
                     {h}
@@ -467,26 +466,26 @@ Only return code where health_score >= 85.`
                 <div key={entry.id}>
                   <div
                     onClick={() => toggleRow(entry.id)}
-                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = T.surface2 }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = entry.expanded ? T.surface2 : 'transparent' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-elevated)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = entry.expanded ? 'var(--surface-elevated)' : 'transparent' }}
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '100px 1fr 90px 70px 70px',
                       minWidth: 480,
                       padding: '10px 16px',
-                      borderBottom: idx < log.length - 1 || entry.expanded ? `1px solid ${T.border}` : 'none',
+                      borderBottom: idx < log.length - 1 || entry.expanded ? '1px solid var(--border)' : 'none',
                       cursor: 'pointer',
-                      background: entry.expanded ? T.surface2 : 'transparent',
+                      background: entry.expanded ? 'var(--surface-elevated)' : 'transparent',
                       transition: 'background 0.15s',
                     }}
                   >
-                    <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>{fmtTs(entry.timestamp)}</span>
-                    <span style={{ fontFamily: mono, fontSize: 11, color: T.text }}>{entry.source}</span>
-                    <span style={{ fontFamily: mono, fontSize: 11, color: entry.violations > 0 ? T.amber : T.green }}>{entry.violations}</span>
-                    <span style={{ fontFamily: mono, fontSize: 11, color: T.green }}>{entry.fixed}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>{fmtTs(entry.timestamp)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)' }}>{entry.source}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: entry.violations > 0 ? 'var(--warning)' : 'var(--success)' }}>{entry.violations}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--success)' }}>{entry.fixed}</span>
                     <span style={{
-                      fontFamily: mono, fontSize: 11,
-                      color: entry.score >= 80 ? T.green : entry.score >= 50 ? T.amber : T.red,
+                      fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: entry.score >= 80 ? 'var(--success)' : entry.score >= 50 ? 'var(--warning)' : 'var(--error)',
                     }}>
                       {entry.score}
                     </span>
@@ -494,12 +493,12 @@ Only return code where health_score >= 85.`
                   {entry.expanded && (
                     <div style={{
                       padding: '14px 16px',
-                      borderBottom: idx < log.length - 1 ? `1px solid ${T.border}` : 'none',
-                      background: T.bg,
+                      borderBottom: idx < log.length - 1 ? '1px solid var(--border)' : 'none',
+                      background: 'var(--code-bg)',
                       transition: 'all 0.2s ease',
                     }}>
                       <pre style={{
-                        fontFamily: mono, fontSize: 10, color: T.muted,
+                        fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
                         overflowX: 'auto', margin: 0, lineHeight: 1.6,
                         whiteSpace: 'pre-wrap', wordBreak: 'break-all',
                       }}>
@@ -517,7 +516,10 @@ Only return code where health_score >= 85.`
         {/* SECTION D — LIVE TEST                                */}
         {/* ══════════════════════════════════════════════════════ */}
         <Section label="04" title="Live Test">
-          <p style={{ fontFamily: mono, fontSize: 11, color: T.muted, margin: '0 0 14px', lineHeight: 1.6 }}>
+          <p style={{
+            fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+            margin: '0 0 14px', lineHeight: 1.6,
+          }}>
             Paste an artifact JSON and run it through the engine locally. The raw JSON response below is exactly what Claude Code receives.
           </p>
 
@@ -526,10 +528,13 @@ Only return code where health_score >= 85.`
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: 6,
             }}>
-              <span style={{ fontFamily: mono, fontSize: 10, color: T.dim, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+              }}>
                 Artifact JSON
               </span>
-              <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
                 Pre-filled: Onboarding Flow (Cursor AI output)
               </span>
             </div>
@@ -539,9 +544,9 @@ Only return code where health_score >= 85.`
               spellCheck={false}
               style={{
                 width: '100%', minHeight: 180,
-                fontFamily: mono, fontSize: 11, color: T.text,
-                background: T.surface2, border: `1px solid ${T.border}`,
-                borderRadius: 8, padding: '12px 14px',
+                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)',
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '12px 14px',
                 resize: 'vertical', outline: 'none', lineHeight: 1.6,
                 boxSizing: 'border-box',
               }}
@@ -551,8 +556,8 @@ Only return code where health_score >= 85.`
           {runError && (
             <div style={{
               marginBottom: 14, padding: '12px 14px',
-              background: T.redDim, border: `1px solid ${T.red}33`,
-              borderRadius: 6, fontFamily: mono, fontSize: 12, color: T.red,
+              background: 'var(--error-dim)', border: '1px solid color-mix(in srgb, var(--error) 25%, transparent)',
+              borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--error)',
               lineHeight: 1.5,
             }}>
               {runError}
@@ -563,21 +568,21 @@ Only return code where health_score >= 85.`
             onClick={handleRunTest}
             disabled={running}
             onMouseEnter={e => {
-              if (!running) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.02)'
+              if (!running) (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-hover)'
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'
+              if (!running) (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent)'
             }}
             style={{
               width: '100%', padding: '14px 0',
-              fontFamily: syne, fontSize: 14, fontWeight: 700,
-              letterSpacing: '0.08em', color: '#fff',
-              background: running ? T.dim : T.blue,
-              border: 'none', borderRadius: 8, cursor: running ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 700,
+              letterSpacing: '0.04em', color: 'var(--bg)',
+              background: running ? 'var(--text-muted)' : 'var(--accent)',
+              border: 'none', borderRadius: 6, cursor: running ? 'not-allowed' : 'pointer',
               transition: 'all 0.15s ease',
             }}
           >
-            {running ? 'RUNNING...' : 'TEST GOVERNANCE NOW'}
+            {running ? 'Running...' : 'Test Governance'}
           </button>
 
           {/* Summary stat cards */}
@@ -586,20 +591,20 @@ Only return code where health_score >= 85.`
               <div style={{
                 display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16,
               }}>
-                <StatCard value={liveReport.score} label="HEALTH SCORE" color={T.green} bg={T.greenDim} />
-                <StatCard value={liveReport.violations} label="VIOLATIONS" color={T.amber} bg={T.amberDim} />
-                <StatCard value={liveReport.fixed} label="AUTO-FIXED" color={T.blue} bg={T.blueDim} />
+                <StatCard value={liveReport.score} label="HEALTH SCORE" color="var(--success)" bg="var(--success-dim)" />
+                <StatCard value={liveReport.violations} label="VIOLATIONS" color="var(--warning)" bg="var(--warning-dim)" />
+                <StatCard value={liveReport.fixed} label="AUTO-FIXED" color="var(--accent)" bg="var(--accent-dim)" />
               </div>
 
               <a
                 href="/report"
-                onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.02)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--accent-hover)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--accent)' }}
                 style={{
                   display: 'block', textAlign: 'center',
-                  fontFamily: syne, fontSize: 13, fontWeight: 700,
-                  color: '#000', background: T.green,
-                  padding: '14px 0', borderRadius: 8,
+                  fontFamily: 'var(--font-serif)', fontSize: 13, fontWeight: 700,
+                  color: 'var(--bg)', background: 'var(--accent)',
+                  padding: '14px 0', borderRadius: 6,
                   textDecoration: 'none', letterSpacing: '0.02em',
                   transition: 'all 0.15s ease',
                 }}
@@ -617,21 +622,21 @@ Only return code where health_score >= 85.`
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 14px',
-                  background: T.surface2, border: `1px solid ${T.border}`,
-                  borderRadius: jsonCollapsed ? 8 : '8px 8px 0 0',
+                  background: 'var(--surface-elevated)', border: '1px solid var(--border)',
+                  borderRadius: jsonCollapsed ? 6 : '6px 6px 0 0',
                   cursor: 'pointer',
                   transition: 'border-radius 0.15s',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{
-                    fontFamily: mono, fontSize: 10, color: T.green,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--success)',
                     letterSpacing: '0.06em', textTransform: 'uppercase',
                   }}>
                     Raw JSON Response
                   </span>
                   <span style={{
-                    fontFamily: mono, fontSize: 10, color: T.dim,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
                     transform: jsonCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
                     transition: 'transform 0.15s',
                     display: 'inline-block',
@@ -646,18 +651,17 @@ Only return code where health_score >= 85.`
                   }}
                   label={copied === 'result' ? 'COPIED \u2713' : 'COPY'}
                   active={copied === 'result'}
-                  activeColor={T.green}
                 />
               </div>
               {!jsonCollapsed && (
                 <div style={{
-                  background: T.bg, border: `1px solid ${T.border}`,
+                  background: 'var(--code-bg)', border: '1px solid var(--border)',
                   borderTop: 'none',
-                  borderRadius: '0 0 8px 8px', overflow: 'hidden',
+                  borderRadius: '0 0 6px 6px', overflow: 'hidden',
                 }}>
                   <pre style={{
-                    padding: '14px 16px', fontFamily: mono, fontSize: 10,
-                    color: T.muted, overflowX: 'auto', margin: 0, lineHeight: 1.7,
+                    padding: '14px 16px', fontFamily: 'var(--font-mono)', fontSize: 10,
+                    color: 'var(--text-muted)', overflowX: 'auto', margin: 0, lineHeight: 1.7,
                     whiteSpace: 'pre-wrap', wordBreak: 'break-all',
                     maxHeight: 400, overflowY: 'auto',
                   }}>
@@ -678,11 +682,11 @@ Only return code where health_score >= 85.`
 
 function Section({ label, title, children }: { label: string; title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 40 }}>
+    <div style={{ marginBottom: 40, animation: 'fadeInSection 0.4s ease both' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 18 }}>
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.blue, letterSpacing: '0.1em' }}>{label}</span>
-        <h2 style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: T.text, margin: 0 }}>{title}</h2>
-        <div style={{ flex: 1, height: 1, background: T.border }} />
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent)', letterSpacing: '0.1em' }}>{label}</span>
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{title}</h2>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
       </div>
       {children}
     </div>
@@ -690,12 +694,11 @@ function Section({ label, title, children }: { label: string; title: string; chi
 }
 
 function SmallButton({
-  onClick, label, active = false, activeColor = T.blue,
+  onClick, label, active = false,
 }: {
   onClick: (e?: React.MouseEvent) => void
   label: string
   active?: boolean
-  activeColor?: string
 }) {
   return (
     <button
@@ -703,10 +706,10 @@ function SmallButton({
       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.02)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
       style={{
-        fontFamily: mono, fontSize: 9, padding: '4px 10px', borderRadius: 4,
-        background: active ? `${activeColor}18` : T.surface2,
-        color: active ? activeColor : T.muted,
-        border: `1px solid ${active ? activeColor + '33' : T.border}`,
+        fontFamily: 'var(--font-mono)', fontSize: 9, padding: '4px 10px', borderRadius: 4,
+        background: active ? 'var(--success-dim)' : 'var(--surface)',
+        color: active ? 'var(--success)' : 'var(--text-muted)',
+        border: active ? '1px solid color-mix(in srgb, var(--success) 25%, transparent)' : '1px solid var(--border)',
         cursor: 'pointer', letterSpacing: '0.06em',
         transition: 'all 0.15s ease',
       }}
@@ -717,7 +720,7 @@ function SmallButton({
 }
 
 function CodeBlock({
-  code, copyId, copied, onCopy, filename, copyLabel, copyActiveColor,
+  code, copyId, copied, onCopy, filename, copyLabel,
 }: {
   code: string
   copyId: string
@@ -725,30 +728,28 @@ function CodeBlock({
   onCopy: (text: string, id: string) => void
   filename?: string
   copyLabel?: string
-  copyActiveColor?: string
 }) {
   const isCopied = copied === copyId
   return (
     <div style={{
-      background: T.bg, border: `1px solid ${T.border}`,
-      borderRadius: 8, overflow: 'hidden',
+      background: 'var(--code-bg)', border: '1px solid var(--border)',
+      borderRadius: 6, overflow: 'hidden',
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 14px', borderBottom: `1px solid ${T.border}`,
-        background: T.surface2,
+        padding: '8px 14px', borderBottom: '1px solid var(--border)',
+        background: 'var(--surface-elevated)',
       }}>
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{filename ?? 'snippet'}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>{filename ?? 'snippet'}</span>
         <SmallButton
           onClick={() => onCopy(code, copyId)}
           label={isCopied ? 'COPIED \u2713' : (copyLabel ?? 'COPY')}
           active={isCopied}
-          activeColor={copyActiveColor ?? T.green}
         />
       </div>
       <pre style={{
-        padding: '14px 16px', fontFamily: mono, fontSize: 11,
-        color: T.text, overflowX: 'auto', margin: 0, lineHeight: 1.7,
+        padding: '14px 16px', fontFamily: 'var(--font-mono)', fontSize: 11,
+        color: 'var(--text-primary)', overflowX: 'auto', margin: 0, lineHeight: 1.7,
         whiteSpace: 'pre-wrap', wordBreak: 'break-all',
       }}>
         {code}
@@ -775,7 +776,7 @@ function StepRow({
       {!last && (
         <div style={{
           position: 'absolute', left: 15, top: 32, bottom: 0,
-          width: 1, background: T.border,
+          width: 1, background: 'var(--border)',
         }} />
       )}
 
@@ -786,10 +787,10 @@ function StepRow({
           width: 30, height: 30, borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
-          background: completed ? T.greenDim : T.surface2,
-          border: `1px solid ${completed ? T.green + '44' : T.border}`,
-          fontFamily: mono, fontSize: 12, fontWeight: 700,
-          color: completed ? T.green : T.muted,
+          background: completed ? 'var(--success-dim)' : 'var(--surface)',
+          border: completed ? '1px solid color-mix(in srgb, var(--success) 35%, transparent)' : '1px solid var(--border)',
+          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+          color: completed ? 'var(--success)' : 'var(--text-muted)',
           cursor: 'pointer',
           transition: 'all 0.15s ease',
         }}
@@ -809,10 +810,10 @@ function StatCard({ value, label, color, bg }: { value: number; label: string; c
   return (
     <div style={{
       padding: '16px 14px', textAlign: 'center',
-      background: bg, border: `1px solid ${color}33`, borderRadius: 8,
+      background: bg, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`, borderRadius: 4,
     }}>
-      <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontFamily: mono, fontSize: 9, color, letterSpacing: '0.08em', marginTop: 4 }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color, letterSpacing: '0.08em', marginTop: 4 }}>{label}</div>
     </div>
   )
 }
