@@ -84,6 +84,7 @@ export default function DashboardPage() {
             { label: 'Dashboard', href: '/dashboard', active: true },
             { label: 'Scan', href: '/scan', active: false },
             { label: 'Rules', href: '/rules', active: false },
+            { label: 'Governance', href: '/governance', active: false },
             { label: 'Integrate', href: '/integrate', active: false },
             { label: 'Team', href: '/team', active: false },
           ].map(l => (
