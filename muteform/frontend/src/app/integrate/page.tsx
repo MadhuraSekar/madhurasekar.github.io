@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Stepper from '@/components/Stepper'
 import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
 import { getFixture } from '@/lib/fixtures'
@@ -96,22 +96,34 @@ function fmtTs(iso: string) {
   return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+// ─── Glow keyframes (injected once) ──────────────────────────
+const glowKeyframes = `
+@keyframes glow-green {
+  0%, 100% { box-shadow: 0 0 6px ${T.green}88; }
+  50% { box-shadow: 0 0 14px ${T.green}cc; }
+}
+@keyframes glow-amber {
+  0%, 100% { box-shadow: 0 0 6px ${T.amber}88; }
+  50% { box-shadow: 0 0 14px ${T.amber}cc; }
+}
+@keyframes pulse-amber {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+`
 
 // ─── Page ─────────────────────────────────────────────────────
 export default function IntegratePage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [apiKey] = useState(() => getOrCreateMcpToken())
   const [masked, setMasked] = useState(true)
   const [copied, setCopied] = useState<string | null>(null)
+  const [jsonCollapsed, setJsonCollapsed] = useState(true)
 
   // Sync token to Supabase on mount
   useEffect(() => {
     const session = loadSession()
     syncMcpToken(session.user?.id ?? null, apiKey)
   }, [apiKey])
-
-  // Connection status — always show active for demo
-  const connStatus = 'connected' as const
 
   // Live test
   const fixture = getFixture('onboarding')
@@ -126,28 +138,31 @@ export default function IntegratePage() {
   // Log
   const [log, setLog] = useState<LogEntry[]>([])
 
+  // Steps completion tracking
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
+
   const copyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text).catch(() => {})
     setCopied(id)
     setTimeout(() => setCopied(null), 2000)
   }
 
-  const claudeSnippet = `# Add to CLAUDE.md in your project
+  const claudeSnippet = `## Design Governance
 
-Before completing any UI generation task:
-1. POST your generated component to:
-   ${ENDPOINT}/api/validate
-   Header: x-muteform-token: ${apiKey}
-   Body: { "artifact": { "nodes": [...], "metadata": {...} } }
-2. Apply every patch in the response
-   before returning the final code
-3. Only return code with health_score >= 90`
+Before completing any UI task:
+POST the generated code to:
+${ENDPOINT}/api/validate
+x-muteform-token: ${apiKey}
+
+Apply every patch in the response.
+Only return code where health_score >= 85.`
 
   const handleRunTest = async () => {
     setRunning(true)
     setRunError(null)
     setLiveResult(null)
     setLiveReport(null)
+    setJsonCollapsed(true)
     try {
       const artifact = JSON.parse(artifactInput)
       const config = loadConfig(DEMO_YAML)
@@ -181,7 +196,7 @@ Before completing any UI generation task:
       }
       setLog(prev => [entry, ...prev])
     } catch (e: any) {
-      setRunError(e?.message ?? 'Parse error — check your JSON')
+      setRunError(e?.message ? `Parse error — ${e.message}` : 'Parse error — check your JSON')
     } finally {
       setRunning(false)
     }
@@ -191,49 +206,99 @@ Before completing any UI generation task:
     setLog(prev => prev.map(e => e.id === id ? { ...e, expanded: !e.expanded } : e))
   }
 
+  const markStepComplete = (step: number) => {
+    setCompletedSteps(prev => {
+      const next = new Set(prev)
+      next.add(step)
+      return next
+    })
+  }
+
   // ─── Render ─────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: mono }}>
+      <style dangerouslySetInnerHTML={{ __html: glowKeyframes }} />
       <Stepper />
 
       {/* ── Content ── */}
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '40px 24px 100px' }}>
 
-
         {/* Page heading */}
         <h1 style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.text, margin: '0 0 6px' }}>
           MCP Runtime Console
         </h1>
-        <p style={{ fontFamily: mono, fontSize: 12, color: T.muted, margin: '0 0 36px', lineHeight: 1.6 }}>
+        <p style={{ fontFamily: mono, fontSize: 12, color: T.muted, margin: '0 0 40px', lineHeight: 1.6, maxWidth: 600 }}>
           Connect Claude Code to the Muteform validation engine. Every generated component is scanned and patched before delivery.
         </p>
 
-        {/* ── Section 1: Connection Status ── */}
-        <Section label="01" title="Connection Status">
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* SECTION A — YOUR ENDPOINT                            */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <Section label="01" title="Your Endpoint">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Status row */}
+            {/* Status indicator */}
             <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              display: 'flex', alignItems: 'center', gap: 10,
               padding: '14px 18px',
-              background: connStatus === 'connected' ? T.greenDim : connStatus === 'disconnected' ? T.redDim : T.surface2,
-              border: `1px solid ${connStatus === 'connected' ? T.green + '33' : connStatus === 'disconnected' ? T.red + '33' : T.border}`,
+              background: T.greenDim, border: `1px solid ${T.green}33`,
               borderRadius: 8,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: connStatus === 'connected' ? T.green : connStatus === 'disconnected' ? T.red : T.amber,
-                  boxShadow: connStatus === 'connected' ? `0 0 8px ${T.green}` : connStatus === 'disconnected' ? `0 0 8px ${T.red}` : `0 0 8px ${T.amber}`,
-                }} />
-                <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
-                  MCP Endpoint Active
-                </span>
-              </div>
-              <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{ENDPOINT}</span>
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: T.green,
+                animation: 'glow-green 2s ease-in-out infinite',
+              }} />
+              <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+                Your governance endpoint is live.
+              </span>
             </div>
 
-            {/* API Token */}
+            {/* Endpoint URL display */}
+            <div style={{
+              padding: '16px 18px', background: T.surface2,
+              border: `1px solid ${T.border}`, borderRadius: 8,
+            }}>
+              <div style={{
+                fontFamily: mono, fontSize: 12, color: T.muted, marginBottom: 6,
+                letterSpacing: '0.02em',
+              }}>
+                Endpoint
+              </div>
+              <div style={{
+                fontFamily: mono, fontSize: 13, color: T.text,
+                padding: '10px 14px', background: T.bg,
+                borderRadius: 6, border: `1px solid ${T.border}`,
+                lineHeight: 1.8, marginBottom: 12,
+              }}>
+                <span style={{ color: T.green }}>POST</span>{' '}
+                <span style={{ color: T.text }}>{ENDPOINT}/api/validate</span>
+                <br />
+                <span style={{ color: T.muted }}>x-muteform-token:</span>{' '}
+                <span style={{ color: T.amber }}>{masked ? `${apiKey.substring(0, 12)}${'*'.repeat(20)}` : apiKey}</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <SmallButton
+                  onClick={() => copyText(`${ENDPOINT}/api/validate`, 'endpoint')}
+                  label={copied === 'endpoint' ? 'COPIED \u2713' : 'COPY ENDPOINT'}
+                  active={copied === 'endpoint'}
+                  activeColor={T.green}
+                />
+                <SmallButton
+                  onClick={() => copyText(apiKey, 'token')}
+                  label={copied === 'token' ? 'COPIED \u2713' : 'COPY TOKEN'}
+                  active={copied === 'token'}
+                  activeColor={T.green}
+                />
+                <SmallButton
+                  onClick={() => setMasked(!masked)}
+                  label={masked ? 'REVEAL TOKEN' : 'HIDE TOKEN'}
+                />
+              </div>
+            </div>
+
+            {/* API Token card */}
             <div style={{
               padding: '14px 18px', background: T.surface2,
               border: `1px solid ${T.border}`, borderRadius: 8,
@@ -242,15 +307,12 @@ Before completing any UI generation task:
                 <span style={{ fontFamily: syne, fontSize: 12, fontWeight: 700, color: T.text, letterSpacing: '0.08em' }}>
                   API TOKEN
                 </span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <SmallButton onClick={() => setMasked(!masked)} label={masked ? 'REVEAL' : 'HIDE'} />
-                  <SmallButton
-                    onClick={() => copyText(apiKey, 'key')}
-                    label={copied === 'key' ? 'COPIED ✓' : 'COPY'}
-                    active={copied === 'key'}
-                    activeColor={T.green}
-                  />
-                </div>
+                <SmallButton
+                  onClick={() => copyText(apiKey, 'key')}
+                  label={copied === 'key' ? 'COPIED \u2713' : 'COPY'}
+                  active={copied === 'key'}
+                  activeColor={T.green}
+                />
               </div>
               <div style={{
                 fontFamily: mono, fontSize: 12, color: T.text,
@@ -258,58 +320,145 @@ Before completing any UI generation task:
                 borderRadius: 6, border: `1px solid ${T.border}`,
                 letterSpacing: '0.04em', wordBreak: 'break-all',
               }}>
-                {masked ? `${apiKey.substring(0, 12)}${'•'.repeat(28)}` : apiKey}
+                {masked ? `${apiKey.substring(0, 12)}${'*'.repeat(28)}` : apiKey}
               </div>
             </div>
           </div>
         </Section>
 
-        {/* ── Section 2: Claude Code Snippet ── */}
-        <Section label="02" title="Claude Code Snippet">
-          <p style={{ fontFamily: mono, fontSize: 11, color: T.muted, margin: '0 0 12px', lineHeight: 1.6 }}>
-            Add this to <code style={{ color: T.blue, background: T.blueDim, padding: '1px 5px', borderRadius: 3 }}>CLAUDE.md</code> in your project root. Claude Code will call the endpoint before finalizing any UI component.
-          </p>
-          <CodeBlock
-            code={claudeSnippet}
-            copyId="snippet"
-            copied={copied}
-            onCopy={copyText}
-            filename="CLAUDE.md"
-          />
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* SECTION B — CONNECT CLAUDE CODE                      */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <Section label="02" title="Connect Claude Code">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+            {/* Step 1 */}
+            <StepRow
+              num={1}
+              completed={completedSteps.has(1)}
+              onComplete={() => markStepComplete(1)}
+            >
+              <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+                Open your project in Claude Code.
+              </span>
+            </StepRow>
+
+            {/* Step 2 */}
+            <StepRow
+              num={2}
+              completed={completedSteps.has(2)}
+              onComplete={() => markStepComplete(2)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+                  Create or open{' '}
+                  <code style={{ color: T.blue, background: T.blueDim, padding: '1px 6px', borderRadius: 3, fontSize: 12 }}>
+                    CLAUDE.md
+                  </code>{' '}
+                  in your project root.
+                </span>
+              </div>
+            </StepRow>
+
+            {/* Step 3 */}
+            <StepRow
+              num={3}
+              completed={completedSteps.has(3)}
+              onComplete={() => markStepComplete(3)}
+              last={false}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
+                <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+                  Paste this at the top:
+                </span>
+                <CodeBlock
+                  code={claudeSnippet}
+                  copyId="snippet"
+                  copied={copied}
+                  onCopy={(text, id) => {
+                    copyText(text, id)
+                    markStepComplete(3)
+                  }}
+                  filename="CLAUDE.md"
+                  copyLabel="COPY SNIPPET"
+                  copyActiveColor={T.green}
+                />
+              </div>
+            </StepRow>
+
+            {/* Step 4 */}
+            <StepRow
+              num={4}
+              completed={completedSteps.has(4)}
+              onComplete={() => markStepComplete(4)}
+            >
+              <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+                Generate any UI component.
+              </span>
+            </StepRow>
+
+            {/* Step 5 */}
+            <StepRow
+              num={5}
+              completed={completedSteps.has(5)}
+              onComplete={() => markStepComplete(5)}
+              last
+            >
+              <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
+                Come back here to see it governed.
+              </span>
+            </StepRow>
+          </div>
         </Section>
 
-        {/* ── Section 3: Runtime Log ── */}
-        <Section label="03" title="Runtime Log">
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* SECTION C — LIVE CALL LOG                            */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <Section label="03" title="Live Call Log">
           {log.length === 0 ? (
             <div style={{
-              padding: '28px 20px', textAlign: 'center',
+              padding: '36px 20px', textAlign: 'center',
               background: T.surface2, border: `1px solid ${T.border}`,
               borderRadius: 8,
             }}>
               <div style={{
                 display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                background: T.amber, marginBottom: 12,
+                background: T.amber, marginBottom: 14,
+                animation: 'pulse-amber 2s ease-in-out infinite',
                 boxShadow: `0 0 8px ${T.amber}`,
               }} />
-              <p style={{ fontFamily: mono, fontSize: 12, color: T.muted, margin: '0 0 6px' }}>
-                Waiting for first MCP call…
+              <p style={{ fontFamily: mono, fontSize: 13, color: T.muted, margin: '0 0 8px' }}>
+                No calls yet.
               </p>
-              <p style={{ fontFamily: mono, fontSize: 11, color: T.dim, margin: 0 }}>
-                Add the snippet above to CLAUDE.md to begin
+              <p style={{ fontFamily: mono, fontSize: 11, color: T.dim, margin: 0, lineHeight: 1.6 }}>
+                Add the snippet to CLAUDE.md and generate your first component.
               </p>
             </div>
           ) : (
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{
+              border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden',
+              overflowX: 'auto',
+            }}>
               {/* Table header */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '120px 1fr 80px 60px 70px',
-                padding: '8px 16px',
+                gridTemplateColumns: '100px 1fr 90px 70px 70px',
+                minWidth: 480,
+                padding: '10px 16px',
                 background: T.surface2,
                 borderBottom: `1px solid ${T.border}`,
               }}>
-                {['Timestamp', 'Source', 'Violations', 'Fixed', 'Score'].map(h => (
-                  <span key={h} style={{ fontFamily: mono, fontSize: 9, color: T.dim, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{h}</span>
+                {['Time', 'Source', 'Violations', 'Fixed', 'Score'].map(h => (
+                  <span key={h} style={{
+                    fontFamily: mono, fontSize: 9, color: T.dim,
+                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                  }}>
+                    {h}
+                  </span>
                 ))}
               </div>
 
@@ -318,9 +467,12 @@ Before completing any UI generation task:
                 <div key={entry.id}>
                   <div
                     onClick={() => toggleRow(entry.id)}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = T.surface2 }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = entry.expanded ? T.surface2 : 'transparent' }}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '120px 1fr 80px 60px 70px',
+                      gridTemplateColumns: '100px 1fr 90px 70px 70px',
+                      minWidth: 480,
                       padding: '10px 16px',
                       borderBottom: idx < log.length - 1 || entry.expanded ? `1px solid ${T.border}` : 'none',
                       cursor: 'pointer',
@@ -332,15 +484,19 @@ Before completing any UI generation task:
                     <span style={{ fontFamily: mono, fontSize: 11, color: T.text }}>{entry.source}</span>
                     <span style={{ fontFamily: mono, fontSize: 11, color: entry.violations > 0 ? T.amber : T.green }}>{entry.violations}</span>
                     <span style={{ fontFamily: mono, fontSize: 11, color: T.green }}>{entry.fixed}</span>
-                    <span style={{ fontFamily: mono, fontSize: 11, color: entry.score >= 80 ? T.green : entry.score >= 50 ? T.amber : T.red }}>
+                    <span style={{
+                      fontFamily: mono, fontSize: 11,
+                      color: entry.score >= 80 ? T.green : entry.score >= 50 ? T.amber : T.red,
+                    }}>
                       {entry.score}
                     </span>
                   </div>
                   {entry.expanded && (
                     <div style={{
-                      padding: '12px 16px',
+                      padding: '14px 16px',
                       borderBottom: idx < log.length - 1 ? `1px solid ${T.border}` : 'none',
                       background: T.bg,
+                      transition: 'all 0.2s ease',
                     }}>
                       <pre style={{
                         fontFamily: mono, fontSize: 10, color: T.muted,
@@ -357,13 +513,15 @@ Before completing any UI generation task:
           )}
         </Section>
 
-        {/* ── Section 4: Live Test ── */}
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* SECTION D — LIVE TEST                                */}
+        {/* ══════════════════════════════════════════════════════ */}
         <Section label="04" title="Live Test">
-          <p style={{ fontFamily: mono, fontSize: 11, color: T.muted, margin: '0 0 12px', lineHeight: 1.6 }}>
+          <p style={{ fontFamily: mono, fontSize: 11, color: T.muted, margin: '0 0 14px', lineHeight: 1.6 }}>
             Paste an artifact JSON and run it through the engine locally. The raw JSON response below is exactly what Claude Code receives.
           </p>
 
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 14 }}>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: 6,
@@ -392,9 +550,10 @@ Before completing any UI generation task:
 
           {runError && (
             <div style={{
-              marginBottom: 12, padding: '10px 14px',
+              marginBottom: 14, padding: '12px 14px',
               background: T.redDim, border: `1px solid ${T.red}33`,
-              borderRadius: 6, fontFamily: mono, fontSize: 11, color: T.red,
+              borderRadius: 6, fontFamily: mono, fontSize: 12, color: T.red,
+              lineHeight: 1.5,
             }}>
               {runError}
             </div>
@@ -403,98 +562,109 @@ Before completing any UI generation task:
           <button
             onClick={handleRunTest}
             disabled={running}
+            onMouseEnter={e => {
+              if (!running) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.02)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'
+            }}
             style={{
-              width: '100%', padding: '12px 0',
-              fontFamily: syne, fontSize: 13, fontWeight: 700,
+              width: '100%', padding: '14px 0',
+              fontFamily: syne, fontSize: 14, fontWeight: 700,
               letterSpacing: '0.08em', color: '#fff',
               background: running ? T.dim : T.blue,
               border: 'none', borderRadius: 8, cursor: running ? 'not-allowed' : 'pointer',
-              transition: 'background 0.15s',
+              transition: 'all 0.15s ease',
             }}
           >
-            {running ? 'RUNNING…' : 'TEST GOVERNANCE NOW'}
+            {running ? 'RUNNING...' : 'TEST GOVERNANCE NOW'}
           </button>
 
-          {/* Summary stats after test */}
+          {/* Summary stat cards */}
           {liveReport && (
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 18 }}>
               <div style={{
                 display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16,
               }}>
-                <div style={{
-                  padding: '14px', textAlign: 'center',
-                  background: T.greenDim, border: `1px solid ${T.green}33`, borderRadius: 8,
-                }}>
-                  <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.green }}>{liveReport.score}</div>
-                  <div style={{ fontFamily: mono, fontSize: 9, color: T.green, letterSpacing: '0.08em', marginTop: 4 }}>HEALTH SCORE</div>
-                </div>
-                <div style={{
-                  padding: '14px', textAlign: 'center',
-                  background: `${T.amber}18`, border: `1px solid ${T.amber}33`, borderRadius: 8,
-                }}>
-                  <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.amber }}>{liveReport.violations}</div>
-                  <div style={{ fontFamily: mono, fontSize: 9, color: T.amber, letterSpacing: '0.08em', marginTop: 4 }}>VIOLATIONS</div>
-                </div>
-                <div style={{
-                  padding: '14px', textAlign: 'center',
-                  background: T.blueDim, border: `1px solid ${T.blue}33`, borderRadius: 8,
-                }}>
-                  <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.blue }}>{liveReport.fixed}</div>
-                  <div style={{ fontFamily: mono, fontSize: 9, color: T.blue, letterSpacing: '0.08em', marginTop: 4 }}>AUTO-FIXED</div>
-                </div>
+                <StatCard value={liveReport.score} label="HEALTH SCORE" color={T.green} bg={T.greenDim} />
+                <StatCard value={liveReport.violations} label="VIOLATIONS" color={T.amber} bg={T.amberDim} />
+                <StatCard value={liveReport.fixed} label="AUTO-FIXED" color={T.blue} bg={T.blueDim} />
               </div>
-              <div style={{
-                fontFamily: mono, fontSize: 11, color: T.muted, textAlign: 'center',
-                marginBottom: 12,
-              }}>
-                This is what Claude Code receives
-              </div>
-              <a href="/demo" style={{
-                display: 'block', textAlign: 'center',
-                fontFamily: mono, fontSize: 13, fontWeight: 700,
-                color: '#000', background: T.green,
-                padding: '14px 0', borderRadius: 8,
-                textDecoration: 'none', letterSpacing: '0.02em',
-              }}>
-                View Full Report →
+
+              <a
+                href="/report"
+                onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.02)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1)' }}
+                style={{
+                  display: 'block', textAlign: 'center',
+                  fontFamily: syne, fontSize: 13, fontWeight: 700,
+                  color: '#000', background: T.green,
+                  padding: '14px 0', borderRadius: 8,
+                  textDecoration: 'none', letterSpacing: '0.02em',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                View Full Report &rarr;
               </a>
             </div>
           )}
 
+          {/* Raw JSON response (collapsible) */}
           {liveResult && (
             <div style={{ marginTop: 16 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                marginBottom: 8,
-              }}>
-                <span style={{ fontFamily: mono, fontSize: 10, color: T.green, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                  Raw JSON Response
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>
-                    This is what Claude Code receives
+              <div
+                onClick={() => setJsonCollapsed(!jsonCollapsed)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  background: T.surface2, border: `1px solid ${T.border}`,
+                  borderRadius: jsonCollapsed ? 8 : '8px 8px 0 0',
+                  cursor: 'pointer',
+                  transition: 'border-radius 0.15s',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    fontFamily: mono, fontSize: 10, color: T.green,
+                    letterSpacing: '0.06em', textTransform: 'uppercase',
+                  }}>
+                    Raw JSON Response
                   </span>
-                  <SmallButton
-                    onClick={() => copyText(liveResult, 'result')}
-                    label={copied === 'result' ? 'COPIED ✓' : 'COPY'}
-                    active={copied === 'result'}
-                    activeColor={T.green}
-                  />
+                  <span style={{
+                    fontFamily: mono, fontSize: 10, color: T.dim,
+                    transform: jsonCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+                    transition: 'transform 0.15s',
+                    display: 'inline-block',
+                  }}>
+                    &#9654;
+                  </span>
                 </div>
+                <SmallButton
+                  onClick={(e?: React.MouseEvent) => {
+                    if (e) e.stopPropagation()
+                    copyText(liveResult, 'result')
+                  }}
+                  label={copied === 'result' ? 'COPIED \u2713' : 'COPY'}
+                  active={copied === 'result'}
+                  activeColor={T.green}
+                />
               </div>
-              <div style={{
-                background: T.bg, border: `1px solid ${T.border}`,
-                borderRadius: 8, overflow: 'hidden',
-              }}>
-                <pre style={{
-                  padding: '14px 16px', fontFamily: mono, fontSize: 10,
-                  color: T.muted, overflowX: 'auto', margin: 0, lineHeight: 1.7,
-                  whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                  maxHeight: 400, overflowY: 'auto',
+              {!jsonCollapsed && (
+                <div style={{
+                  background: T.bg, border: `1px solid ${T.border}`,
+                  borderTop: 'none',
+                  borderRadius: '0 0 8px 8px', overflow: 'hidden',
                 }}>
-                  {liveResult}
-                </pre>
-              </div>
+                  <pre style={{
+                    padding: '14px 16px', fontFamily: mono, fontSize: 10,
+                    color: T.muted, overflowX: 'auto', margin: 0, lineHeight: 1.7,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                    maxHeight: 400, overflowY: 'auto',
+                  }}>
+                    {liveResult}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </Section>
@@ -508,8 +678,8 @@ Before completing any UI generation task:
 
 function Section({ label, title, children }: { label: string; title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 36 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 16 }}>
+    <div style={{ marginBottom: 40 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 18 }}>
         <span style={{ fontFamily: mono, fontSize: 10, color: T.blue, letterSpacing: '0.1em' }}>{label}</span>
         <h2 style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: T.text, margin: 0 }}>{title}</h2>
         <div style={{ flex: 1, height: 1, background: T.border }} />
@@ -522,20 +692,23 @@ function Section({ label, title, children }: { label: string; title: string; chi
 function SmallButton({
   onClick, label, active = false, activeColor = T.blue,
 }: {
-  onClick: () => void
+  onClick: (e?: React.MouseEvent) => void
   label: string
   active?: boolean
   activeColor?: string
 }) {
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => onClick(e)}
+      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.02)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
       style={{
-        fontFamily: mono, fontSize: 9, padding: '3px 9px', borderRadius: 4,
+        fontFamily: mono, fontSize: 9, padding: '4px 10px', borderRadius: 4,
         background: active ? `${activeColor}18` : T.surface2,
         color: active ? activeColor : T.muted,
         border: `1px solid ${active ? activeColor + '33' : T.border}`,
         cursor: 'pointer', letterSpacing: '0.06em',
+        transition: 'all 0.15s ease',
       }}
     >
       {label}
@@ -544,14 +717,17 @@ function SmallButton({
 }
 
 function CodeBlock({
-  code, copyId, copied, onCopy, filename,
+  code, copyId, copied, onCopy, filename, copyLabel, copyActiveColor,
 }: {
   code: string
   copyId: string
   copied: string | null
   onCopy: (text: string, id: string) => void
   filename?: string
+  copyLabel?: string
+  copyActiveColor?: string
 }) {
+  const isCopied = copied === copyId
   return (
     <div style={{
       background: T.bg, border: `1px solid ${T.border}`,
@@ -565,9 +741,9 @@ function CodeBlock({
         <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{filename ?? 'snippet'}</span>
         <SmallButton
           onClick={() => onCopy(code, copyId)}
-          label={copied === copyId ? 'COPIED ✓' : 'COPY'}
-          active={copied === copyId}
-          activeColor={T.green}
+          label={isCopied ? 'COPIED \u2713' : (copyLabel ?? 'COPY')}
+          active={isCopied}
+          activeColor={copyActiveColor ?? T.green}
         />
       </div>
       <pre style={{
@@ -577,6 +753,66 @@ function CodeBlock({
       }}>
         {code}
       </pre>
+    </div>
+  )
+}
+
+function StepRow({
+  num, completed, onComplete, children, last = false,
+}: {
+  num: number
+  completed: boolean
+  onComplete: () => void
+  children: React.ReactNode
+  last?: boolean
+}) {
+  return (
+    <div style={{
+      display: 'flex', gap: 16, position: 'relative',
+      paddingBottom: last ? 0 : 24,
+    }}>
+      {/* Vertical connector line */}
+      {!last && (
+        <div style={{
+          position: 'absolute', left: 15, top: 32, bottom: 0,
+          width: 1, background: T.border,
+        }} />
+      )}
+
+      {/* Step number circle */}
+      <div
+        onClick={onComplete}
+        style={{
+          width: 30, height: 30, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          background: completed ? T.greenDim : T.surface2,
+          border: `1px solid ${completed ? T.green + '44' : T.border}`,
+          fontFamily: mono, fontSize: 12, fontWeight: 700,
+          color: completed ? T.green : T.muted,
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        {completed ? '\u2713' : num}
+      </div>
+
+      {/* Step content */}
+      <div style={{ paddingTop: 5, flex: 1, minWidth: 0 }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ value, label, color, bg }: { value: number; label: string; color: string; bg: string }) {
+  return (
+    <div style={{
+      padding: '16px 14px', textAlign: 'center',
+      background: bg, border: `1px solid ${color}33`, borderRadius: 8,
+    }}>
+      <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontFamily: mono, fontSize: 9, color, letterSpacing: '0.08em', marginTop: 4 }}>{label}</div>
     </div>
   )
 }
