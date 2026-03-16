@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 const T = {
   bg: '#08090d', surface: '#0c0e12', surface2: '#111318',
@@ -9,60 +9,211 @@ const T = {
   red: '#ff4070', redDim: '#ff407018',
   amber: '#ffb830', amberDim: '#ffb83018',
   blue: '#4090ff', blueDim: '#4090ff18',
+  purple: '#a855f7', purpleDim: '#a855f718',
   muted: '#6b7280', dim: '#3a3f4a',
   text: '#e8eaf0', textBright: '#f8f9fb',
 }
 const mono = "'JetBrains Mono', 'DM Mono', monospace"
 const sans = "'DM Sans', system-ui, sans-serif"
 
-interface ScanViolation {
-  id: string; severity: string; message: string; nodePath: string
-  currentValue: string; suggestedValue: string; detail: string
+const PRELOADED_CODE = `// AI-generated checkout button (from Claude Code)
+const CheckoutButton = () => (
+  <Button
+    color="#3478F6"
+    padding="22px"
+    variant="ghost"
+    fontStyle="display-xl"
+    gridColumns={10}
+  >
+    Complete Purchase
+  </Button>
+)`
+
+const GOVERNED_CODE = `// Governed by muteform — all violations fixed
+const CheckoutButton = () => (
+  <Button
+    color="semantic.primary"
+    padding="spacing.24"
+    variant="filled"
+    fontStyle="heading.lg"
+    gridColumns={12}
+  >
+    Complete Purchase
+  </Button>
+)`
+
+interface Violation {
+  id: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  rule: string
+  message: string
+  current: string
+  fixed: string
+  type: 'color' | 'spacing' | 'component' | 'typography'
 }
 
-const MOCK_VIOLATIONS: ScanViolation[] = [
-  { id: 'sv1', severity: 'critical', message: 'Contrast ratio 3.1:1 on body text (needs 4.5:1)', nodePath: 'div > p.description', currentValue: '3.1:1', suggestedValue: '≥4.5:1', detail: 'Darken text color or lighten background to meet WCAG AA.' },
-  { id: 'sv2', severity: 'high', message: '#3478F6 not in approved color palette', nodePath: 'button.primary', currentValue: '#3478F6', suggestedValue: '#4090ff', detail: 'Nearest approved token: semantic.info #4090ff (ΔE=5.2)' },
-  { id: 'sv3', severity: 'medium', message: '18px padding not on spacing scale', nodePath: 'div.card', currentValue: '18px', suggestedValue: '16px', detail: 'Nearest scale value: 16px. Approved scale: [4, 8, 12, 16, 24, 32]' },
-  { id: 'sv4', severity: 'low', message: 'Transition 500ms exceeds 300ms max', nodePath: 'button.cta', currentValue: '500ms', suggestedValue: '300ms', detail: 'Clamped to maximum allowed duration.' },
+const VIOLATIONS: Violation[] = [
+  {
+    id: 'v1', severity: 'critical', rule: 'color-token-compliance',
+    message: '#3478F6 is not in the approved color palette',
+    current: '#3478F6', fixed: 'semantic.primary',
+    type: 'color',
+  },
+  {
+    id: 'v2', severity: 'high', rule: 'spacing-scale-compliance',
+    message: '22px padding is not on the 8px spacing scale',
+    current: '22px', fixed: 'spacing.24',
+    type: 'spacing',
+  },
+  {
+    id: 'v3', severity: 'high', rule: 'variant-allowlist',
+    message: '"ghost" variant not allowed for primary actions',
+    current: 'ghost', fixed: 'filled',
+    type: 'component',
+  },
+  {
+    id: 'v4', severity: 'medium', rule: 'grid-column-snap',
+    message: 'gridColumns={10} does not align to 12-column grid',
+    current: '10', fixed: '12',
+    type: 'typography',
+  },
 ]
 
-const SEV: Record<string, { color: string; dim: string; label: string }> = {
+const SEV_STYLE: Record<string, { color: string; dim: string; label: string }> = {
   critical: { color: T.red, dim: T.redDim, label: 'CRITICAL' },
   high: { color: T.red, dim: T.redDim, label: 'HIGH' },
   medium: { color: T.amber, dim: T.amberDim, label: 'MEDIUM' },
   low: { color: T.muted, dim: `${T.muted}18`, label: 'LOW' },
 }
 
+function ScoreRing({ score, size = 90, animating }: { score: number; size?: number; animating?: boolean }) {
+  const r = (size - 6) / 2
+  const circ = 2 * Math.PI * r
+  const filled = (score / 100) * circ
+  const col = score >= 90 ? T.green : score >= 60 ? T.amber : T.red
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={T.border2} strokeWidth={5} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={col} strokeWidth={5}
+        strokeDasharray={`${filled} ${circ}`} strokeLinecap="round"
+        style={{ transition: animating ? 'stroke-dasharray 1.2s ease-out, stroke 0.5s' : 'none' }} />
+      <text x={size / 2} y={size / 2 + 1} textAnchor="middle" dominantBaseline="middle"
+        style={{
+          fontFamily: mono, fontSize: size * 0.3, fill: col, fontWeight: 700,
+          transform: 'rotate(90deg)', transformOrigin: `${size / 2}px ${size / 2}px`,
+          transition: animating ? 'fill 0.5s' : 'none',
+        }}>
+        {score}
+      </text>
+    </svg>
+  )
+}
+
+function ColorSwatch({ color, label }: { color: string; label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{
+        width: 16, height: 16, borderRadius: 4, background: color,
+        border: `1px solid ${T.border2}`,
+      }} />
+      <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{label}</span>
+    </div>
+  )
+}
+
+function SpacingBar({ px, label }: { px: number; label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{
+        width: Math.min(px * 1.5, 40), height: 8, borderRadius: 2,
+        background: `${T.amber}60`, border: `1px solid ${T.amber}33`,
+      }} />
+      <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{label}</span>
+    </div>
+  )
+}
+
+function ComponentBadge({ name }: { name: string }) {
+  return (
+    <span style={{
+      fontFamily: mono, fontSize: 9, fontWeight: 600,
+      padding: '2px 8px', borderRadius: 4,
+      color: T.purple, background: T.purpleDim,
+      border: `1px solid ${T.purple}33`, letterSpacing: '0.04em',
+    }}>{name}</span>
+  )
+}
+
 export default function ScanPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(PRELOADED_CODE)
   const [scanning, setScanning] = useState(false)
-  const [violations, setViolations] = useState<ScanViolation[]>([])
-  const [fixedIds, setFixedIds] = useState<Set<string>>(new Set())
-  const [expanded, setExpanded] = useState<string | null>(null)
   const [scanned, setScanned] = useState(false)
-
-  const score = scanned ? Math.max(0, 100 - violations.filter(v => !fixedIds.has(v.id)).reduce((s, v) =>
-    s + (v.severity === 'critical' ? 15 : v.severity === 'high' ? 8 : v.severity === 'medium' ? 3 : 1), 0)) : 0
-
-  const allFixed = scanned && violations.every(v => fixedIds.has(v.id))
+  const [governed, setGoverned] = useState(false)
+  const [score, setScore] = useState(0)
+  const [copied, setCopied] = useState(false)
+  const autoTriggered = useRef(false)
 
   const handleScan = useCallback(() => {
-    if (!code.trim()) return
     setScanning(true)
-    setFixedIds(new Set())
+    setGoverned(false)
+    setScore(0)
     setTimeout(() => {
-      setViolations(MOCK_VIOLATIONS)
       setScanning(false)
       setScanned(true)
-    }, 600)
-  }, [code])
+      setScore(58)
+    }, 800)
+  }, [])
 
-  const handleFixAll = () => {
-    const ids = new Set<string>()
-    violations.forEach(v => ids.add(v.id))
-    setFixedIds(ids)
+  // Auto-trigger scan 1 second after page load
+  useEffect(() => {
+    if (autoTriggered.current) return
+    autoTriggered.current = true
+    const timer = setTimeout(handleScan, 1000)
+    return () => clearTimeout(timer)
+  }, [handleScan])
+
+  const handleGovernance = () => {
+    setGoverned(true)
+    // Animate score to 100 after a brief delay
+    setTimeout(() => setScore(100), 300)
+  }
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(GOVERNED_CODE).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const ViolationVisual = ({ v }: { v: Violation }) => {
+    if (v.type === 'color') return (
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <ColorSwatch color={v.current} label={v.current} />
+        <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>→</span>
+        <ColorSwatch color="#4090ff" label={v.fixed} />
+      </div>
+    )
+    if (v.type === 'spacing') return (
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <SpacingBar px={22} label={v.current} />
+        <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>→</span>
+        <SpacingBar px={24} label={v.fixed} />
+      </div>
+    )
+    if (v.type === 'component') return (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <ComponentBadge name={v.current} />
+        <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>→</span>
+        <ComponentBadge name={v.fixed} />
+      </div>
+    )
+    return (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>{v.current}</span>
+        <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>→</span>
+        <span style={{ fontFamily: mono, fontSize: 11, color: T.green }}>{v.fixed}</span>
+      </div>
+    )
   }
 
   return (
@@ -85,8 +236,10 @@ export default function ScanPage() {
             PASTE & SCAN
           </span>
         </div>
-        <a href="/dashboard" style={{ fontFamily: mono, fontSize: 11, color: T.muted, textDecoration: 'none' }}>← Dashboard</a>
-          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg></button>
+        <a href="/dashboard" className="nav-links" style={{ fontFamily: mono, fontSize: 11, color: T.muted, textDecoration: 'none' }}>← Dashboard</a>
+        <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+        </button>
       </div>
       <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
@@ -101,16 +254,16 @@ export default function ScanPage() {
       <div className="page-container grid-2" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 80px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Left: Code editor */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontFamily: sans, fontSize: 16, fontWeight: 700, color: T.textBright }}>
-            Paste AI-Generated Code
+          <div style={{
+            fontFamily: sans, fontSize: 12, fontWeight: 600, color: T.amber,
+            background: T.amberDim, padding: '6px 12px', borderRadius: 6,
+            border: `1px solid ${T.amber}33`,
+          }}>
+            AI-generated code from Claude Code — 4 violations detected
           </div>
-          <p style={{ fontFamily: sans, fontSize: 12, color: T.muted, lineHeight: 1.5 }}>
-            Paste HTML, CSS, or JSX from Claude, GPT, v0, Cursor, or any AI tool.
-          </p>
           <textarea
             value={code}
             onChange={e => setCode(e.target.value)}
-            placeholder={'<div class="checkout">\n  <button style="background: #3478F6; padding: 18px; transition: 0.5s">\n    Pay Now\n  </button>\n  <p style="color: #999">Secure checkout</p>\n</div>'}
             style={{
               flex: 1, minHeight: 350, fontFamily: mono, fontSize: 12, lineHeight: 1.7,
               background: T.bg, color: T.text, border: `1px solid ${T.border}`, borderRadius: 10,
@@ -141,7 +294,7 @@ export default function ScanPage() {
               border: `1px dashed ${T.border}`, borderRadius: 10, minHeight: 350,
             }}>
               <span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>
-                Paste code and run scan to see results
+                Scan will auto-run in a moment...
               </span>
             </div>
           )}
@@ -159,83 +312,94 @@ export default function ScanPage() {
 
           {scanned && !scanning && (
             <>
-              {/* Score */}
+              {/* Health Score Ring */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 16,
                 padding: '16px 20px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10,
               }}>
-                <div style={{ fontFamily: mono, fontSize: 32, fontWeight: 700, color: score >= 90 ? T.green : score >= 60 ? T.amber : T.red }}>
-                  {score}
-                </div>
+                <ScoreRing score={score} size={70} animating />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: sans, fontSize: 14, fontWeight: 600, color: T.textBright }}>Health Score</div>
                   <div style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>
-                    {allFixed ? 'All violations resolved' : `${violations.length} violations found`}
+                    {governed ? 'All violations resolved' : `${VIOLATIONS.length} violations found`}
                   </div>
                 </div>
-                {!allFixed && (
-                  <button onClick={handleFixAll} style={{
-                    fontFamily: mono, fontSize: 10, fontWeight: 600, letterSpacing: '0.06em',
-                    padding: '6px 14px', borderRadius: 5, cursor: 'pointer',
-                    background: T.green, color: T.bg, border: 'none',
-                  }}>FIX ALL</button>
-                )}
-                {allFixed && (
-                  <span style={{ fontFamily: mono, fontSize: 10, color: T.green, letterSpacing: '0.06em' }}>ALL FIXED ✓</span>
-                )}
               </div>
 
-              {/* Violations */}
-              <div style={{
-                background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, overflow: 'hidden',
-              }}>
-                <div style={{
-                  padding: '10px 14px', borderBottom: `1px solid ${T.border}`,
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}>
-                  <span style={{ fontFamily: sans, fontSize: 12, fontWeight: 600, color: T.textBright }}>Violations</span>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{violations.length} found</span>
-                </div>
-                {violations.map(v => {
-                  const sev = SEV[v.severity] || SEV.low
-                  const isFixed = fixedIds.has(v.id)
-                  const isExp = expanded === v.id
+              {/* Violation Cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {VIOLATIONS.map(v => {
+                  const sev = SEV_STYLE[v.severity]
                   return (
-                    <div key={v.id} style={{ borderBottom: `1px solid ${T.border}`, opacity: isFixed ? 0.5 : 1, transition: 'opacity 0.3s' }}>
-                      <div
-                        onClick={() => setExpanded(isExp ? null : v.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', cursor: 'pointer' }}
-                      >
-                        <span style={{ fontFamily: mono, fontSize: 9, width: 12, color: T.dim, transform: isExp ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▶</span>
-                        <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: sev.color, background: sev.dim, padding: '2px 6px', borderRadius: 3, border: `1px solid ${sev.color}33`, letterSpacing: '0.06em' }}>{sev.label}</span>
-                        <span style={{ fontFamily: sans, fontSize: 11, color: T.text, flex: 1, textDecoration: isFixed ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.message}</span>
-                        {isFixed && <span style={{ fontFamily: mono, fontSize: 9, color: T.green, letterSpacing: '0.06em' }}>FIXED</span>}
+                    <div key={v.id} style={{
+                      padding: '12px 16px', background: T.surface,
+                      border: `1px solid ${governed ? T.green + '33' : T.border}`,
+                      borderRadius: 10, opacity: governed ? 0.6 : 1,
+                      transition: 'opacity 0.5s, border-color 0.5s',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{
+                          fontFamily: mono, fontSize: 9, fontWeight: 600,
+                          color: sev.color, background: sev.dim,
+                          padding: '2px 6px', borderRadius: 3,
+                          border: `1px solid ${sev.color}33`, letterSpacing: '0.06em',
+                        }}>{sev.label}</span>
+                        <span style={{ fontFamily: sans, fontSize: 11, color: T.text, flex: 1 }}>{v.message}</span>
+                        {governed && <span style={{ fontFamily: mono, fontSize: 9, color: T.green }}>FIXED</span>}
                       </div>
-                      {isExp && (
-                        <div style={{ padding: '8px 14px 12px 34px', borderTop: `1px solid ${T.border}`, background: T.bg }}>
-                          <div style={{ fontFamily: mono, fontSize: 10, color: T.dim, marginBottom: 6 }}>{v.nodePath}</div>
-                          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 6 }}>
-                            <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>{v.currentValue}</span>
-                            <span style={{ color: T.dim }}>→</span>
-                            <span style={{ fontFamily: mono, fontSize: 11, color: T.green }}>{v.suggestedValue}</span>
-                          </div>
-                          <p style={{ fontFamily: sans, fontSize: 11, color: T.muted, lineHeight: 1.5 }}>{v.detail}</p>
-                          {!isFixed && (
-                            <button onClick={e => { e.stopPropagation(); setFixedIds(prev => new Set(prev).add(v.id)) }} style={{ fontFamily: mono, fontSize: 9, padding: '4px 10px', borderRadius: 3, background: T.green, color: T.bg, border: 'none', cursor: 'pointer', marginTop: 6 }}>
-                              AUTO-FIX
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <ViolationVisual v={v} />
+                        <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>{v.rule}</span>
+                      </div>
                     </div>
                   )
                 })}
               </div>
 
-              {allFixed && (
-                <div style={{ textAlign: 'center', padding: '24px', background: T.surface, borderRadius: 10, border: `1px solid ${T.green}33` }}>
-                  <div style={{ fontFamily: sans, fontSize: 16, fontWeight: 700, color: T.green, marginBottom: 4 }}>Interface is compliant</div>
-                  <div style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>Score: 100 · All violations auto-fixed</div>
+              {/* APPLY GOVERNANCE / Governed Code */}
+              {!governed ? (
+                <button onClick={handleGovernance} style={{
+                  fontFamily: mono, fontSize: 12, fontWeight: 600, letterSpacing: '0.06em',
+                  padding: '14px 24px', borderRadius: 8, cursor: 'pointer',
+                  background: `linear-gradient(135deg, ${T.green}, ${T.green}cc)`,
+                  color: T.bg, border: 'none',
+                  boxShadow: `0 0 20px ${T.green}33`,
+                }}>
+                  APPLY GOVERNANCE
+                </button>
+              ) : (
+                <div style={{
+                  background: T.surface, border: `1px solid ${T.green}33`, borderRadius: 10,
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '10px 14px', borderBottom: `1px solid ${T.border}`,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <span style={{ fontFamily: sans, fontSize: 12, fontWeight: 600, color: T.green }}>
+                      Governed Output
+                    </span>
+                    <span style={{ fontFamily: mono, fontSize: 9, color: T.green, letterSpacing: '0.06em' }}>
+                      SCORE 100 ✓
+                    </span>
+                  </div>
+                  <pre style={{
+                    fontFamily: mono, fontSize: 11, lineHeight: 1.7,
+                    color: T.text, padding: 16, margin: 0,
+                    background: T.bg, overflow: 'auto',
+                  }}>{GOVERNED_CODE}</pre>
+                  <div style={{ padding: '10px 14px', borderTop: `1px solid ${T.border}` }}>
+                    <button onClick={handleCopy} style={{
+                      fontFamily: mono, fontSize: 10, fontWeight: 600, letterSpacing: '0.06em',
+                      padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
+                      background: copied ? T.greenDim : T.surface2,
+                      color: copied ? T.green : T.textBright,
+                      border: `1px solid ${copied ? T.green + '33' : T.border}`,
+                      transition: 'all 0.2s',
+                    }}>
+                      {copied ? 'COPIED ✓' : 'Copy governed code'}
+                    </button>
+                  </div>
                 </div>
               )}
             </>

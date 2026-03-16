@@ -9,34 +9,40 @@ const T = {
   red: '#ff4070', redDim: '#ff407018',
   amber: '#ffb830', amberDim: '#ffb83018',
   blue: '#4090ff', blueDim: '#4090ff18',
+  purple: '#a855f7', purpleDim: '#a855f718',
   muted: '#6b7280', dim: '#3a3f4a',
   text: '#e8eaf0', textBright: '#f8f9fb',
 }
 const mono = "'JetBrains Mono', 'DM Mono', monospace"
 const sans = "'DM Sans', system-ui, sans-serif"
 
-const CATEGORY_SCORES = [
-  { name: 'Color', score: 95, color: '#ff4070' },
-  { name: 'Spacing', score: 100, color: '#ffb830' },
-  { name: 'Typography', score: 88, color: '#a855f7' },
-  { name: 'Motion', score: 100, color: '#4090ff' },
-  { name: 'Accessibility', score: 92, color: '#00e087' },
+const STATS = [
+  { label: 'Components scanned', value: '847', icon: '⊕', color: T.blue },
+  { label: 'Compliance rate', value: '94%', icon: '◉', color: T.green },
+  { label: 'Violations auto-fixed this week', value: '23', icon: '⊞', color: T.amber },
+  { label: 'AI tools connected', value: '4', icon: '◇', color: T.purple },
 ]
+
+const TOOL_BADGE: Record<string, { label: string; color: string; dim: string }> = {
+  claude: { label: 'Claude Code', color: T.amber, dim: T.amberDim },
+  cursor: { label: 'Cursor', color: T.blue, dim: T.blueDim },
+  v0: { label: 'v0', color: T.purple, dim: T.purpleDim },
+  copilot: { label: 'Copilot', color: T.green, dim: T.greenDim },
+}
 
 const RECENT_SCANS = [
-  { time: '2 min ago', source: 'Manual paste', nodes: 12, violations: 3, fixed: 3, score: 100 },
-  { time: '1 hour ago', source: 'Sample: Checkout', nodes: 8, violations: 4, fixed: 4, score: 100 },
-  { time: '3 hours ago', source: 'Manual paste', nodes: 24, violations: 7, fixed: 5, score: 84 },
-  { time: 'Yesterday', source: 'Sample: Dashboard', nodes: 16, violations: 2, fixed: 2, score: 100 },
-  { time: '2 days ago', source: 'Manual paste', nodes: 6, violations: 5, fixed: 3, score: 72 },
+  { time: '2 min ago', tool: 'claude', component: 'CheckoutButton', nodes: 12, violations: 4, fixed: 4, score: 100 },
+  { time: '18 min ago', tool: 'cursor', component: 'PricingCard', nodes: 8, violations: 2, fixed: 2, score: 100 },
+  { time: '1 hour ago', tool: 'v0', component: 'HeroSection', nodes: 24, violations: 7, fixed: 5, score: 84 },
+  { time: '3 hours ago', tool: 'copilot', component: 'NavBar', nodes: 6, violations: 1, fixed: 1, score: 100 },
 ]
 
-const RULES = [
-  { id: 'contrast-wcag-aa', triggered: 12, lastTriggered: '2 min ago' },
-  { id: 'color-token-compliance', triggered: 8, lastTriggered: '1 hour ago' },
-  { id: 'spacing-scale-compliance', triggered: 6, lastTriggered: '3 hours ago' },
-  { id: 'motion-performance', triggered: 3, lastTriggered: 'Yesterday' },
-  { id: 'typography-family', triggered: 2, lastTriggered: '2 days ago' },
+const CATEGORY_SCORES = [
+  { name: 'Color', score: 95, color: T.red },
+  { name: 'Spacing', score: 100, color: T.amber },
+  { name: 'Typography', score: 88, color: T.purple },
+  { name: 'Motion', score: 100, color: T.blue },
+  { name: 'Accessibility', score: 92, color: T.green },
 ]
 
 function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
@@ -62,7 +68,6 @@ function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
 }
 
 export default function DashboardPage() {
-  const overallScore = 94
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const navItems = [
@@ -99,15 +104,13 @@ export default function DashboardPage() {
             }}>{l.label}</a>
           ))}
         </nav>
-        <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)}
-          aria-label="Open menu">
+        <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
             <path d="M3 6h18M3 12h18M3 18h18" />
           </svg>
         </button>
       </div>
 
-      {/* mobile menu */}
       <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
         {navItems.map(l => (
@@ -117,12 +120,35 @@ export default function DashboardPage() {
       </div>
 
       <div className="page-container" style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 80px' }}>
+        {/* 4 Stat Cards */}
+        <div className="grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+          {STATS.map(s => (
+            <div key={s.label} style={{
+              padding: '20px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{
+                  fontSize: 14, width: 28, height: 28, borderRadius: 6,
+                  background: `${s.color}18`, color: s.color,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{s.icon}</span>
+              </div>
+              <div style={{ fontFamily: mono, fontSize: 28, fontWeight: 700, color: T.textBright, marginBottom: 4 }}>
+                {s.value}
+              </div>
+              <div style={{ fontFamily: sans, fontSize: 11, color: T.muted, lineHeight: 1.4 }}>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* Health Score Section */}
         <div className="grid-3-auto" style={{
           display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 24, alignItems: 'center',
           padding: '24px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, marginBottom: 20,
         }}>
-          <ScoreRing score={overallScore} size={100} />
+          <ScoreRing score={94} size={100} />
           <div>
             <div style={{ fontFamily: sans, fontSize: 20, fontWeight: 700, color: T.textBright }}>
               Health Score
@@ -151,74 +177,49 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-          {[
-            { label: 'Paste & Scan', href: '/scan', icon: '⊕' },
-            { label: 'Edit Rules', href: '/rules', icon: '⊞' },
-            { label: 'View All Scans', href: '/scan', icon: '◇' },
-            { label: 'Get SDK', href: '/integrate', icon: '◉' },
-          ].map(a => (
-            <a key={a.label} href={a.href} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px',
-              background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10,
-              textDecoration: 'none', transition: 'border-color 0.15s',
-            }}>
-              <span style={{ fontSize: 16 }}>{a.icon}</span>
-              <span style={{ fontFamily: sans, fontSize: 12, fontWeight: 600, color: T.textBright }}>{a.label}</span>
-            </a>
-          ))}
-        </div>
-
-        <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          {/* Recent Scans */}
+        {/* Recent Scans Feed */}
+        <div style={{
+          background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden',
+        }}>
           <div style={{
-            background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden',
+            padding: '12px 16px', borderBottom: `1px solid ${T.border}`,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
-            <div style={{
-              padding: '12px 16px', borderBottom: `1px solid ${T.border}`,
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <span style={{ fontFamily: sans, fontSize: 13, fontWeight: 600, color: T.textBright }}>Recent Scans</span>
-              <a href="/scan" style={{ fontFamily: mono, fontSize: 10, color: T.green, textDecoration: 'none' }}>View all →</a>
-            </div>
-            {RECENT_SCANS.map((s, i) => (
+            <span style={{ fontFamily: sans, fontSize: 13, fontWeight: 600, color: T.textBright }}>Recent Scans</span>
+            <a href="/scan" style={{ fontFamily: mono, fontSize: 10, color: T.green, textDecoration: 'none' }}>View all →</a>
+          </div>
+          {RECENT_SCANS.map((s, i) => {
+            const badge = TOOL_BADGE[s.tool]
+            const scoreCol = s.score >= 90 ? T.green : s.score >= 60 ? T.amber : T.red
+            return (
               <div key={i} style={{
-                display: 'grid', gridTemplateColumns: '80px 1fr auto auto',
-                alignItems: 'center', gap: 12, padding: '10px 16px',
+                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
                 borderBottom: i < RECENT_SCANS.length - 1 ? `1px solid ${T.border}` : 'none',
               }}>
-                <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{s.time}</span>
-                <span style={{ fontFamily: sans, fontSize: 11, color: T.text }}>{s.source}</span>
-                <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{s.violations} violations</span>
-                <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, color: s.score >= 90 ? T.green : s.score >= 60 ? T.amber : T.red }}>{s.score}</span>
+                <span style={{ fontFamily: mono, fontSize: 10, color: T.dim, minWidth: 80 }}>{s.time}</span>
+                <span style={{
+                  fontFamily: mono, fontSize: 9, fontWeight: 600, letterSpacing: '0.04em',
+                  padding: '2px 8px', borderRadius: 4,
+                  color: badge.color, background: badge.dim, border: `1px solid ${badge.color}33`,
+                }}>{badge.label}</span>
+                <span style={{ fontFamily: sans, fontSize: 12, color: T.textBright, flex: 1 }}>{s.component}</span>
+                <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{s.violations} violations · {s.fixed} fixed</span>
+                {/* Health score mini ring */}
+                <svg width={28} height={28} viewBox="0 0 28 28" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx={14} cy={14} r={11} fill="none" stroke={T.border2} strokeWidth={2} />
+                  <circle cx={14} cy={14} r={11} fill="none" stroke={scoreCol} strokeWidth={2}
+                    strokeDasharray={`${(s.score / 100) * 2 * Math.PI * 11} ${2 * Math.PI * 11}`} strokeLinecap="round" />
+                  <text x={14} y={14.5} textAnchor="middle" dominantBaseline="middle"
+                    style={{
+                      fontFamily: mono, fontSize: 8, fill: scoreCol, fontWeight: 700,
+                      transform: 'rotate(90deg)', transformOrigin: '14px 14px',
+                    }}>
+                    {s.score}
+                  </text>
+                </svg>
               </div>
-            ))}
-          </div>
-
-          {/* Active Rules */}
-          <div style={{
-            background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden',
-          }}>
-            <div style={{
-              padding: '12px 16px', borderBottom: `1px solid ${T.border}`,
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <span style={{ fontFamily: sans, fontSize: 13, fontWeight: 600, color: T.textBright }}>Active Rules</span>
-              <a href="/rules" style={{ fontFamily: mono, fontSize: 10, color: T.green, textDecoration: 'none' }}>Edit →</a>
-            </div>
-            {RULES.map((r, i) => (
-              <div key={r.id} style={{
-                display: 'grid', gridTemplateColumns: '1fr auto auto',
-                alignItems: 'center', gap: 12, padding: '10px 16px',
-                borderBottom: i < RULES.length - 1 ? `1px solid ${T.border}` : 'none',
-              }}>
-                <span style={{ fontFamily: mono, fontSize: 11, color: T.text }}>{r.id}</span>
-                <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{r.triggered} caught</span>
-                <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>{r.lastTriggered}</span>
-              </div>
-            ))}
-          </div>
+            )
+          })}
         </div>
       </div>
     </div>
