@@ -441,6 +441,7 @@ Only return code where health_score >= 85.`
             <div style={{
               border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden',
               overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
             }}>
               {/* Table header */}
               <div style={{
@@ -588,7 +589,7 @@ Only return code where health_score >= 85.`
           {/* Summary stat cards */}
           {liveReport && (
             <div style={{ marginTop: 18 }}>
-              <div style={{
+              <div className="grid-3" style={{
                 display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16,
               }}>
                 <StatCard value={liveReport.score} label="HEALTH SCORE" color="var(--success)" bg="var(--success-dim)" />
@@ -751,6 +752,7 @@ function CodeBlock({
         padding: '14px 16px', fontFamily: 'var(--font-mono)', fontSize: 11,
         color: 'var(--text-primary)', overflowX: 'auto', margin: 0, lineHeight: 1.7,
         whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+        WebkitOverflowScrolling: 'touch',
       }}>
         {code}
       </pre>

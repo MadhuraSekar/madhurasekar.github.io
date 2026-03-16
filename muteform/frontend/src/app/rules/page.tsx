@@ -614,7 +614,7 @@ export default function RulesPage() {
                 </div>
 
                 {/* Category + Severity row */}
-                <div style={{ display: 'flex', gap: 12 }}>
+                <div className="stack-mobile" style={{ display: 'flex', gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <label style={{
                       fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',

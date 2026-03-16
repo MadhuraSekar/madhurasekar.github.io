@@ -215,7 +215,7 @@ export default function LandingPage() {
           .nav-links { display: none !important; }
           .nav-hamburger { display: block !important; }
           .hero-grid { grid-template-columns: 1fr !important; }
-          .hero-heading { font-size: 36px !important; }
+          .hero-heading { font-size: 32px !important; }
           .stats-row { flex-direction: column; gap: 32px !important; }
           .how-grid { grid-template-columns: 1fr !important; }
           .quotes-grid { grid-template-columns: 1fr !important; }
@@ -298,6 +298,10 @@ export default function LandingPage() {
         <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
         <a href="/demo" onClick={() => setMobileMenuOpen(false)}>Demo</a>
         <a href="/integrate" onClick={() => setMobileMenuOpen(false)}>Docs</a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 16, color: 'var(--text-primary)', flex: 1 }}>Theme</span>
+          <ThemeToggle />
+        </div>
         <a href="#waitlist" onClick={() => setMobileMenuOpen(false)} style={{
           fontWeight: 600, color: 'var(--bg)', background: 'var(--accent)',
           borderRadius: 4, textAlign: 'center', marginTop: 8,

@@ -297,7 +297,17 @@ export function buildGovernanceReport(
     { name: 'Typography', key: 'typography', color: '#a855f7' },
     { name: 'Components', key: 'component', color: '#4090ff' },
     { name: 'Accessibility', key: 'accessibility', color: '#00e087' },
+    { name: 'Spacing', key: 'spacing', color: '#f59e0b' },
   ]
+
+  const catWeights: Record<string, number> = {
+    token: 0.20,
+    accessibility: 0.30,
+    typography: 0.15,
+    component: 0.10,
+    layout: 0.10,
+    spacing: 0.15,
+  }
 
   const categories: CategoryScore[] = catDefs.map(c => ({
     ...c,
@@ -309,12 +319,31 @@ export function buildGovernanceReport(
   const blocked = enriched.filter(v => !v.fixApplied && v.severity === 'block')
   const unfixedAutoFix = enriched.filter(v => !v.fixApplied && v.severity === 'auto-fix')
 
-  // Overall score
-  const unfixedDeduction = [...warnings, ...blocked, ...unfixedAutoFix].reduce((s, v) => {
-    return s + (sevWeights[v.severity] || 3)
-  }, 0)
-  const overallBefore = Math.max(0, 100 - enriched.reduce((s, v) => s + (sevWeights[v.severity] || 3), 0))
-  const overallAfter = rewriteResult ? Math.max(0, 100 - unfixedDeduction) : overallBefore
+  // Overall score (weighted average of category scores)
+  const overallBefore = Math.round(categories.reduce((sum, cat) => {
+    const weight = catWeights[cat.key] || (1 / categories.length)
+    return sum + cat.score * weight
+  }, 0))
+
+  // After score: recalculate category scores with only unfixed violations
+  const afterDeductions: Record<string, number> = {}
+  for (const v of enriched) {
+    if (v.fixApplied) continue
+    const cat = v.type === 'color_token' ? 'token' :
+                v.type === 'accessibility' ? 'accessibility' : v.type
+    const w = sevWeights[v.severity] || 3
+    afterDeductions[cat] = (afterDeductions[cat] || 0) + w
+  }
+  const afterCats = catDefs.map(c => ({
+    ...c,
+    score: Math.max(0, 100 - (afterDeductions[c.key] || 0)),
+  }))
+  const overallAfter = rewriteResult
+    ? Math.round(afterCats.reduce((sum, cat) => {
+        const weight = catWeights[cat.key] || (1 / afterCats.length)
+        return sum + cat.score * weight
+      }, 0))
+    : overallBefore
 
   return {
     fixtureName,

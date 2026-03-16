@@ -981,7 +981,7 @@ export default function ScanPage() {
               </div>
 
               {/* Violation summary cards */}
-              <div style={{
+              <div className="grid-3" style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: 12, marginBottom: 32,
               }}>
@@ -1074,6 +1074,25 @@ export default function ScanPage() {
               ═══════════════════════════════════════════════ */}
           {phase === 'governed' && report && (
             <div style={{ animation: 'fadeIn 150ms ease' }}>
+              {/* Governed banner */}
+              <div style={{
+                width: '100%', textAlign: 'center', padding: '16px 20px',
+                background: 'var(--success-dim)', borderRadius: 4, marginBottom: 20,
+                border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
+              }}>
+                <div style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+                  color: 'var(--success)', marginBottom: 4,
+                }}>
+                  Governed &mdash; ready to ship
+                </div>
+                <div style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                }}>
+                  {report.autoFixedCount} fixes applied &middot; {report.warningCount} warning{report.warningCount !== 1 ? 's' : ''} &middot; {report.blockedCount} blocked
+                </div>
+              </div>
+
               {/* Before / After comparison */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1112,7 +1131,7 @@ export default function ScanPage() {
               </div>
 
               {/* Violation summary (post-governance) */}
-              <div style={{
+              <div className="grid-3" style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: 12, marginBottom: 32,
               }}>
@@ -1307,7 +1326,7 @@ export default function ScanPage() {
               </div>
 
               {/* Bottom actions */}
-              <div style={{
+              <div className="action-bar-mobile" style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 gap: 16, flexWrap: 'wrap',
               }}>
