@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { C, mono, syne, VMETA, SEVC } from './tokens'
-import { VisualComparison, ConfidenceBadge } from './VisualComparison'
+import { VisualComparison, ConfidenceBadge, SeverityBadge } from './VisualComparison'
 
 interface ViolationRowProps {
   violation: any
@@ -19,7 +19,6 @@ export function ViolationRow({
 }: ViolationRowProps) {
   const [hovering, setHovering] = useState(false)
   const meta = VMETA[violation.type] || { label: 'Issue', short: 'Issue', icon: '!', color: C.muted }
-  const sevColor = SEVC[violation.severity] || SEVC.low
   const isIgnored = violation.status === 'ignored'
   const confidence = violation.confidence || 'manual'
 
@@ -58,10 +57,8 @@ export function ViolationRow({
           {meta.icon}
         </span>
 
-        {/* Severity dot */}
-        <span style={{
-          width: 7, height: 7, borderRadius: '50%', backgroundColor: sevColor, flexShrink: 0,
-        }} />
+        {/* Severity badge */}
+        <SeverityBadge severity={violation.severity} />
 
         {/* Message */}
         <span style={{
@@ -105,9 +102,9 @@ export function ViolationRow({
           background: C.surface,
         }}>
           {/* Node path */}
-          {showPath && violation.nodePath && (
+          {violation.nodePath && (
             <div style={{
-              fontFamily: mono, fontSize: 10, color: C.dim, padding: '8px 0 4px',
+              fontFamily: mono, fontSize: 10, color: C.muted, padding: '8px 0 4px',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {violation.nodePath}
