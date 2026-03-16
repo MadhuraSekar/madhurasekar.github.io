@@ -29,12 +29,6 @@ function scoreColor(score: number): string {
   return T.red
 }
 
-function severityMeta(sev: string): { color: string; dim: string; label: string } {
-  if (sev === 'auto-fix') return { color: T.green, dim: T.greenDim, label: 'AUTO-FIXED' }
-  if (sev === 'warn') return { color: T.amber, dim: T.amberDim, label: 'WARNING' }
-  return { color: T.red, dim: T.redDim, label: 'BLOCKED' }
-}
-
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString('en-US', {
@@ -49,9 +43,11 @@ function reportToMarkdown(report: GovernanceReport, company: string): string {
   lines.push(`# Governance Report`)
   lines.push('')
   lines.push(`**Company:** ${company}`)
-  lines.push(`**Scanned:** ${report.fixtureName} (${report.fixtureSource})`)
+  lines.push(`**Design System:** Acme Design System`)
+  lines.push(`**Scanned:** ${report.fixtureName} from ${report.fixtureSource}`)
   lines.push(`**Date:** ${formatDate(report.timestamp)}`)
-  lines.push(`**Score:** ${report.overallScore} -> ${report.afterScore}`)
+  lines.push('')
+  lines.push(`## Score: ${report.overallScore} → ${report.afterScore} (+${report.afterScore - report.overallScore})`)
   lines.push('')
   lines.push(`## Category Scores`)
   lines.push('')
@@ -102,20 +98,152 @@ function reportToMarkdown(report: GovernanceReport, company: string): string {
   return lines.join('\n')
 }
 
-// ─── Visual Preview for Violations ──────────────────────────
+// ─── Keyframes CSS ──────────────────────────────────────────
+
+const keyframesCSS = `
+@keyframes fadeInPage {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInCard {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulseFixed {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 ${T.green}44; }
+  50% { transform: scale(1.08); box-shadow: 0 0 0 6px ${T.green}00; }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 ${T.green}00; }
+}
+@keyframes barGrow {
+  from { width: 0%; }
+}
+@keyframes scoreGlow {
+  0% { filter: drop-shadow(0 0 6px ${T.green}66); }
+  50% { filter: drop-shadow(0 0 14px ${T.green}44); }
+  100% { filter: drop-shadow(0 0 6px ${T.green}66); }
+}
+.report-btn:hover {
+  transform: scale(1.02) !important;
+}
+`
+
+// ─── ScoreRing ──────────────────────────────────────────────
+
+function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
+  const [animatedScore, setAnimatedScore] = useState(0)
+  const [visible, setVisible] = useState(false)
+  const strokeWidth = 8
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const color = scoreColor(score)
+
+  useEffect(() => {
+    if (!visible) return
+    const duration = 1400
+    const start = performance.now()
+    let raf: number
+    const animate = (now: number) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setAnimatedScore(Math.round(eased * score))
+      if (progress < 1) {
+        raf = requestAnimationFrame(animate)
+      }
+    }
+    raf = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(raf)
+  }, [visible, score])
+
+  useEffect(() => {
+    // Use IntersectionObserver to trigger on visibility
+    const el = document.getElementById('score-ring-container')
+    if (!el) { setVisible(true); return }
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect() } },
+      { threshold: 0.3 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  const offset = circumference - (circumference * (animatedScore / 100))
+
+  return (
+    <div
+      id="score-ring-container"
+      style={{
+        position: 'relative', width: size, height: size,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        animation: visible ? 'scoreGlow 3s ease-in-out infinite' : 'none',
+      }}
+    >
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        {/* Track */}
+        <circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke={T.border2} strokeWidth={strokeWidth}
+        />
+        {/* Score arc */}
+        <circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke={color} strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.05s linear' }}
+        />
+      </svg>
+      {/* Center number */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{
+          fontFamily: mono, fontSize: size * 0.3, fontWeight: 800,
+          color, lineHeight: 1,
+        }}>
+          {animatedScore}
+        </span>
+        <span style={{
+          fontFamily: mono, fontSize: 9, color: T.muted,
+          letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 4,
+        }}>
+          / 100
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ─── ViolationPreview ───────────────────────────────────────
 
 function ViolationPreview({ v }: { v: EnrichedViolation }) {
   if (v.type === 'color_token') {
     const hex = v.evidence.match(/#[0-9a-fA-F]{6}/)?.[0] || '#ff0000'
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-        <div style={{ width: 18, height: 18, borderRadius: 4, background: hex, border: `1px solid ${T.border2}`, flexShrink: 0 }} />
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{hex}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Was:</span>
+          <div style={{
+            width: 18, height: 18, borderRadius: '50%', background: hex,
+            border: `2px solid ${T.red}88`, flexShrink: 0,
+          }} />
+          <span style={{ fontFamily: mono, fontSize: 10, color: T.red }}>{hex}</span>
+        </div>
         {v.suggestedFix && v.suggestedFix.startsWith('#') && (
           <>
-            <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{'\u2192'}</span>
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: v.suggestedFix, border: `1px solid ${T.border2}`, flexShrink: 0 }} />
-            <span style={{ fontFamily: mono, fontSize: 10, color: T.green }}>{v.suggestedFix}</span>
+            <span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>{'\u2192'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Now:</span>
+              <div style={{
+                width: 18, height: 18, borderRadius: '50%', background: v.suggestedFix,
+                border: `2px solid ${T.green}88`, flexShrink: 0,
+              }} />
+              <span style={{ fontFamily: mono, fontSize: 10, color: T.green }}>{v.suggestedFix}</span>
+            </div>
           </>
         )}
       </div>
@@ -126,24 +254,89 @@ function ViolationPreview({ v }: { v: EnrichedViolation }) {
     const cur = parseInt(v.evidence.match(/(\d+)/)?.[1] || '10')
     const sug = parseInt(v.suggestedFix.match(/(\d+)/)?.[1] || String(cur))
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-        <div style={{ width: Math.min(cur * 1.5, 48), height: 8, borderRadius: 3, background: `${T.red}80` }} />
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{cur}px</span>
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{'\u2192'}</span>
-        <div style={{ width: Math.min(sug * 1.5, 48), height: 8, borderRadius: 3, background: `${T.green}80` }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Was:</span>
+        <div style={{
+          width: Math.min(cur * 2, 60), height: 8, borderRadius: 4,
+          background: `${T.red}80`,
+        }} />
+        <span style={{ fontFamily: mono, fontSize: 10, color: T.red }}>{cur}px</span>
+        <span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>{'\u2192'}</span>
+        <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Now:</span>
+        <div style={{
+          width: Math.min(sug * 2, 60), height: 8, borderRadius: 4,
+          background: `${T.green}80`,
+        }} />
         <span style={{ fontFamily: mono, fontSize: 10, color: T.green }}>{sug}px</span>
       </div>
     )
   }
 
+  if (v.type === 'typography') {
+    return (
+      <div style={{
+        fontFamily: mono, fontSize: 11, color: T.muted, marginTop: 6,
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        <span style={{
+          padding: '2px 8px', borderRadius: 4,
+          background: T.redDim, color: T.red,
+          border: `1px solid ${T.red}22`, fontSize: 10,
+        }}>
+          {v.evidence.match(/"([^"]+)"/)?.[1] || v.evidence}
+        </span>
+        {v.suggestedFix && (
+          <>
+            <span style={{ color: T.dim }}>{'\u2192'}</span>
+            <span style={{
+              padding: '2px 8px', borderRadius: 4,
+              background: T.greenDim, color: T.green,
+              border: `1px solid ${T.green}22`, fontSize: 10,
+            }}>
+              {v.suggestedFix}
+            </span>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  if (v.type === 'component') {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6, marginTop: 6,
+      }}>
+        <span style={{
+          fontFamily: mono, fontSize: 10, padding: '2px 10px',
+          borderRadius: 12, background: T.redDim, color: T.red,
+          border: `1px solid ${T.red}22`,
+        }}>
+          {v.evidence.match(/"([^"]+)"/)?.[1] || 'unknown'}
+        </span>
+        {v.suggestedFix && (
+          <>
+            <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{'\u2192'}</span>
+            <span style={{
+              fontFamily: mono, fontSize: 10, padding: '2px 10px',
+              borderRadius: 12, background: T.greenDim, color: T.green,
+              border: `1px solid ${T.green}22`,
+            }}>
+              {v.suggestedFix}
+            </span>
+          </>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div style={{ fontFamily: sans, fontSize: 11, color: T.muted, marginTop: 4 }}>
+    <div style={{ fontFamily: sans, fontSize: 11, color: T.muted, marginTop: 6 }}>
       {v.fixDescription}
     </div>
   )
 }
 
-// ─── Section Header ─────────────────────────────────────────
+// ─── SectionHeader ──────────────────────────────────────────
 
 function SectionHeader({ label, count, color, dimColor }: {
   label: string; count: number; color: string; dimColor: string
@@ -151,7 +344,7 @@ function SectionHeader({ label, count, color, dimColor }: {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '14px 0', marginTop: 28,
+      padding: '14px 0', marginTop: 32,
       borderBottom: `1px solid ${T.border}`,
     }}>
       <span style={{
@@ -162,27 +355,27 @@ function SectionHeader({ label, count, color, dimColor }: {
       }}>
         {label}
       </span>
-      <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, color }}>{count}</span>
+      <span style={{ fontFamily: mono, fontSize: 13, fontWeight: 700, color }}>{count}</span>
       <div style={{ flex: 1, height: 1, background: T.border }} />
     </div>
   )
 }
 
-// ─── Violation Card ─────────────────────────────────────────
+// ─── AutoFixed Card ─────────────────────────────────────────
 
-function ViolationCard({ v, index }: { v: EnrichedViolation; index: number }) {
-  const sev = severityMeta(v.severity)
+function AutoFixedCard({ v, index }: { v: EnrichedViolation; index: number }) {
   return (
     <div style={{
-      padding: '14px 18px', background: T.surface,
-      border: `1px solid ${v.fixApplied ? T.green + '22' : T.border}`,
+      padding: '16px 20px', background: T.surface,
+      border: `1px solid ${T.green}18`,
       borderRadius: 10, marginTop: 8,
-      borderLeft: `3px solid ${sev.color}22`,
+      borderLeft: `3px solid ${T.green}44`,
+      animation: `fadeInCard 0.4s ease ${index * 50}ms both`,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontFamily: sans, fontSize: 13, fontWeight: 600,
+            fontFamily: sans, fontSize: 13, fontWeight: 700,
             color: T.textBright, lineHeight: 1.3,
           }}>
             {v.ruleName}
@@ -195,20 +388,15 @@ function ViolationCard({ v, index }: { v: EnrichedViolation; index: number }) {
           </div>
         </div>
         <span style={{
-          fontFamily: mono, fontSize: 8, fontWeight: 600, letterSpacing: '0.06em',
-          color: T.muted, background: T.surface2,
-          padding: '3px 8px', borderRadius: 4,
-          border: `1px solid ${T.border}`, whiteSpace: 'nowrap', flexShrink: 0,
+          fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+          color: T.green, background: T.greenDim,
+          padding: '3px 10px', borderRadius: 4,
+          border: `1px solid ${T.green}33`,
+          whiteSpace: 'nowrap', flexShrink: 0,
+          animation: 'pulseFixed 0.6s ease 0.5s both',
         }}>
-          {v.ruleSource}
+          FIXED
         </span>
-      </div>
-
-      <div style={{
-        fontFamily: sans, fontSize: 12, color: T.muted,
-        marginTop: 8, lineHeight: 1.5,
-      }}>
-        {v.evidence}
       </div>
 
       <ViolationPreview v={v} />
@@ -216,7 +404,113 @@ function ViolationCard({ v, index }: { v: EnrichedViolation; index: number }) {
   )
 }
 
-// ─── Copy Button ────────────────────────────────────────────
+// ─── Warning Card ───────────────────────────────────────────
+
+function WarningCard({ v, index }: { v: EnrichedViolation; index: number }) {
+  return (
+    <div style={{
+      padding: '16px 20px', background: T.surface,
+      border: `1px solid ${T.amber}18`,
+      borderRadius: 10, marginTop: 8,
+      borderLeft: `3px solid ${T.amber}44`,
+      animation: `fadeInCard 0.4s ease ${index * 50}ms both`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{
+            fontFamily: sans, fontSize: 13, fontWeight: 700,
+            color: T.textBright, lineHeight: 1.3,
+          }}>
+            {v.ruleName}
+          </div>
+          <div style={{
+            fontFamily: mono, fontSize: 10, color: T.dim,
+            marginTop: 4, wordBreak: 'break-all',
+          }}>
+            {v.nodePath}
+          </div>
+        </div>
+        <span style={{
+          fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+          color: T.amber, background: T.amberDim,
+          padding: '3px 10px', borderRadius: 4,
+          border: `1px solid ${T.amber}33`,
+          whiteSpace: 'nowrap', flexShrink: 0,
+        }}>
+          WARNING
+        </span>
+      </div>
+
+      <div style={{
+        fontFamily: sans, fontSize: 12, color: T.muted,
+        marginTop: 10, lineHeight: 1.6,
+      }}>
+        <span style={{ color: T.text, fontWeight: 600 }}>Found: </span>{v.evidence}
+      </div>
+      <div style={{
+        fontFamily: sans, fontSize: 12, color: T.muted,
+        marginTop: 4, lineHeight: 1.6,
+      }}>
+        <span style={{ color: T.amber, fontWeight: 600 }}>Recommended: </span>{v.fixDescription}
+      </div>
+    </div>
+  )
+}
+
+// ─── Blocked Card ───────────────────────────────────────────
+
+function BlockedCard({ v, index }: { v: EnrichedViolation; index: number }) {
+  return (
+    <div style={{
+      padding: '16px 20px', background: T.surface,
+      border: `1px solid ${T.red}18`,
+      borderRadius: 10, marginTop: 8,
+      borderLeft: `3px solid ${T.red}44`,
+      animation: `fadeInCard 0.4s ease ${index * 50}ms both`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{
+            fontFamily: sans, fontSize: 13, fontWeight: 700,
+            color: T.textBright, lineHeight: 1.3,
+          }}>
+            {v.ruleName}
+          </div>
+          <div style={{
+            fontFamily: mono, fontSize: 10, color: T.dim,
+            marginTop: 4, wordBreak: 'break-all',
+          }}>
+            {v.nodePath}
+          </div>
+        </div>
+        <span style={{
+          fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+          color: T.red, background: T.redDim,
+          padding: '3px 10px', borderRadius: 4,
+          border: `1px solid ${T.red}33`,
+          whiteSpace: 'nowrap', flexShrink: 0,
+        }}>
+          BLOCKED
+        </span>
+      </div>
+
+      <div style={{
+        fontFamily: sans, fontSize: 12, color: T.muted,
+        marginTop: 10, lineHeight: 1.6,
+      }}>
+        <span style={{ color: T.text, fontWeight: 600 }}>Issue: </span>{v.evidence}
+      </div>
+      <div style={{
+        fontFamily: sans, fontSize: 12, color: T.muted,
+        marginTop: 4, lineHeight: 1.6,
+      }}>
+        <span style={{ color: T.red, fontWeight: 600 }}>Action required: </span>{v.fixDescription}
+      </div>
+    </div>
+  )
+}
+
+// ─── CopyButton ─────────────────────────────────────────────
 
 function CopyButton({ label, onCopy }: { label: string; onCopy: () => void }) {
   const [copied, setCopied] = useState(false)
@@ -228,17 +522,59 @@ function CopyButton({ label, onCopy }: { label: string; onCopy: () => void }) {
   }
 
   return (
-    <button onClick={handleClick} style={{
-      fontFamily: mono, fontSize: 11, fontWeight: 600,
-      padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
-      background: copied ? T.greenDim : T.surface,
-      color: copied ? T.green : T.textBright,
-      border: `1px solid ${copied ? T.green + '44' : T.border}`,
-      letterSpacing: '0.04em',
-      transition: 'all 0.2s',
-    }}>
+    <button
+      className="report-btn"
+      onClick={handleClick}
+      style={{
+        fontFamily: mono, fontSize: 11, fontWeight: 600,
+        padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
+        background: copied ? T.greenDim : T.surface,
+        color: copied ? T.green : T.textBright,
+        border: `1px solid ${copied ? T.green + '44' : T.border}`,
+        letterSpacing: '0.04em',
+        transition: 'all 150ms ease',
+      }}
+    >
       {copied ? 'Copied!' : label}
     </button>
+  )
+}
+
+// ─── CategoryBar ────────────────────────────────────────────
+
+function CategoryBar({ name, score, delay }: { name: string; score: number; delay: number }) {
+  const color = scoreColor(score)
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      marginBottom: 14,
+    }}>
+      <span style={{
+        fontFamily: sans, fontSize: 12, color: T.muted,
+        width: 140, flexShrink: 0,
+      }}>
+        {name}
+      </span>
+      <div style={{
+        flex: 1, height: 8, borderRadius: 4,
+        background: T.border,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%', borderRadius: 4,
+          width: `${score}%`,
+          background: `linear-gradient(90deg, ${color}cc, ${color})`,
+          animation: `barGrow 0.8s ease ${delay}ms both`,
+        }} />
+      </div>
+      <span style={{
+        fontFamily: mono, fontSize: 12, fontWeight: 700,
+        color, width: 32, textAlign: 'right',
+        flexShrink: 0,
+      }}>
+        {score}
+      </span>
+    </div>
   )
 }
 
@@ -260,236 +596,215 @@ export default function ReportPage() {
 
   if (!loaded) return null
 
+  // ─── Empty State ────────────────────────────────────────
   if (!report) {
     return (
       <div style={{ minHeight: '100vh', background: T.bg, color: T.text }}>
+        <style>{keyframesCSS}</style>
         <Stepper />
         <div style={{
-          maxWidth: 900, margin: '0 auto', padding: '80px 20px',
+          maxWidth: 900, margin: '0 auto', padding: '120px 20px',
           textAlign: 'center',
+          animation: 'fadeInPage 0.5s ease both',
         }}>
           <div style={{
-            fontFamily: sans, fontSize: 18, fontWeight: 600,
-            color: T.textBright, marginBottom: 12,
+            fontFamily: sans, fontSize: 20, fontWeight: 700,
+            color: T.textBright, marginBottom: 8,
           }}>
-            No report available. Run a scan first.
+            No report yet.
           </div>
-          <a href="/scan" style={{
-            fontFamily: mono, fontSize: 12, color: T.green,
-            textDecoration: 'none',
-            padding: '10px 24px', borderRadius: 8,
-            background: T.greenDim,
-            border: `1px solid ${T.green}33`,
-            display: 'inline-block', marginTop: 8,
+          <div style={{
+            fontFamily: sans, fontSize: 14, color: T.muted, marginBottom: 28,
           }}>
-            Go to Scan
+            Run a governance scan first.
+          </div>
+          <a
+            href="/scan"
+            className="report-btn"
+            style={{
+              fontFamily: mono, fontSize: 13, fontWeight: 700,
+              color: '#000', background: T.green,
+              textDecoration: 'none',
+              padding: '12px 32px', borderRadius: 8,
+              border: 'none',
+              display: 'inline-block',
+              letterSpacing: '0.02em',
+              transition: 'all 150ms ease',
+            }}
+          >
+            Go to Scan {'\u2192'}
           </a>
         </div>
       </div>
     )
   }
 
+  // ─── Report Data ────────────────────────────────────────
   const autoFixed = report.violations.filter(v => v.fixApplied)
   const warnings = report.violations.filter(v => !v.fixApplied && v.severity === 'warn')
   const blocked = report.violations.filter(v => !v.fixApplied && v.severity === 'block')
-
-  const beforeColor = scoreColor(report.overallScore)
-  const afterColor = scoreColor(report.afterScore)
   const delta = report.afterScore - report.overallScore
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text }}>
+      <style>{keyframesCSS}</style>
       <Stepper />
 
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 20px 100px' }}>
+      <div style={{
+        maxWidth: 900, margin: '0 auto', padding: '32px 20px 120px',
+        animation: 'fadeInPage 0.5s ease both',
+      }}>
 
-        {/* ─── Report Header ──────────────────────────────── */}
+        {/* ─── Header ──────────────────────────────────────── */}
         <div style={{
           background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: '28px 32px', marginBottom: 24,
+          borderRadius: 14, padding: '32px 36px', marginBottom: 24,
         }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 24 }}>
-            {/* Left: metadata */}
-            <div style={{ flex: 1, minWidth: 280 }}>
-              <div style={{
-                fontFamily: syne, fontSize: 22, fontWeight: 700,
-                color: T.textBright, marginBottom: 16,
+          <div style={{
+            fontFamily: syne, fontSize: 24, fontWeight: 800,
+            color: T.textBright, marginBottom: 20,
+          }}>
+            Muteform Governance Report
+          </div>
+
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 20px',
+          }}>
+            <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.06em' }}>Company</span>
+            <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>{company}</span>
+
+            <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.06em' }}>Design System</span>
+            <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>Acme Design System</span>
+
+            <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.06em' }}>Scanned</span>
+            <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>
+              {report.fixtureName} <span style={{ color: T.muted }}>from</span> {report.fixtureSource}
+            </span>
+
+            <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.06em' }}>Date</span>
+            <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>{formatDate(report.timestamp)}</span>
+          </div>
+        </div>
+
+        {/* ─── Score Card ──────────────────────────────────── */}
+        <div style={{
+          background: T.surface, border: `1px solid ${T.border}`,
+          borderRadius: 14, padding: '36px 36px 28px',
+          marginBottom: 24,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+        }}>
+          <ScoreRing score={report.afterScore} size={120} />
+
+          <div style={{
+            fontFamily: mono, fontSize: 13, color: T.muted,
+            marginTop: 16, textAlign: 'center', lineHeight: 1.6,
+          }}>
+            <span style={{ color: scoreColor(report.overallScore), fontWeight: 700 }}>{report.overallScore}</span>
+            <span style={{ color: T.dim, margin: '0 8px' }}>{'\u2192'}</span>
+            <span style={{ color: scoreColor(report.afterScore), fontWeight: 700 }}>{report.afterScore}</span>
+            <span style={{ color: T.dim, margin: '0 6px' }}>{'\u00B7'}</span>
+            {delta > 0 ? (
+              <span style={{
+                color: T.green, fontWeight: 700,
+                background: T.greenDim, padding: '2px 10px', borderRadius: 4,
+                border: `1px solid ${T.green}33`,
               }}>
-                Governance Report
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px' }}>
-                <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.04em' }}>Company</span>
-                <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>{company}</span>
-
-                <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.04em' }}>Design System</span>
-                <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>Acme Design System</span>
-
-                <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.04em' }}>Scanned</span>
-                <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>
-                  {report.fixtureName} <span style={{ color: T.muted }}>from</span> {report.fixtureSource}
-                </span>
-
-                <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.04em' }}>Date</span>
-                <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>{formatDate(report.timestamp)}</span>
-              </div>
-            </div>
-
-            {/* Right: Score */}
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              padding: '16px 28px', borderRadius: 12,
-              background: T.surface2, border: `1px solid ${T.border}`,
-              minWidth: 180,
-            }}>
-              <div style={{ fontFamily: mono, fontSize: 10, color: T.muted, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
-                Governance Score
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <span style={{ fontFamily: mono, fontSize: 32, fontWeight: 700, color: beforeColor, lineHeight: 1 }}>
-                  {report.overallScore}
-                </span>
-                <span style={{ fontFamily: mono, fontSize: 16, color: T.dim }}>-&gt;</span>
-                <span style={{ fontFamily: mono, fontSize: 32, fontWeight: 700, color: afterColor, lineHeight: 1 }}>
-                  {report.afterScore}
-                </span>
-              </div>
-              {delta > 0 && (
-                <div style={{
-                  fontFamily: mono, fontSize: 11, fontWeight: 600,
-                  color: T.green, marginTop: 6,
-                  background: T.greenDim, padding: '2px 10px', borderRadius: 4,
-                }}>
-                  +{delta} pts
-                </div>
-              )}
-            </div>
+                +{delta} points after governance
+              </span>
+            ) : (
+              <span style={{ color: T.muted }}>
+                {delta === 0 ? 'no change' : `${delta} points`}
+              </span>
+            )}
           </div>
 
           {/* Summary pills */}
           <div style={{
-            display: 'flex', gap: 10, marginTop: 24, flexWrap: 'wrap',
+            display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap', justifyContent: 'center',
           }}>
-            <div style={{
+            <span style={{
               fontFamily: mono, fontSize: 11, fontWeight: 600,
               color: T.green, background: T.greenDim,
-              padding: '6px 14px', borderRadius: 6,
+              padding: '5px 14px', borderRadius: 6,
               border: `1px solid ${T.green}33`,
             }}>
               {report.autoFixedCount} auto-fixed
-            </div>
-            <div style={{
+            </span>
+            <span style={{
               fontFamily: mono, fontSize: 11, fontWeight: 600,
               color: T.amber, background: T.amberDim,
-              padding: '6px 14px', borderRadius: 6,
+              padding: '5px 14px', borderRadius: 6,
               border: `1px solid ${T.amber}33`,
             }}>
               {report.warningCount} warnings
-            </div>
-            <div style={{
+            </span>
+            <span style={{
               fontFamily: mono, fontSize: 11, fontWeight: 600,
               color: T.red, background: T.redDim,
-              padding: '6px 14px', borderRadius: 6,
+              padding: '5px 14px', borderRadius: 6,
               border: `1px solid ${T.red}33`,
             }}>
               {report.blockedCount} blocked
-            </div>
-            <div style={{
-              fontFamily: mono, fontSize: 11, fontWeight: 600,
-              color: T.blue, background: T.blueDim,
-              padding: '6px 14px', borderRadius: 6,
-              border: `1px solid ${T.blue}33`,
-            }}>
-              {report.violations.length} total issues
-            </div>
+            </span>
           </div>
         </div>
 
-        {/* ─── Category Breakdown ─────────────────────────── */}
+        {/* ─── Category Breakdown ──────────────────────────── */}
         <div style={{
           background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: '24px 32px', marginBottom: 24,
+          borderRadius: 14, padding: '28px 36px', marginBottom: 24,
         }}>
           <div style={{
             fontFamily: sans, fontSize: 14, fontWeight: 700,
-            color: T.textBright, marginBottom: 18,
+            color: T.textBright, marginBottom: 20,
             letterSpacing: '0.02em',
           }}>
-            Category Scores
+            Category Breakdown
           </div>
 
-          {report.categories.map(c => {
-            const col = scoreColor(c.score)
-            return (
-              <div key={c.key} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                marginBottom: 12,
-              }}>
-                <span style={{
-                  fontFamily: sans, fontSize: 12, color: T.muted,
-                  width: 130, flexShrink: 0,
-                }}>
-                  {c.name}
-                </span>
-                <div style={{
-                  flex: 1, height: 6, borderRadius: 4,
-                  background: T.border,
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    height: '100%', borderRadius: 4,
-                    width: `${c.score}%`,
-                    background: col,
-                    transition: 'width 0.8s ease',
-                  }} />
-                </div>
-                <span style={{
-                  fontFamily: mono, fontSize: 12, fontWeight: 700,
-                  color: col, width: 30, textAlign: 'right',
-                  flexShrink: 0,
-                }}>
-                  {c.score}
-                </span>
-              </div>
-            )
-          })}
+          {report.categories.map((c, i) => (
+            <CategoryBar key={c.key} name={c.name} score={c.score} delay={200 + i * 100} />
+          ))}
         </div>
 
-        {/* ─── Auto-Fixed Section ─────────────────────────── */}
+        {/* ─── Auto-Fixed Section ──────────────────────────── */}
         {autoFixed.length > 0 && (
           <div>
             <SectionHeader label="AUTO-FIXED" count={autoFixed.length} color={T.green} dimColor={T.greenDim} />
             {autoFixed.map((v, i) => (
-              <ViolationCard key={v.id} v={v} index={i} />
+              <AutoFixedCard key={v.id} v={v} index={i} />
             ))}
           </div>
         )}
 
-        {/* ─── Warnings Section ───────────────────────────── */}
+        {/* ─── Warnings Section ────────────────────────────── */}
         {warnings.length > 0 && (
           <div>
             <SectionHeader label="WARNINGS" count={warnings.length} color={T.amber} dimColor={T.amberDim} />
             {warnings.map((v, i) => (
-              <ViolationCard key={v.id} v={v} index={i} />
+              <WarningCard key={v.id} v={v} index={i} />
             ))}
           </div>
         )}
 
-        {/* ─── Blocked Section ────────────────────────────── */}
+        {/* ─── Blocked Section ─────────────────────────────── */}
         {blocked.length > 0 && (
           <div>
             <SectionHeader label="BLOCKED" count={blocked.length} color={T.red} dimColor={T.redDim} />
             {blocked.map((v, i) => (
-              <ViolationCard key={v.id} v={v} index={i} />
+              <BlockedCard key={v.id} v={v} index={i} />
             ))}
           </div>
         )}
 
-        {/* ─── Action Buttons ─────────────────────────────── */}
+        {/* ─── Bottom Action Bar ───────────────────────────── */}
         <div style={{
-          display: 'flex', gap: 10, marginTop: 40, flexWrap: 'wrap',
+          display: 'flex', gap: 10, marginTop: 48, flexWrap: 'wrap',
           padding: '24px 0',
           borderTop: `1px solid ${T.border}`,
+          position: 'sticky', bottom: 0,
+          background: T.bg,
+          zIndex: 10,
         }}>
           <CopyButton
             label="Copy as JSON"
@@ -500,37 +815,57 @@ export default function ReportPage() {
             onCopy={() => navigator.clipboard.writeText(reportToMarkdown(report, company))}
           />
           <CopyButton
-            label="Share Link"
+            label="Share Report"
             onCopy={() => navigator.clipboard.writeText(window.location.href)}
           />
+          <div style={{ flex: 1 }} />
+          <a
+            href="/scan"
+            className="report-btn"
+            style={{
+              fontFamily: mono, fontSize: 11, fontWeight: 700,
+              padding: '10px 24px', borderRadius: 8, cursor: 'pointer',
+              background: T.green, color: '#000',
+              border: 'none', textDecoration: 'none',
+              letterSpacing: '0.02em',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              transition: 'all 150ms ease',
+            }}
+          >
+            Scan another {'\u2192'}
+          </a>
         </div>
 
-        {/* ─── CTA: MCP Integration ──────────────────────── */}
-        <a href="/integrate" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 28px', marginTop: 24,
-          background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 14, textDecoration: 'none',
-          transition: 'border-color 0.2s',
-        }}>
+        {/* ─── CTA: MCP Integration ────────────────────────── */}
+        <a
+          href="/integrate"
+          className="report-btn"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '24px 32px', marginTop: 24,
+            background: T.surface, border: `1px solid ${T.border}`,
+            borderRadius: 14, textDecoration: 'none',
+            transition: 'all 150ms ease',
+          }}
+        >
           <div>
             <div style={{
-              fontFamily: sans, fontSize: 15, fontWeight: 700,
-              color: T.textBright, marginBottom: 4,
+              fontFamily: sans, fontSize: 16, fontWeight: 700,
+              color: T.textBright, marginBottom: 6,
             }}>
               Set up MCP integration
             </div>
             <div style={{
-              fontFamily: sans, fontSize: 12, color: T.muted,
+              fontFamily: sans, fontSize: 13, color: T.muted, lineHeight: 1.5,
             }}>
               Enforce governance automatically in your AI coding workflow.
             </div>
           </div>
           <span style={{
-            fontFamily: mono, fontSize: 18, color: T.green,
-            flexShrink: 0, marginLeft: 16,
+            fontFamily: mono, fontSize: 22, color: T.green,
+            flexShrink: 0, marginLeft: 20,
           }}>
-            &rarr;
+            {'\u2192'}
           </span>
         </a>
 

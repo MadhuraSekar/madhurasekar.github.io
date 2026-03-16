@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Stepper from '@/components/Stepper'
 import {
@@ -27,6 +27,30 @@ const T = {
 }
 const syne = "'Syne', sans-serif"
 const mono = "'DM Mono', monospace"
+
+// ─── Sample system visual identity ───────────────────────────
+const SAMPLE_VISUALS: Record<string, { swatches: string[]; label: string }> = {
+  acme: {
+    swatches: ['#0055FF', '#111111', '#22c55e', '#f59e0b', '#9ca3af'],
+    label: 'Acme Design System',
+  },
+  carbon: {
+    swatches: ['#0F62FE'],
+    label: 'Carbon (IBM)',
+  },
+  material: {
+    swatches: ['#6750A4', '#625B71', '#7D5260'],
+    label: 'Material Design 3',
+  },
+}
+
+// ─── Category colors for success pills ──────────────────────
+const CATEGORY_COLORS: Record<string, string> = {
+  colors: '#0055FF',
+  spacing: '#22c55e',
+  components: '#f59e0b',
+  typography: '#a78bfa',
+}
 
 const SAMPLE_JSON = `{
   "colors": {
@@ -56,7 +80,7 @@ function hexToLuma(hex: string): number {
   return 0.299 * r + 0.587 * g + 0.114 * b
 }
 
-// ─── Color Swatches ───────────────────────────────────────────
+// ─── Color Swatches ──────────────────────────────────────────
 function ColorSwatches({ colors }: { colors: Record<string, string> }) {
   const entries = Object.entries(colors)
   if (entries.length === 0) return null
@@ -105,7 +129,7 @@ function ColorSwatches({ colors }: { colors: Record<string, string> }) {
   )
 }
 
-// ─── Spacing Bars ─────────────────────────────────────────────
+// ─── Spacing Bars ────────────────────────────────────────────
 function SpacingBars({ scale }: { scale: number[] }) {
   if (scale.length === 0) return null
   const max = Math.max(...scale)
@@ -137,7 +161,7 @@ function SpacingBars({ scale }: { scale: number[] }) {
   )
 }
 
-// ─── Confirmation Panel ───────────────────────────────────────
+// ─── Confirmation Panel ──────────────────────────────────────
 function ConfirmationPanel({
   ds,
   warnings,
@@ -312,11 +336,462 @@ function ConfirmationPanel({
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────
+// ─── Name/Company Modal Overlay ──────────────────────────────
+function IdentityModal({
+  onSave,
+}: {
+  onSave: (name: string, company: string) => void
+}) {
+  const [name, setName] = useState('')
+  const [company, setCompany] = useState('')
+  const canSave = name.trim().length > 0 && company.trim().length > 0
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'rgba(0,0,0,0.7)',
+      backdropFilter: 'blur(4px)',
+      padding: 20,
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: 420,
+        background: T.surface,
+        border: `1px solid ${T.border2}`,
+        borderRadius: 16,
+        padding: '36px 32px 32px',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+      }}>
+        <h2 style={{
+          fontFamily: syne,
+          fontWeight: 700,
+          fontSize: 22,
+          color: T.text,
+          margin: '0 0 8px',
+          letterSpacing: '-0.3px',
+        }}>
+          Before we start &mdash; who are you?
+        </h2>
+        <p style={{
+          fontFamily: mono,
+          fontSize: 13,
+          color: T.muted,
+          margin: '0 0 28px',
+          lineHeight: 1.5,
+        }}>
+          We&apos;ll save your progress so you can pick up where you left off.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Jane Doe"
+              autoFocus
+              style={{
+                fontFamily: mono, fontSize: 14, color: T.text,
+                background: T.bg, border: `1px solid ${T.border2}`,
+                borderRadius: 8, padding: '12px 14px', outline: 'none',
+                transition: 'border-color 0.15s',
+                width: '100%', boxSizing: 'border-box',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = T.blue)}
+              onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>Company</label>
+            <input
+              type="text"
+              value={company}
+              onChange={e => setCompany(e.target.value)}
+              placeholder="Acme Corp"
+              onKeyDown={e => e.key === 'Enter' && canSave && onSave(name.trim(), company.trim())}
+              style={{
+                fontFamily: mono, fontSize: 14, color: T.text,
+                background: T.bg, border: `1px solid ${T.border2}`,
+                borderRadius: 8, padding: '12px 14px', outline: 'none',
+                transition: 'border-color 0.15s',
+                width: '100%', boxSizing: 'border-box',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = T.blue)}
+              onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
+            />
+          </div>
+
+          <button
+            onClick={() => canSave && onSave(name.trim(), company.trim())}
+            disabled={!canSave}
+            style={{
+              fontFamily: mono, fontSize: 14, fontWeight: 700,
+              color: '#000', background: T.green,
+              border: 'none', borderRadius: 10,
+              padding: '14px 24px', cursor: canSave ? 'pointer' : 'not-allowed',
+              opacity: canSave ? 1 : 0.4,
+              marginTop: 8,
+              transition: 'transform 0.15s, opacity 0.15s',
+              letterSpacing: '0.01em',
+            }}
+            onMouseEnter={e => { if (canSave) e.currentTarget.style.transform = 'scale(1.02)' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+          >
+            Save and continue
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Import Method Card ──────────────────────────────────────
+function MethodCard({
+  icon,
+  title,
+  description,
+  selected,
+  onClick,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        minWidth: 200,
+        minHeight: 200,
+        background: T.surface,
+        border: `2px solid ${selected ? T.green : T.border}`,
+        borderRadius: 14,
+        padding: '28px 24px',
+        cursor: 'pointer',
+        textAlign: 'left',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 14,
+        transition: 'border-color 0.2s, transform 0.15s, background 0.15s',
+      }}
+      onMouseEnter={e => {
+        if (!selected) e.currentTarget.style.borderColor = T.border2
+        e.currentTarget.style.transform = 'scale(1.02)'
+      }}
+      onMouseLeave={e => {
+        if (!selected) e.currentTarget.style.borderColor = T.border
+        e.currentTarget.style.transform = 'scale(1)'
+      }}
+    >
+      <div style={{
+        fontSize: 32,
+        lineHeight: 1,
+        opacity: selected ? 1 : 0.6,
+        transition: 'opacity 0.15s',
+      }}>
+        {icon}
+      </div>
+      <div>
+        <div style={{
+          fontFamily: syne,
+          fontWeight: 700,
+          fontSize: 17,
+          color: selected ? T.text : T.muted,
+          marginBottom: 6,
+          transition: 'color 0.15s',
+        }}>
+          {title}
+        </div>
+        <div style={{
+          fontFamily: mono,
+          fontSize: 13,
+          color: T.dim,
+          lineHeight: 1.5,
+        }}>
+          {description}
+        </div>
+      </div>
+      {selected && (
+        <div style={{
+          marginTop: 'auto',
+          fontFamily: mono,
+          fontSize: 11,
+          color: T.green,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: T.green, display: 'inline-block',
+          }} />
+          Selected
+        </div>
+      )}
+    </button>
+  )
+}
+
+// ─── Sample System Card ──────────────────────────────────────
+function SampleCard({
+  sample,
+  onClick,
+}: {
+  sample: typeof SAMPLE_SYSTEMS[number]
+  onClick: () => void
+}) {
+  const visuals = SAMPLE_VISUALS[sample.id]
+  const isCarbonSingle = sample.id === 'carbon'
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: 12,
+        padding: '22px 20px',
+        cursor: 'pointer',
+        textAlign: 'left',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+        transition: 'border-color 0.15s, transform 0.15s, background 0.15s',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = T.border2
+        e.currentTarget.style.background = T.surface2
+        e.currentTarget.style.transform = 'scale(1.02)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = T.border
+        e.currentTarget.style.background = T.surface
+        e.currentTarget.style.transform = 'scale(1)'
+      }}
+    >
+      {/* Color swatch row */}
+      {visuals && (
+        <div style={{ display: 'flex', gap: isCarbonSingle ? 0 : 8, alignItems: 'center' }}>
+          {visuals.swatches.map((color, i) => (
+            <div
+              key={i}
+              style={{
+                width: isCarbonSingle ? 48 : 28,
+                height: isCarbonSingle ? 48 : 28,
+                borderRadius: '50%',
+                background: color,
+                border: `2px solid ${T.surface}`,
+                boxShadow: `0 0 0 1px ${T.border2}`,
+                flexShrink: 0,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      <div style={{
+        fontFamily: syne, fontWeight: 700, fontSize: 16,
+        color: T.text,
+      }}>
+        {sample.name}
+      </div>
+      <div style={{
+        fontFamily: mono, fontSize: 12, color: T.muted,
+        lineHeight: 1.5,
+      }}>
+        {sample.description}
+      </div>
+      <div style={{
+        fontFamily: mono, fontSize: 12, color: T.dim,
+      }}>
+        {sample.tokens} tokens &middot; {sample.components} components
+      </div>
+    </button>
+  )
+}
+
+// ─── Success Screen ──────────────────────────────────────────
+function SuccessScreen({
+  ds,
+  onContinue,
+}: {
+  ds: ImportedDesignSystem
+  onContinue: () => void
+}) {
+  const colorCount = Object.keys(ds.tokens.color).length
+  const spacingCount = ds.tokens.spacing.length
+  const compCount = Object.keys(ds.components).length
+  const typoCount = ds.typography.allowedStyles.length
+
+  const colorSwatchList = Object.values(ds.tokens.color).slice(0, 8)
+
+  const pills = [
+    { label: `${colorCount} colors`, category: 'colors', swatches: colorSwatchList },
+    { label: `${spacingCount} spacing values`, category: 'spacing', swatches: [] },
+    { label: `${compCount} components`, category: 'components', swatches: [] },
+    { label: `${typoCount} typography styles`, category: 'typography', swatches: [] },
+  ]
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9998,
+      background: T.bg,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      overflow: 'auto',
+    }}>
+      {/* Animated checkmark */}
+      <div style={{
+        width: 88,
+        height: 88,
+        borderRadius: '50%',
+        background: T.green,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 32,
+        animation: 'checkPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+      }}>
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <path
+            d="M12 22L19 29L32 15"
+            stroke="#000"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+
+      {/* Title */}
+      <h1 style={{
+        fontFamily: syne,
+        fontWeight: 700,
+        fontSize: 36,
+        color: T.text,
+        margin: '0 0 12px',
+        textAlign: 'center',
+        letterSpacing: '-0.5px',
+        lineHeight: 1.2,
+      }}>
+        {ds.sourceLabel} imported successfully
+      </h1>
+
+      <p style={{
+        fontFamily: mono,
+        fontSize: 14,
+        color: T.muted,
+        margin: '0 0 40px',
+        textAlign: 'center',
+      }}>
+        Your design system is ready. Here&apos;s what we found:
+      </p>
+
+      {/* Stats pills */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 14,
+        justifyContent: 'center',
+        marginBottom: 48,
+        maxWidth: 640,
+      }}>
+        {pills.map(pill => (
+          <div
+            key={pill.category}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              background: T.surface,
+              border: `1px solid ${T.border2}`,
+              borderLeft: `4px solid ${CATEGORY_COLORS[pill.category]}`,
+              borderRadius: 10,
+              padding: '12px 18px',
+              minWidth: 160,
+            }}
+          >
+            {/* Inline color swatches for colors pill */}
+            {pill.swatches.length > 0 && (
+              <div style={{ display: 'flex', gap: 3, marginRight: 4 }}>
+                {pill.swatches.map((hex, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: 3,
+                      background: hex,
+                      border: `1px solid ${T.border2}`,
+                      flexShrink: 0,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+            <span style={{
+              fontFamily: mono,
+              fontSize: 13,
+              color: T.text,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}>
+              {pill.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA button */}
+      <button
+        onClick={onContinue}
+        style={{
+          fontFamily: mono, fontSize: 16, fontWeight: 700,
+          color: '#000', background: T.green,
+          border: 'none', borderRadius: 12,
+          padding: '18px 40px', cursor: 'pointer',
+          letterSpacing: '0.01em',
+          transition: 'transform 0.15s, opacity 0.15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+      >
+        Set your governance rules &#8594;
+      </button>
+
+      <style>{`
+        @keyframes checkPop {
+          0% { transform: scale(0); opacity: 0; }
+          70% { transform: scale(1.1); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ─── Main Page ───────────────────────────────────────────────
 export default function ImportPage() {
   const router = useRouter()
 
-  const [activeTab, setActiveTab] = useState<'paste' | 'url' | 'sample'>('paste')
+  type ImportMethod = 'paste' | 'url' | 'sample'
+  const [activeMethod, setActiveMethod] = useState<ImportMethod | null>(null)
   const [urlInput, setUrlInput] = useState('')
   const [pasteInput, setPasteInput] = useState(SAMPLE_JSON)
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'error'>('idle')
@@ -324,11 +799,11 @@ export default function ImportPage() {
   const [parsed, setParsed] = useState<ImportedDesignSystem | null>(null)
   const [warnings, setWarnings] = useState<string[]>([])
   const [importSuccess, setImportSuccess] = useState(false)
+  const [parseStatus, setParseStatus] = useState('')
 
-  // Welcome prompt state
-  const [userName, setUserName] = useState('')
-  const [userCompany, setUserCompany] = useState('')
+  // User identity
   const [savedUser, setSavedUser] = useState<{ name: string; company: string } | null>(null)
+  const [showModal, setShowModal] = useState(false)
 
   // Existing system
   const [existingSystem, setExistingSystem] = useState<ImportedDesignSystem | null>(null)
@@ -341,6 +816,8 @@ export default function ImportPage() {
     const session = loadSession()
     if (session.user) {
       setSavedUser({ name: session.user.name, company: session.user.company })
+    } else {
+      setShowModal(true)
     }
     const existing = loadDesignSystem()
     if (existing) {
@@ -360,26 +837,25 @@ export default function ImportPage() {
     setToast(msg)
   }
 
-  async function handleSaveUser() {
-    const name = userName.trim()
-    const company = userCompany.trim()
-    if (!name || !company) return
+  const handleSaveUser = useCallback(async (name: string, company: string) => {
     const session = loadSession()
     const user = { name, company, createdAt: new Date().toISOString() }
     session.user = user
     saveSession(session)
     setSavedUser({ name, company })
+    setShowModal(false)
     const id = await syncUserToSupabase(user)
     if (id) {
       session.user!.id = id
       saveSession(session)
     }
-  }
+  }, [])
 
   function handleParsed(ds: ImportedDesignSystem) {
     setParsed(ds)
     setWarnings(getImportWarnings(ds))
     setImportSuccess(false)
+    setParseStatus('')
     setTimeout(() => {
       document.getElementById('confirmation-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
@@ -392,15 +868,18 @@ export default function ImportPage() {
     setFetchError('')
     setParsed(null)
     setImportSuccess(false)
+    setParseStatus('Fetching token file from URL...')
     try {
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+      setParseStatus('Parsing token file...')
       const text = await res.text()
       const ds = parseTokenJSON(text, 'url', url)
       setFetchStatus('idle')
       handleParsed(ds)
     } catch (err: unknown) {
       setFetchStatus('error')
+      setParseStatus('')
       const msg = err instanceof Error ? err.message : 'Unknown error'
       if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS') || msg.includes('TypeError')) {
         setFetchError('This URL blocked the request. Try pasting the JSON directly.')
@@ -416,11 +895,18 @@ export default function ImportPage() {
     setFetchError('')
     setParsed(null)
     setImportSuccess(false)
+    setParseStatus('Parsing token file...')
     try {
       const ds = parseTokenJSON(text, 'paste', 'Pasted JSON')
       handleParsed(ds)
     } catch (err: unknown) {
-      setFetchError(err instanceof Error ? err.message : 'JSON parse error')
+      setParseStatus('')
+      const msg = err instanceof Error ? err.message : 'JSON parse error'
+      if (msg.includes('Unexpected token') || msg.includes('JSON')) {
+        setFetchError('Invalid JSON format. Check for missing commas, brackets, or quotes.')
+      } else {
+        setFetchError(msg)
+      }
     }
   }
 
@@ -428,6 +914,7 @@ export default function ImportPage() {
     setParsed(null)
     setFetchError('')
     setImportSuccess(false)
+    setParseStatus('Loading sample system...')
     handleParsed(sample.data)
     showToast(`Loaded: ${sample.tokens} tokens, ${sample.components} components`)
   }
@@ -441,9 +928,6 @@ export default function ImportPage() {
     await syncImportedSystem(testerId, parsed)
     markStepComplete(0)
     setImportSuccess(true)
-    setTimeout(() => {
-      document.getElementById('success-banner')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
   }
 
   function handleReImport() {
@@ -451,22 +935,16 @@ export default function ImportPage() {
     setParsed(null)
     setImportSuccess(false)
     setFetchError('')
+    setActiveMethod(null)
+    setParseStatus('')
   }
 
-  function tabStyle(tab: 'paste' | 'url' | 'sample') {
-    const isActive = activeTab === tab
-    return {
-      fontFamily: mono,
-      fontSize: 13,
-      color: isActive ? T.text : T.muted,
-      background: isActive ? T.surface2 : 'transparent',
-      border: `1px solid ${isActive ? T.border2 : 'transparent'}`,
-      borderRadius: 7,
-      padding: '7px 16px',
-      cursor: 'pointer' as const,
-      transition: 'color 0.15s, background 0.15s',
-      whiteSpace: 'nowrap' as const,
-    }
+  function selectMethod(method: ImportMethod) {
+    setActiveMethod(method)
+    setParsed(null)
+    setFetchError('')
+    setImportSuccess(false)
+    setParseStatus('')
   }
 
   return (
@@ -477,6 +955,14 @@ export default function ImportPage() {
       fontFamily: mono,
     }}>
       <Stepper />
+
+      {/* Identity Modal */}
+      {showModal && <IdentityModal onSave={handleSaveUser} />}
+
+      {/* Success Screen (full screen) */}
+      {importSuccess && parsed && (
+        <SuccessScreen ds={parsed} onContinue={() => router.push('/rules')} />
+      )}
 
       {/* Toast */}
       {toast && (
@@ -500,89 +986,13 @@ export default function ImportPage() {
       )}
 
       <main style={{
-        maxWidth: 800,
+        maxWidth: 860,
         margin: '0 auto',
         padding: '48px 24px 80px',
       }}>
 
-        {/* Welcome prompt or greeting */}
-        {!savedUser ? (
-          <div style={{
-            background: T.surface,
-            border: `1px solid ${T.border}`,
-            borderRadius: 10,
-            padding: '20px 24px',
-            marginBottom: 32,
-          }}>
-            <div style={{
-              fontFamily: syne, fontWeight: 700, fontSize: 15,
-              color: T.text, marginBottom: 4,
-            }}>
-              Welcome
-            </div>
-            <p style={{
-              fontFamily: mono, fontSize: 13, color: T.muted,
-              margin: '0 0 16px', lineHeight: 1.5,
-            }}>
-              What&apos;s your name and company? We&apos;ll save your progress.
-            </p>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160 }}>
-                <label style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>Name</label>
-                <input
-                  type="text"
-                  value={userName}
-                  onChange={e => setUserName(e.target.value)}
-                  placeholder="Jane Doe"
-                  style={{
-                    fontFamily: mono, fontSize: 13, color: T.text,
-                    background: T.bg, border: `1px solid ${T.border2}`,
-                    borderRadius: 8, padding: '9px 12px', outline: 'none',
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160 }}>
-                <label style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>Company</label>
-                <input
-                  type="text"
-                  value={userCompany}
-                  onChange={e => setUserCompany(e.target.value)}
-                  placeholder="Acme Corp"
-                  onKeyDown={e => e.key === 'Enter' && handleSaveUser()}
-                  style={{
-                    fontFamily: mono, fontSize: 13, color: T.text,
-                    background: T.bg, border: `1px solid ${T.border2}`,
-                    borderRadius: 8, padding: '9px 12px', outline: 'none',
-                  }}
-                />
-              </div>
-              <button
-                onClick={handleSaveUser}
-                disabled={!userName.trim() || !userCompany.trim()}
-                style={{
-                  fontFamily: mono, fontSize: 13, fontWeight: 600,
-                  color: '#fff', background: T.blue,
-                  border: 'none', borderRadius: 8,
-                  padding: '10px 20px', cursor: (!userName.trim() || !userCompany.trim()) ? 'not-allowed' : 'pointer',
-                  opacity: (!userName.trim() || !userCompany.trim()) ? 0.5 : 1,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={{
-            fontFamily: mono, fontSize: 13, color: T.muted,
-            marginBottom: 32, padding: '12px 0',
-          }}>
-            Welcome, <span style={{ color: T.text, fontWeight: 600 }}>{savedUser.name}</span> from <span style={{ color: T.text, fontWeight: 600 }}>{savedUser.company}</span>
-          </div>
-        )}
-
         {/* Page heading */}
-        <div style={{ marginBottom: 36 }}>
+        <div style={{ marginBottom: 40 }}>
           <h1 style={{
             fontFamily: syne, fontWeight: 700, fontSize: 32,
             color: T.text, margin: '0 0 10px', letterSpacing: '-0.5px',
@@ -605,7 +1015,7 @@ export default function ImportPage() {
             border: `1px solid ${T.green}33`,
             borderRadius: 10,
             padding: '16px 20px',
-            marginBottom: 28,
+            marginBottom: 32,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             flexWrap: 'wrap', gap: 12,
           }}>
@@ -629,7 +1039,10 @@ export default function ImportPage() {
                   color: T.muted, background: T.surface2,
                   border: `1px solid ${T.border2}`, borderRadius: 8,
                   padding: '8px 16px', cursor: 'pointer',
+                  transition: 'transform 0.15s',
                 }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
               >
                 Re-import
               </button>
@@ -640,7 +1053,10 @@ export default function ImportPage() {
                   color: '#000', background: T.green,
                   border: 'none', borderRadius: 8,
                   padding: '8px 16px', cursor: 'pointer',
+                  transition: 'transform 0.15s',
                 }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
               >
                 Set governance rules &#8594;
               </button>
@@ -648,30 +1064,44 @@ export default function ImportPage() {
           </div>
         )}
 
-        {/* Tab bar */}
-        {(!existingSystem || parsed || importSuccess) && (
+        {/* Three Import Method Cards */}
+        {(!existingSystem || parsed || importSuccess) && !importSuccess && (
           <>
             <div style={{
-              display: 'flex', gap: 4, padding: 6,
-              background: T.surface, border: `1px solid ${T.border}`,
-              borderRadius: 10, marginBottom: 28, overflowX: 'auto',
+              display: 'flex',
+              gap: 16,
+              marginBottom: 32,
+              flexWrap: 'wrap',
             }}>
-              <button onClick={() => { setActiveTab('paste'); setParsed(null); setFetchError(''); setImportSuccess(false) }} style={tabStyle('paste')}>
-                Paste JSON
-              </button>
-              <button onClick={() => { setActiveTab('url'); setParsed(null); setFetchError(''); setImportSuccess(false) }} style={tabStyle('url')}>
-                URL Fetch
-              </button>
-              <button onClick={() => { setActiveTab('sample'); setParsed(null); setFetchError(''); setImportSuccess(false) }} style={tabStyle('sample')}>
-                Sample Systems
-              </button>
+              <MethodCard
+                icon={<span style={{ fontFamily: mono }}>&#123;&#125;</span>}
+                title="Paste JSON"
+                description="Paste your design token JSON directly into the editor"
+                selected={activeMethod === 'paste'}
+                onClick={() => selectMethod('paste')}
+              />
+              <MethodCard
+                icon={<span style={{ fontFamily: mono }}>&#8599;</span>}
+                title="Fetch from URL"
+                description="Provide a public URL to your JSON token file"
+                selected={activeMethod === 'url'}
+                onClick={() => selectMethod('url')}
+              />
+              <MethodCard
+                icon={<span style={{ fontFamily: mono }}>&#9733;</span>}
+                title="Sample Systems"
+                description="Try with a pre-built design system to explore the tool"
+                selected={activeMethod === 'sample'}
+                onClick={() => selectMethod('sample')}
+              />
             </div>
 
             {/* ── PATH A: Paste JSON ── */}
-            {activeTab === 'paste' && !importSuccess && (
+            {activeMethod === 'paste' && (
               <div style={{
                 background: T.surface, border: `1px solid ${T.border}`,
-                borderRadius: 10, padding: 24,
+                borderRadius: 12, padding: 24,
+                marginBottom: 24,
               }}>
                 <h2 style={{
                   fontFamily: syne, fontWeight: 700, fontSize: 16,
@@ -696,10 +1126,18 @@ export default function ImportPage() {
                     border: `1px solid ${T.border2}`, borderRadius: 8,
                     padding: '12px 14px', resize: 'vertical', outline: 'none',
                     boxSizing: 'border-box', lineHeight: 1.6,
+                    transition: 'border-color 0.15s',
                   }}
+                  onFocus={e => (e.currentTarget.style.borderColor = T.blue)}
+                  onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
                 />
 
-                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
+                  {parseStatus && (
+                    <span style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>
+                      {parseStatus}
+                    </span>
+                  )}
                   <button
                     onClick={handlePasteJson}
                     disabled={!pasteInput.trim()}
@@ -710,14 +1148,16 @@ export default function ImportPage() {
                       padding: '10px 20px',
                       cursor: !pasteInput.trim() ? 'not-allowed' : 'pointer',
                       opacity: !pasteInput.trim() ? 0.5 : 1,
-                      transition: 'opacity 0.15s',
+                      transition: 'transform 0.15s, opacity 0.15s',
                     }}
+                    onMouseEnter={e => { if (pasteInput.trim()) e.currentTarget.style.transform = 'scale(1.02)' }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
                   >
                     Parse
                   </button>
                 </div>
 
-                {fetchError && activeTab === 'paste' && (
+                {fetchError && activeMethod === 'paste' && (
                   <div style={{
                     marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8,
                     padding: '10px 14px', background: T.redDim,
@@ -732,10 +1172,11 @@ export default function ImportPage() {
             )}
 
             {/* ── PATH B: URL Fetch ── */}
-            {activeTab === 'url' && !importSuccess && (
+            {activeMethod === 'url' && (
               <div style={{
                 background: T.surface, border: `1px solid ${T.border}`,
-                borderRadius: 10, padding: 24,
+                borderRadius: 12, padding: 24,
+                marginBottom: 24,
               }}>
                 <h2 style={{
                   fontFamily: syne, fontWeight: 700, fontSize: 16,
@@ -762,7 +1203,10 @@ export default function ImportPage() {
                       color: T.text, background: T.bg,
                       border: `1px solid ${T.border2}`, borderRadius: 8,
                       padding: '10px 14px', outline: 'none',
+                      transition: 'border-color 0.15s',
                     }}
+                    onFocus={e => (e.currentTarget.style.borderColor = T.blue)}
+                    onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
                   />
                   <button
                     onClick={handleFetchUrl}
@@ -775,14 +1219,24 @@ export default function ImportPage() {
                       cursor: (fetchStatus === 'loading' || !urlInput.trim()) ? 'not-allowed' : 'pointer',
                       opacity: (fetchStatus === 'loading' || !urlInput.trim()) ? 0.5 : 1,
                       whiteSpace: 'nowrap',
-                      transition: 'opacity 0.15s',
+                      transition: 'transform 0.15s, opacity 0.15s',
                     }}
+                    onMouseEnter={e => { if (urlInput.trim() && fetchStatus !== 'loading') e.currentTarget.style.transform = 'scale(1.02)' }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
                   >
                     {fetchStatus === 'loading' ? 'Fetching...' : 'Fetch & Parse'}
                   </button>
                 </div>
 
-                {fetchError && activeTab === 'url' && (
+                {parseStatus && fetchStatus === 'loading' && (
+                  <div style={{
+                    marginTop: 12, fontFamily: mono, fontSize: 12, color: T.muted,
+                  }}>
+                    {parseStatus}
+                  </div>
+                )}
+
+                {fetchError && activeMethod === 'url' && (
                   <div style={{
                     marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8,
                     padding: '10px 14px', background: T.redDim,
@@ -797,66 +1251,19 @@ export default function ImportPage() {
             )}
 
             {/* ── PATH C: Sample Systems ── */}
-            {activeTab === 'sample' && !importSuccess && (
+            {activeMethod === 'sample' && (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
                 gap: 16,
+                marginBottom: 24,
               }}>
                 {SAMPLE_SYSTEMS.map(sample => (
-                  <button
+                  <SampleCard
                     key={sample.id}
+                    sample={sample}
                     onClick={() => handleLoadSample(sample)}
-                    style={{
-                      background: T.surface,
-                      border: `1px solid ${T.border}`,
-                      borderRadius: 10,
-                      padding: '20px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'border-color 0.15s, background 0.15s',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 12,
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = T.border2
-                      e.currentTarget.style.background = T.surface2
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = T.border
-                      e.currentTarget.style.background = T.surface
-                    }}
-                  >
-                    <div style={{
-                      fontFamily: syne, fontWeight: 700, fontSize: 15,
-                      color: T.text,
-                    }}>
-                      {sample.name}
-                    </div>
-                    <div style={{
-                      fontFamily: mono, fontSize: 12, color: T.muted,
-                      lineHeight: 1.5,
-                    }}>
-                      {sample.description}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{
-                        fontFamily: mono, fontSize: 11, color: T.blue,
-                        background: T.blueDim, border: `1px solid ${T.blue}28`,
-                        borderRadius: 5, padding: '3px 9px',
-                      }}>
-                        {sample.tokens} tokens
-                      </span>
-                      <span style={{
-                        fontFamily: mono, fontSize: 11, color: T.green,
-                        background: T.greenDim, border: `1px solid ${T.green}28`,
-                        borderRadius: 5, padding: '3px 9px',
-                      }}>
-                        {sample.components} components
-                      </span>
-                    </div>
-                  </button>
+                  />
                 ))}
               </div>
             )}
@@ -876,64 +1283,21 @@ export default function ImportPage() {
                       color: '#000', background: T.green,
                       border: 'none', borderRadius: 8,
                       padding: '12px 28px', cursor: 'pointer',
-                      letterSpacing: '0.02em', transition: 'opacity 0.15s',
+                      letterSpacing: '0.02em',
+                      transition: 'transform 0.15s, opacity 0.15s',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.opacity = '0.85'
+                      e.currentTarget.style.transform = 'scale(1.02)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.opacity = '1'
+                      e.currentTarget.style.transform = 'scale(1)'
+                    }}
                   >
                     Confirm &amp; Save Import
                   </button>
                 </div>
-              </div>
-            )}
-
-            {/* ── Success State ── */}
-            {importSuccess && parsed && (
-              <div id="success-banner" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{
-                  padding: '20px 24px',
-                  background: T.greenDim,
-                  border: `1px solid ${T.green}33`,
-                  borderRadius: 10,
-                  display: 'flex', alignItems: 'center', gap: 14,
-                }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: T.green,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <span style={{ color: '#000', fontWeight: 700, fontSize: 18 }}>&#10003;</span>
-                  </div>
-                  <div>
-                    <div style={{
-                      fontFamily: syne, fontWeight: 700, fontSize: 16, color: T.green,
-                    }}>
-                      Import successful
-                    </div>
-                    <div style={{
-                      fontFamily: mono, fontSize: 13, color: T.green, marginTop: 3, opacity: 0.85,
-                    }}>
-                      {parsed.sourceLabel} &mdash; {Object.keys(parsed.tokens.color).length + parsed.tokens.spacing.length + parsed.typography.allowedStyles.length + parsed.layout.allowedGridColumns.length} tokens, {Object.keys(parsed.components).length} components saved
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => router.push('/rules')}
-                  style={{
-                    fontFamily: mono, fontSize: 15, fontWeight: 700,
-                    color: '#000', background: T.green,
-                    border: 'none', borderRadius: 10,
-                    padding: '16px 32px', cursor: 'pointer',
-                    letterSpacing: '0.02em', transition: 'opacity 0.15s',
-                    alignSelf: 'center',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                >
-                  Set governance rules &#8594;
-                </button>
               </div>
             )}
           </>
@@ -942,8 +1306,11 @@ export default function ImportPage() {
       </main>
 
       <style>{`
-        @media (max-width: 600px) {
+        @media (max-width: 700px) {
           main { padding: 32px 16px 60px !important; }
+        }
+        @media (max-width: 600px) {
+          /* Stack method cards vertically on mobile */
         }
       `}</style>
     </div>

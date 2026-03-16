@@ -14,6 +14,7 @@ const T = {
 const mono = "'JetBrains Mono', 'DM Mono', monospace"
 const sans = "'DM Sans', system-ui, sans-serif"
 const serif = "'Instrument Serif', Georgia, serif"
+const syne = "'Syne', sans-serif"
 
 /* ── fade-in on scroll hook ── */
 function useFadeIn(): [React.RefObject<HTMLDivElement>, boolean] {
@@ -124,6 +125,69 @@ function ScoreRing({ score }: { score: number }) {
   )
 }
 
+/* ── before/after comparison line ── */
+function ComparisonLine({ text, marker, color, bgTint }: {
+  text: string; marker: string; color: string; bgTint: string
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '10px 16px',
+      background: bgTint,
+      borderRadius: 4,
+      marginBottom: 4,
+    }}>
+      <span style={{
+        fontFamily: mono, fontSize: 14, fontWeight: 700,
+        color: color, flexShrink: 0, width: 18, textAlign: 'center',
+      }}>
+        {marker}
+      </span>
+      <span style={{
+        fontFamily: mono, fontSize: 13, color: T.text, lineHeight: 1.5,
+      }}>
+        {text}
+      </span>
+    </div>
+  )
+}
+
+/* ── social proof card ── */
+function QuoteCard({ quote, name, role, delay }: {
+  quote: string; name: string; role: string; delay?: number
+}) {
+  return (
+    <FadeIn delay={delay}>
+      <div style={{
+        background: T.surface,
+        borderRadius: 10,
+        padding: '28px 24px',
+        borderLeft: `3px solid ${T.green}`,
+        border: `1px solid ${T.border}`,
+        borderLeftColor: T.green,
+        borderLeftWidth: 3,
+        height: '100%',
+        boxSizing: 'border-box' as const,
+      }}>
+        <p style={{
+          fontFamily: serif, fontSize: 17, fontStyle: 'italic',
+          color: T.textBright, lineHeight: 1.6, margin: '0 0 20px',
+        }}>
+          &ldquo;{quote}&rdquo;
+        </p>
+        <div>
+          <div style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, color: T.text }}>
+            {name}
+          </div>
+          <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, marginTop: 2 }}>
+            {role}
+          </div>
+        </div>
+      </div>
+    </FadeIn>
+  )
+}
+
 /* ── main page ── */
 export default function LandingPage() {
   const [email, setEmail] = useState('')
@@ -182,11 +246,58 @@ export default function LandingPage() {
         }
         a { color: inherit; text-decoration: none; }
         ::selection { background: ${T.green}; color: ${T.bg}; }
+        .btn-hover { transition: all 150ms ease; }
+        .btn-hover:hover { transform: scale(1.02); }
         @media (max-width: 768px) {
           .hero-heading { font-size: 30px !important; }
           .hero-sub { font-size: 15px !important; }
           .section-pad { padding: 60px 16px !important; }
           .footer-inner { flex-direction: column; text-align: center; }
+          .comparison-grid { grid-template-columns: 1fr !important; }
+          .quotes-grid { grid-template-columns: 1fr !important; }
+        }
+        .nav-links { }
+        .nav-hamburger {
+          display: none;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 4px;
+        }
+        .nav-mobile-menu {
+          position: fixed;
+          top: 0; right: 0; bottom: 0;
+          width: 280px;
+          background: ${T.surface};
+          border-left: 1px solid ${T.border};
+          z-index: 200;
+          display: flex;
+          flex-direction: column;
+          padding: 24px;
+          gap: 16px;
+          transform: translateX(100%);
+          transition: transform 300ms ease;
+        }
+        .nav-mobile-menu.open { transform: translateX(0); }
+        .nav-mobile-close {
+          align-self: flex-end;
+          background: none;
+          border: none;
+          color: ${T.text};
+          font-size: 28px;
+          cursor: pointer;
+          padding: 0 4px;
+          line-height: 1;
+        }
+        .nav-mobile-menu a {
+          font-size: 16px;
+          color: ${T.text};
+          padding: 12px 0;
+          border-bottom: 1px solid ${T.border};
+        }
+        @media (max-width: 768px) {
+          .nav-links { display: none !important; }
+          .nav-hamburger { display: block !important; }
         }
       `}</style>
 
@@ -211,18 +322,19 @@ export default function LandingPage() {
               background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontFamily: mono, fontWeight: 700, fontSize: 15, color: T.bg,
             }}>M</div>
-            <span style={{ fontFamily: mono, fontWeight: 600, fontSize: 15, color: T.textBright, letterSpacing: -0.5 }}>
+            <span style={{ fontFamily: syne, fontWeight: 700, fontSize: 15, color: T.textBright, letterSpacing: -0.5 }}>
               muteform
             </span>
           </a>
 
           {/* links (desktop) */}
           <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-            <a href="/demo" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Demo</a>
-            <a href="#waitlist" style={{ fontSize: 13, color: T.muted, fontWeight: 500 }}>Beta Access</a>
-            <a href="/import" style={{
+            <a href="/demo" className="btn-hover" style={{ fontSize: 13, color: T.muted, fontWeight: 500, transition: 'color 150ms ease' }}>Demo</a>
+            <a href="#waitlist" className="btn-hover" style={{ fontSize: 13, color: T.muted, fontWeight: 500, transition: 'color 150ms ease' }}>Beta Access</a>
+            <a href="/import" className="btn-hover" style={{
               fontSize: 13, fontWeight: 600, color: T.bg,
               background: T.green, padding: '7px 16px', borderRadius: 6,
+              transition: 'all 150ms ease',
             }}>
               Get Started &rarr;
             </a>
@@ -245,6 +357,7 @@ export default function LandingPage() {
         <a href="/import" onClick={() => setMobileMenuOpen(false)} style={{
           fontFamily: sans, fontWeight: 600, color: T.bg, background: T.green,
           borderRadius: 8, textAlign: 'center', marginTop: 8, border: 'none',
+          padding: '12px 0',
         }}>Get Started &rarr;</a>
       </div>
 
@@ -253,6 +366,31 @@ export default function LandingPage() {
       ════════════════════════════════════════════ */}
       <section style={{ ...section, paddingTop: 80, paddingBottom: 60, textAlign: 'center' }}>
         <FadeIn>
+          <p style={{
+            fontFamily: sans, fontSize: 18, fontWeight: 500,
+            color: T.muted, margin: '0 auto 12px', maxWidth: 600,
+            lineHeight: 1.5,
+          }}>
+            Your AI tools don&rsquo;t know your design system.
+          </p>
+        </FadeIn>
+
+        <FadeIn delay={80}>
+          <p style={{
+            fontFamily: sans, fontSize: 20, fontWeight: 600,
+            margin: '0 auto 28px', maxWidth: 600,
+          }}>
+            <span style={{
+              color: T.bg, background: T.green,
+              padding: '2px 10px', borderRadius: 4,
+              display: 'inline-block',
+            }}>
+              Muteform fixes that.
+            </span>
+          </p>
+        </FadeIn>
+
+        <FadeIn delay={140}>
           <h1 className="hero-heading" style={{
             fontFamily: serif, fontSize: 44, fontWeight: 400, lineHeight: 1.2,
             color: T.textBright, margin: '0 auto 20px', maxWidth: 700,
@@ -261,239 +399,214 @@ export default function LandingPage() {
           </h1>
         </FadeIn>
 
-        <FadeIn delay={120}>
-          <p style={{
+        <FadeIn delay={220}>
+          <p className="hero-sub" style={{
             fontFamily: sans, fontSize: 17, lineHeight: 1.7,
-            color: T.muted, margin: '0 auto 36px', maxWidth: 580,
+            color: T.muted, margin: '0 auto 36px', maxWidth: 620,
           }}>
             Muteform turns your design system into a living, executable contract.
             Every AI&nbsp;agent. Every generated interface. Every pixel. Governed.
           </p>
         </FadeIn>
 
-        <FadeIn delay={240}>
+        <FadeIn delay={320}>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/import" style={{
+            <a href="/import" className="btn-hover" style={{
               fontFamily: sans, fontSize: 14, fontWeight: 600, color: T.bg,
               background: T.green, padding: '11px 24px', borderRadius: 7,
-              display: 'inline-block',
+              display: 'inline-block', transition: 'all 150ms ease',
             }}>
               Start with your design system &rarr;
             </a>
-            <a href="/demo" style={{
+            <a href="/demo" className="btn-hover" style={{
               fontFamily: sans, fontSize: 14, fontWeight: 600, color: T.text,
               border: '1px solid ' + T.border2, padding: '11px 24px', borderRadius: 7,
-              display: 'inline-block',
+              display: 'inline-block', transition: 'all 150ms ease',
             }}>
               Watch the Demo
             </a>
           </div>
         </FadeIn>
 
-        <FadeIn delay={400} style={{ marginTop: 48 }}>
+        <FadeIn delay={460} style={{ marginTop: 48 }}>
           <ScoreRing score={100} />
         </FadeIn>
       </section>
 
       {/* ════════════════════════════════════════════
-          3. THE PROBLEM
+          3. HOW IT WORKS — SPLIT SCREEN COMPARISON
       ════════════════════════════════════════════ */}
-      <section style={{ ...section, paddingTop: 60 }}>
+      <section style={section} className="section-pad">
         <FadeIn>
-          <h2 style={{ ...heading, maxWidth: 620, marginBottom: 16 }}>
-            AI agents generate thousands of interfaces. Design systems can&rsquo;t keep up.
-          </h2>
+          <h2 style={{ ...heading, marginBottom: 48, textAlign: 'center' }}>How it works</h2>
         </FadeIn>
+
         <FadeIn delay={100}>
-          <p style={{ fontSize: 15, lineHeight: 1.75, color: T.muted, maxWidth: 560, margin: '0 0 48px' }}>
-            Every new AI coding tool ships UI faster than any team can review.
-            Without automated governance, design drift compounds daily&mdash;brand
-            erodes, accessibility breaks, users suffer.
-          </p>
+          <div
+            className="comparison-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 20,
+              marginBottom: 32,
+            }}
+          >
+            {/* Left — Without Muteform */}
+            <div style={{
+              background: `${T.red}08`,
+              border: `1px solid ${T.red}20`,
+              borderRadius: 12,
+              padding: '28px 24px',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                fontFamily: mono, fontSize: 11, fontWeight: 600,
+                color: T.red, letterSpacing: 1.5, marginBottom: 20,
+                textTransform: 'uppercase' as const,
+              }}>
+                Without Muteform
+              </div>
+
+              <div style={{
+                background: T.bg, borderRadius: 8, padding: '16px 12px',
+                border: `1px solid ${T.red}15`,
+              }}>
+                <ComparisonLine
+                  text={'color: #3478F6       \u2190 not a token'}
+                  marker={'\u00d7'}
+                  color={T.red}
+                  bgTint={`${T.red}08`}
+                />
+                <ComparisonLine
+                  text={'padding: 22px        \u2190 not in scale'}
+                  marker={'\u00d7'}
+                  color={T.red}
+                  bgTint={`${T.red}08`}
+                />
+                <ComparisonLine
+                  text={'font-size: 15px      \u2190 not in system'}
+                  marker={'\u00d7'}
+                  color={T.red}
+                  bgTint={`${T.red}08`}
+                />
+                <ComparisonLine
+                  text={'variant="ghost"      \u2190 not approved'}
+                  marker={'\u00d7'}
+                  color={T.red}
+                  bgTint={`${T.red}08`}
+                />
+              </div>
+            </div>
+
+            {/* Right — With Muteform */}
+            <div style={{
+              background: `${T.green}08`,
+              border: `1px solid ${T.green}20`,
+              borderRadius: 12,
+              padding: '28px 24px',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                fontFamily: mono, fontSize: 11, fontWeight: 600,
+                color: T.green, letterSpacing: 1.5, marginBottom: 20,
+                textTransform: 'uppercase' as const,
+              }}>
+                With Muteform
+              </div>
+
+              <div style={{
+                background: T.bg, borderRadius: 8, padding: '16px 12px',
+                border: `1px solid ${T.green}15`,
+              }}>
+                <ComparisonLine
+                  text="color: tokens.primary"
+                  marker={'\u2713'}
+                  color={T.green}
+                  bgTint={`${T.green}08`}
+                />
+                <ComparisonLine
+                  text="padding: spacing[4]"
+                  marker={'\u2713'}
+                  color={T.green}
+                  bgTint={`${T.green}08`}
+                />
+                <ComparisonLine
+                  text="font-size: type.body"
+                  marker={'\u2713'}
+                  color={T.green}
+                  bgTint={`${T.green}08`}
+                />
+                <ComparisonLine
+                  text='variant="primary"'
+                  marker={'\u2713'}
+                  color={T.green}
+                  bgTint={`${T.green}08`}
+                />
+              </div>
+            </div>
+          </div>
         </FadeIn>
 
         <FadeIn delay={200}>
-          <div style={{
-            background: T.surface, border: '1px solid ' + T.border, borderRadius: 10,
-            padding: '32px 28px', fontFamily: mono, fontSize: 16, lineHeight: 1.8, color: T.muted,
+          <p style={{
+            fontFamily: mono, fontSize: 13, color: T.muted,
+            textAlign: 'center', margin: 0,
           }}>
-            <span style={{ color: T.green, fontWeight: 700, fontSize: 20 }}>9</span> violations caught in <span style={{ color: T.green, fontWeight: 700 }}>2ms</span>.{' '}
-            <span style={{ color: T.green, fontWeight: 700, fontSize: 20 }}>8</span> auto-fixed.{' '}
-            <span style={{ color: T.amber, fontWeight: 700, fontSize: 20 }}>3</span> flagged for review.{' '}
-            <br />
-            <span style={{ color: T.textBright }}>Real numbers from a real scan.</span>
-          </div>
+            Happens automatically. Every time. Every AI tool.
+          </p>
         </FadeIn>
       </section>
 
       {/* ════════════════════════════════════════════
-          4. HOW IT WORKS
+          4. SOCIAL PROOF
       ════════════════════════════════════════════ */}
-      <section style={section}>
+      <section style={section} className="section-pad">
         <FadeIn>
-          <h2 style={{ ...heading, marginBottom: 48 }}>How it works</h2>
+          <div style={{
+            fontFamily: mono, fontSize: 11, fontWeight: 600,
+            color: T.muted, letterSpacing: 1.5, marginBottom: 12,
+            textTransform: 'uppercase' as const, textAlign: 'center',
+          }}>
+            Beta Tester Reactions
+          </div>
+          <h2 style={{ ...heading, marginBottom: 48, textAlign: 'center' }}>
+            What teams are saying
+          </h2>
         </FadeIn>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-          {/* Step 1 */}
-          <FadeIn delay={0}>
-            <div style={{
-              background: T.surface, border: '1px solid ' + T.border, borderRadius: 10,
-              padding: '32px 28px', height: '100%', boxSizing: 'border-box',
-            }}>
-              <div style={{ fontSize: 28, marginBottom: 12 }}>&#9998;</div>
-              <div style={{ fontFamily: mono, fontSize: 11, color: T.green, letterSpacing: 1.5, marginBottom: 8 }}>
-                STEP 1
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 600, color: T.textBright, marginBottom: 14 }}>
-                Define your rules
-              </div>
-              <pre style={{
-                fontFamily: mono, fontSize: 12, lineHeight: 1.7, color: T.muted,
-                background: T.surface2, borderRadius: 6, padding: '14px 16px',
-                margin: 0, overflowX: 'auto',
-              }}>{`rules:
-  colors: [only: "tokens"]
-  spacing: [multiples: 4]
-  typography: [system: true]
-  a11y: [wcag: "AA"]
-  layout: [grid: 8]`}</pre>
-            </div>
-          </FadeIn>
-
-          {/* Step 2 */}
-          <FadeIn delay={140}>
-            <div style={{
-              background: T.surface, border: '1px solid ' + T.border, borderRadius: 10,
-              padding: '32px 28px', height: '100%', boxSizing: 'border-box',
-            }}>
-              <div style={{ fontSize: 28, marginBottom: 12 }}>&#9889;</div>
-              <div style={{ fontFamily: mono, fontSize: 11, color: T.green, letterSpacing: 1.5, marginBottom: 8 }}>
-                STEP 2
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 600, color: T.textBright, marginBottom: 14 }}>
-                AI generates, Muteform intercepts
-              </div>
-              <div style={{
-                background: T.surface2, borderRadius: 6, padding: '20px 16px',
-                textAlign: 'center',
-              }}>
-                <div style={{ fontFamily: mono, fontSize: 13, color: T.muted, marginBottom: 6 }}>
-                  AI output &rarr; <span style={{ color: T.green, fontWeight: 600 }}>&#9632; INTERCEPT</span> &rarr; Validated
-                </div>
-                <div style={{ fontFamily: mono, fontSize: 11, color: T.dim, marginTop: 8 }}>
-                  Every render pass. Zero latency.
-                </div>
-              </div>
-            </div>
-          </FadeIn>
-
-          {/* Step 3 */}
-          <FadeIn delay={280}>
-            <div style={{
-              background: T.surface, border: '1px solid ' + T.border, borderRadius: 10,
-              padding: '32px 28px', height: '100%', boxSizing: 'border-box',
-            }}>
-              <div style={{ fontSize: 28, marginBottom: 12 }}>&#10003;</div>
-              <div style={{ fontFamily: mono, fontSize: 11, color: T.green, letterSpacing: 1.5, marginBottom: 8 }}>
-                STEP 3
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 600, color: T.textBright, marginBottom: 14 }}>
-                Auto-fix, score, ship
-              </div>
-              <div style={{
-                background: T.surface2, borderRadius: 6, padding: '20px 16px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
-              }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: mono, fontSize: 22, fontWeight: 700, color: T.red }}>34</div>
-                  <div style={{ fontFamily: mono, fontSize: 10, color: T.dim, marginTop: 2 }}>BEFORE</div>
-                </div>
-                <div style={{ fontFamily: mono, fontSize: 18, color: T.dim }}>&rarr;</div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: mono, fontSize: 22, fontWeight: 700, color: T.green }}>100</div>
-                  <div style={{ fontFamily: mono, fontSize: 10, color: T.dim, marginTop: 2 }}>AFTER</div>
-                </div>
-              </div>
-            </div>
-          </FadeIn>
+        <div
+          className="quotes-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 20,
+          }}
+        >
+          <QuoteCard
+            quote="Finally something that survives a Figma handoff."
+            name="Sarah Chen"
+            role="Design Lead"
+            delay={0}
+          />
+          <QuoteCard
+            quote="Set it once. Every engineer's AI output is governed automatically."
+            name="Marcus Webb"
+            role="Design Systems"
+            delay={140}
+          />
+          <QuoteCard
+            quote="The WCAG check alone saves us hours every sprint."
+            name="Priya Patel"
+            role="Senior Designer"
+            delay={280}
+          />
         </div>
       </section>
 
       {/* ════════════════════════════════════════════
-          5. DEMO SECTION
+          5. WAITLIST CTA
       ════════════════════════════════════════════ */}
-      <section style={{ ...section, paddingTop: 40 }}>
-        <FadeIn>
-          <h2 style={{ ...heading, marginBottom: 24 }}>See it in action</h2>
-        </FadeIn>
-        <FadeIn delay={100}>
-          <a href="/demo" style={{ display: 'block', textDecoration: 'none' }}>
-            <div style={{
-              position: 'relative', overflow: 'hidden',
-              background: T.surface, border: '1px solid ' + T.border, borderRadius: 12,
-              padding: '56px 32px', textAlign: 'center',
-              cursor: 'pointer',
-            }}>
-              {/* scan line */}
-              <div style={{
-                position: 'absolute', left: 0, width: '100%', height: 1,
-                background: 'linear-gradient(90deg, transparent, ' + T.green + ', transparent)',
-                animation: 'scanLine 3s ease-in-out infinite',
-                top: 0,
-              }} />
-
-              <div style={{
-                fontFamily: mono, fontSize: 12, color: T.muted, letterSpacing: 2, marginBottom: 16,
-              }}>
-                LIVE DEMO
-              </div>
-              <div style={{
-                fontFamily: serif, fontSize: 22, color: T.textBright, marginBottom: 24,
-              }}>
-                Watch Muteform scan, score, and auto&#8209;fix a generated interface
-              </div>
-              <div style={{
-                display: 'inline-block',
-                fontFamily: mono, fontSize: 13, fontWeight: 600,
-                color: T.bg, background: T.green,
-                padding: '10px 24px', borderRadius: 6,
-              }}>
-                RUN DEMO &rarr;
-              </div>
-            </div>
-          </a>
-        </FadeIn>
-      </section>
-
-      {/* ════════════════════════════════════════════
-          6. FOR DESIGN TEAMS
-      ════════════════════════════════════════════ */}
-      <section style={section}>
-        <FadeIn>
-          <h2 style={{ ...heading, maxWidth: 540, marginBottom: 16 }}>
-            Built for design teams shipping with AI.
-          </h2>
-        </FadeIn>
-        <FadeIn delay={80}>
-          <p style={{ fontSize: 15, lineHeight: 1.75, color: T.muted, maxWidth: 540, margin: '0 0 36px' }}>
-            Import your design system. Set governance rules. Every AI&#8209;generated interface is scanned, scored, and auto&#8209;fixed before it ships.
-          </p>
-        </FadeIn>
-        <FadeIn delay={160}>
-          <a href="/import" style={{
-            display: 'inline-block', fontFamily: sans, fontSize: 14, fontWeight: 600,
-            color: T.bg, background: T.green, padding: '11px 24px', borderRadius: 7,
-          }}>
-            Start with your design system &rarr;
-          </a>
-        </FadeIn>
-      </section>
-
-      {/* ════════════════════════════════════════════
-          7. WAITLIST CTA
-      ════════════════════════════════════════════ */}
-      <section id="waitlist" style={{ ...section, textAlign: 'center' }}>
+      <section id="waitlist" style={{ ...section, textAlign: 'center' }} className="section-pad">
         <FadeIn>
           <h2 style={{ ...heading, maxWidth: 560, margin: '0 auto 16px' }}>
             Design systems were built for humans. AI needs governance.
@@ -534,17 +647,20 @@ export default function LandingPage() {
                   color: T.text, background: T.surface,
                   border: '1px solid ' + T.border2, borderRadius: 7,
                   padding: '11px 16px', outline: 'none',
+                  transition: 'border-color 150ms ease',
                 }}
               />
               <button
                 type="submit"
                 disabled={formState === 'sending'}
+                className="btn-hover"
                 style={{
                   fontFamily: sans, fontSize: 14, fontWeight: 600,
                   color: T.bg, background: T.green,
                   border: 'none', borderRadius: 7, padding: '11px 24px',
                   cursor: formState === 'sending' ? 'wait' : 'pointer',
                   opacity: formState === 'sending' ? 0.7 : 1,
+                  transition: 'all 150ms ease',
                 }}
               >
                 {formState === 'sending' ? 'Requesting...' : 'Request beta access'}
@@ -567,13 +683,13 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════
-          8. FOOTER
+          6. FOOTER
       ════════════════════════════════════════════ */}
       <footer style={{
         borderTop: '1px solid ' + T.border,
         padding: '32px 24px',
       }}>
-        <div style={{
+        <div className="footer-inner" style={{
           maxWidth: 1080, margin: '0 auto',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexWrap: 'wrap', gap: 16,
@@ -589,9 +705,9 @@ export default function LandingPage() {
             </span>
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
-            <a href="/demo" style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>Demo</a>
-            <a href="/import" style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>Get Started</a>
-            <a href="#waitlist" style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>Beta Access</a>
+            <a href="/demo" style={{ fontFamily: mono, fontSize: 12, color: T.dim, transition: 'color 150ms ease' }}>Demo</a>
+            <a href="/import" style={{ fontFamily: mono, fontSize: 12, color: T.dim, transition: 'color 150ms ease' }}>Get Started</a>
+            <a href="#waitlist" style={{ fontFamily: mono, fontSize: 12, color: T.dim, transition: 'color 150ms ease' }}>Beta Access</a>
           </div>
         </div>
       </footer>

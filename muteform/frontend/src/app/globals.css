@@ -133,3 +133,96 @@ input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 1000px var(--surface) inset;
   transition: background-color 5000s ease-in-out 0s;
 }
+
+/* ── Micro-interactions ── */
+
+/* Page fade-in */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-fade-in {
+  animation: pageIn 0.15s ease-out;
+}
+
+/* Button hover: subtle scale */
+button:not(:disabled):hover,
+a[role="button"]:hover {
+  transform: scale(1.02);
+}
+button, a[role="button"] {
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Score ring glow */
+@keyframes scoreGlow {
+  0%, 100% { filter: drop-shadow(0 0 6px var(--green)); }
+  50% { filter: drop-shadow(0 0 14px var(--green)); }
+}
+
+/* Fixed badge pulse */
+@keyframes fixedPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.badge-fixed-pulse {
+  animation: fixedPulse 0.4s ease-out 1;
+}
+
+/* Color swatch shadow */
+.color-swatch {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* Checkmark scale-in */
+@keyframes checkIn {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.check-animate {
+  animation: checkIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Progress bar fill */
+@keyframes progressFill {
+  from { width: 0%; }
+}
+.progress-animate {
+  animation: progressFill 1.5s ease-out;
+}
+
+/* Stagger fade-in for lists */
+@keyframes staggerIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scan line animation */
+@keyframes scanLine {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Modal backdrop */
+@keyframes modalIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modalCardIn {
+  from { opacity: 0; transform: scale(0.95) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Stepper progress line animation */
+@keyframes stepperFill {
+  from { width: 0; }
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
