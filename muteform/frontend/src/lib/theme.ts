@@ -5,12 +5,12 @@ export type Theme = 'light' | 'dark'
 const STORAGE_KEY = 'muteform-theme'
 
 export function getTheme(): Theme {
-  if (typeof window === 'undefined') return 'light'
+  if (typeof window === 'undefined') return 'dark'
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored === 'dark') return 'dark'
+    if (stored === 'light') return 'light'
   } catch {}
-  return 'light'
+  return 'dark'
 }
 
 export function setTheme(theme: Theme): void {

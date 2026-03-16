@@ -260,11 +260,6 @@ export default function DemoPage() {
 
   const fixture = getFixture('onboarding')
   const violationCount = scanResult?.violations.length || 0
-  const navItems = [
-    { l: 'Import', h: '/import' }, { l: 'Demo', h: '/demo', a: true },
-    { l: 'Playground', h: '/playground' }, { l: 'Governance', h: '/governance' }, { l: 'Integrate', h: '/integrate' },
-  ]
-
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
       <style>{`
@@ -273,27 +268,35 @@ export default function DemoPage() {
         @keyframes spin { to { transform: rotate(360deg) } }
         @media (max-width: 768px) { .demo-hero h1 { font-size: 26px !important; } .demo-grid { grid-template-columns: 1fr !important; } }
       `}</style>
-      <div style={{ position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 52, background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 800, color: 'var(--bg)' }}>M</span>
+      {/* ── Nav — matches landing page ── */}
+      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
+          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 4, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 700, fontSize: 15, color: '#fff' }}>M</span>
+            </div>
+            <span style={{ fontFamily: 'var(--font-heading)', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>muteform</span>
+          </a>
+          <div className="nav-links" style={{ gap: 28 }}>
+            <a href="/demo" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600, textDecoration: 'none' }}>Demo</a>
+            <a href="/integrate" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)', textDecoration: 'none' }}>Docs</a>
           </div>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>muteform</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--success)', background: 'var(--success-dim)', padding: '2px 8px', borderRadius: 4, border: '1px solid var(--success)', letterSpacing: '0.08em' }}>LIVE DEMO</span>
+          <div className="nav-links" style={{ gap: 10 }}>
+            <a href="/#waitlist" style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: '#fff', background: 'var(--accent)', padding: '7px 18px', borderRadius: 4, textDecoration: 'none' }}>Get beta access</a>
+          </div>
+          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+          </button>
         </div>
-        <div className="nav-links" style={{ display: 'flex', gap: 20 }}>
-          {navItems.map(n => (<a key={n.l} href={n.h} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: n.a ? 'var(--success)' : 'var(--text-muted)', textDecoration: 'none' }}>{n.l}</a>))}
-        </div>
-        <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
-        </button>
-      </div>
+      </nav>
       <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
-        {navItems.map(n => <a key={n.l} href={n.h} style={{ fontFamily: 'var(--font-sans)', color: n.a ? 'var(--success)' : undefined }}>{n.l}</a>)}
+        <a href="/demo" onClick={() => setMobileMenuOpen(false)}>Demo</a>
+        <a href="/integrate" onClick={() => setMobileMenuOpen(false)}>Docs</a>
+        <a href="/#waitlist" onClick={() => setMobileMenuOpen(false)} style={{ fontWeight: 600, color: '#fff', background: 'var(--accent)', borderRadius: 4, textAlign: 'center', marginTop: 8, padding: '12px 0', border: 'none' }}>Get beta access</a>
       </div>
       <div className="demo-hero" style={{ padding: '36px 20px 24px', maxWidth: 1200, margin: '0 auto', textAlign: 'center' }}>
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 38, fontWeight: 400, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.15, margin: 0 }}>Design governance for<br />AI-generated interfaces</h1>
+        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 38, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.15, margin: 0 }}>Live governance demo</h1>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.6 }}>Scanning: <strong style={{ color: 'var(--text-primary)' }}>Onboarding Flow</strong> from <strong style={{ color: 'var(--warning)' }}>Cursor AI</strong> {'\u2014'} {violationCount} violations detected</p>
       </div>
       <div className="demo-grid" style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -467,11 +470,10 @@ export default function DemoPage() {
       </div>)}
       {phase !== 'governed' && (<div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 80px', textAlign: 'center' }}>
         <div style={{ padding: '48px 24px', background: 'linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%)', borderRadius: 16, border: '1px solid var(--border)' }}>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 400, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 8 }}>TypeScript for design. Enforced at generation.</h2>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 28, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>Define your rules. AI generates, Muteform intercepts. Auto-fix, score, ship.</p>
+          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 8 }}>Ready to govern your own system?</h2>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 28, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>Import your tokens, define rules, scan any AI output.</p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <a href="/playground" style={{ display: 'inline-block', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--bg)', background: 'var(--success)', padding: '12px 28px', borderRadius: 8, textDecoration: 'none', boxShadow: '0 4px 24px var(--success-dim)' }}>Try the Playground {'\u2192'}</a>
-            <a href="/import" style={{ display: 'inline-block', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--success)', background: 'transparent', padding: '12px 28px', borderRadius: 8, textDecoration: 'none', border: '1px solid var(--success)' }}>Import Your System</a>
+            <a href="/import" style={{ display: 'inline-block', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, color: '#fff', background: 'var(--accent)', padding: '12px 28px', borderRadius: 4, textDecoration: 'none' }}>Start with your design system &rarr;</a>
           </div>
         </div>
       </div>)}

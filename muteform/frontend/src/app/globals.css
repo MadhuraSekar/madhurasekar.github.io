@@ -27,7 +27,7 @@
 
 /* ── Theme: Dark ── */
 :root.theme-dark {
-  --bg: #0A0908;
+  --bg: #080909;
   --surface: #141210;
   --surface-elevated: #1C1A18;
   --border: #2A2724;
@@ -35,9 +35,9 @@
   --text-primary: #F5F4F0;
   --text-secondary: #9B9690;
   --text-muted: #6B6560;
-  --accent: #4A7AFF;
-  --accent-dim: #4A7AFF15;
-  --accent-hover: #5A8AFF;
+  --accent: #0055FF;
+  --accent-dim: #0055FF15;
+  --accent-hover: #3377FF;
   --success: #22c55e;
   --success-dim: #22c55e15;
   --warning: #f59e0b;
@@ -51,6 +51,7 @@
 /* ── Font stacks ── */
 :root {
   --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-heading: 'Syne', 'DM Sans', system-ui, sans-serif;
   --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'DM Mono', 'SF Mono', 'Fira Code', monospace;
 }
