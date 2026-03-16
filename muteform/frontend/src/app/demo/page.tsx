@@ -284,31 +284,29 @@ function reportToMarkdown(report: GovernanceReport): string {
 }
 
 // ─── Main Demo Page ──────────────────────────────────────────
+// ─── Pre-compute scan at module level (runs once, no async) ──
+function runInitialScan() {
+  const fixture = getFixture('onboarding')
+  if (!fixture) return null
+  const policy = loadConfig(DEMO_YAML)
+  const result = scanArtifact(fixture.artifact, policy)
+  const initialReport = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, result, null, policy)
+  return { policy, result, initialReport }
+}
+
 export default function DemoPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null)
+
+  // Run scan synchronously on first render — no useEffect, no delay
+  const [initial] = useState(runInitialScan)
+  const [scanResult, setScanResult] = useState<ScanResult | null>(initial?.result ?? null)
   const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null)
-  const [report, setReport] = useState<GovernanceReport | null>(null)
-  const [config, setConfig] = useState<MuteformConfig | null>(null)
-  const [score, setScore] = useState(0)
-  const [phase, setPhase] = useState<'loading' | 'scanned' | 'governed'>('loading')
+  const [report, setReport] = useState<GovernanceReport | null>(initial?.initialReport ?? null)
+  const [config, setConfig] = useState<MuteformConfig | null>(initial?.policy ?? null)
+  const [score, setScore] = useState(initial?.initialReport?.overallScore ?? 0)
+  const [phase, setPhase] = useState<'loading' | 'scanned' | 'governed'>(initial ? 'scanned' : 'loading')
   const [copied, setCopied] = useState<string | null>(null)
   const [diffTab, setDiffTab] = useState<'original' | 'violations' | 'governed'>('original')
-
-  useEffect(() => {
-    const fixture = getFixture('onboarding')
-    if (!fixture) return
-    try {
-      const policy = loadConfig(DEMO_YAML)
-      setConfig(policy)
-      const result = scanArtifact(fixture.artifact, policy)
-      setScanResult(result)
-      const initialReport = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, result, null, policy)
-      setScore(initialReport.overallScore)
-      setReport(initialReport)
-      setPhase('scanned')
-    } catch (e) { console.error('Demo scan failed:', e) }
-  }, [])
 
   const handleGovernance = useCallback(() => {
     if (!scanResult || !config) return
