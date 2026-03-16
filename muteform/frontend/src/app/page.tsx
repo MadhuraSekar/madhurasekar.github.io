@@ -129,6 +129,13 @@ export default function LandingPage() {
   const [email, setEmail] = useState('')
   const [formState, setFormState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const [waitlistCount, setWaitlistCount] = useState(347)
+
+  useEffect(() => {
+    fetch('/api/waitlist').then(r => r.json()).then(d => {
+      if (d.count) setWaitlistCount(d.count)
+    }).catch(() => {})
+  }, [])
 
   const handleWaitlist = useCallback(async function (e: FormEvent) {
     e.preventDefault()
@@ -141,6 +148,8 @@ export default function LandingPage() {
         body: JSON.stringify({ email: email.trim() }),
       })
       if (!res.ok) throw new Error('Request failed')
+      var data = await res.json()
+      if (data.count) setWaitlistCount(data.count)
       setFormState('success')
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Something went wrong')
@@ -562,7 +571,7 @@ export default function LandingPage() {
             fontFamily: mono, fontSize: 12, color: T.dim, marginTop: 20,
             animation: 'pulse 3s ease-in-out infinite',
           }}>
-            347 / 500 spots claimed
+            {waitlistCount} / 500 spots claimed
           </p>
         </FadeIn>
       </section>
