@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Stepper from '@/components/Stepper'
 import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
 import { getFixture } from '@/lib/fixtures'
 import { buildGovernanceReport, reportToJSON } from '@/lib/governance'
+import { getOrCreateMcpToken, loadSession, syncMcpToken } from '@/lib/session'
 
 // ─── Design Tokens ────────────────────────────────────────────
 const T = {
@@ -19,7 +21,7 @@ const syne = "'Syne', sans-serif"
 const mono = "'DM Mono', monospace"
 
 // ─── Constants ────────────────────────────────────────────────
-const ENDPOINT = 'https://muteform-production.up.railway.app'
+const ENDPOINT = 'https://madhurasekar-github-io.vercel.app'
 
 const DEMO_YAML = `name: "Acme Design System"
 version: "1.0.0"
@@ -89,58 +91,24 @@ interface LogEntry {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
-function randomKey() {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  for (let i = 0; i < 32; i++) result += chars[Math.floor(Math.random() * chars.length)]
-  return 'mf_live_' + result
-}
-
 function fmtTs(iso: string) {
   const d = new Date(iso)
   return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-// ─── Progress Stepper ────────────────────────────────────────────
-function ProgressStepper({ current }: { current: number }) {
-  const steps = [
-    { label: 'Import', href: '/import' },
-    { label: 'Governance Rules', href: '/governance' },
-    { label: 'Connect MCP', href: '/integrate' },
-    { label: 'Scan', href: '/demo' },
-  ]
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 0, marginBottom: 32,
-      overflowX: 'auto', padding: '4px 0',
-    }}>
-      {steps.map((step, i) => (
-        <div key={step.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-          <a href={step.href} style={{
-            fontFamily: syne, fontSize: 11, fontWeight: 600, textDecoration: 'none',
-            color: i === current ? '#000' : i < current ? T.green : T.dim,
-            background: i === current ? T.green : i < current ? T.greenDim : 'transparent',
-            padding: '5px 12px', borderRadius: 6,
-            border: i < current ? `1px solid ${T.green}33` : '1px solid transparent',
-            whiteSpace: 'nowrap',
-          }}>
-            {i < current ? '✓ ' : ''}{step.label}
-          </a>
-          {i < steps.length - 1 && (
-            <div style={{ width: 24, height: 1, background: i < current ? T.green : T.border, margin: '0 4px' }} />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
 
 // ─── Page ─────────────────────────────────────────────────────
 export default function IntegratePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [apiKey] = useState(randomKey)
+  const [apiKey] = useState(() => getOrCreateMcpToken())
   const [masked, setMasked] = useState(true)
   const [copied, setCopied] = useState<string | null>(null)
+
+  // Sync token to Supabase on mount
+  useEffect(() => {
+    const session = loadSession()
+    syncMcpToken(session.user?.id ?? null, apiKey)
+  }, [apiKey])
 
   // Connection status — always show active for demo
   const connStatus = 'connected' as const
@@ -164,14 +132,16 @@ export default function IntegratePage() {
     setTimeout(() => setCopied(null), 2000)
   }
 
-  const claudeSnippet = `Add to CLAUDE.md
+  const claudeSnippet = `# Add to CLAUDE.md in your project
 
-Before generating any UI component:
-POST ${ENDPOINT}/v1/validate
-Headers: x-muteform-token: ${apiKey}
-Body: { artifact: <generated-component> }
-
-Apply all patches from the response before completing the task.`
+Before completing any UI generation task:
+1. POST your generated component to:
+   ${ENDPOINT}/api/validate
+   Header: x-muteform-token: ${apiKey}
+   Body: { "artifact": { "nodes": [...], "metadata": {...} } }
+2. Apply every patch in the response
+   before returning the final code
+3. Only return code with health_score >= 90`
 
   const handleRunTest = async () => {
     setRunning(true)
@@ -224,81 +194,11 @@ Apply all patches from the response before completing the task.`
   // ─── Render ─────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: mono }}>
-
-      {/* ── Nav ── */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 52,
-        background: T.surface, borderBottom: `1px solid ${T.border}`,
-      }}>
-        {/* Logo */}
-        <a href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 26, height: 26, borderRadius: 6,
-            background: T.blue,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ fontFamily: syne, fontSize: 13, fontWeight: 700, color: '#fff' }}>M</span>
-          </div>
-          <span style={{ fontFamily: syne, fontSize: 15, fontWeight: 700, color: T.text }}>muteform</span>
-        </a>
-
-        {/* Desktop links */}
-        <div style={{ display: 'flex', gap: 2, alignItems: 'center' }} className="nav-desktop">
-          {[
-            { label: 'Import', href: '/import' },
-            { label: 'Demo', href: '/demo' },
-            { label: 'Playground', href: '/playground' },
-            { label: 'Governance', href: '/governance' },
-          ].map(link => (
-            <a key={link.href} href={link.href} style={{
-              fontFamily: mono, fontSize: 11, color: T.muted,
-              padding: '5px 12px', borderRadius: 6, textDecoration: 'none',
-              letterSpacing: '0.04em',
-            }}>{link.label}</a>
-          ))}
-          <a href="/integrate" style={{
-            fontFamily: mono, fontSize: 11, color: T.green,
-            padding: '5px 12px', borderRadius: 6, textDecoration: 'none',
-            letterSpacing: '0.04em',
-            background: T.greenDim, border: `1px solid ${T.green}33`,
-          }}>Integrate</a>
-        </div>
-
-        {/* Hamburger */}
-        <button
-          className="nav-hamburger"
-          onClick={() => setMobileMenuOpen(true)}
-          aria-label="Open menu"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
-            <path d="M3 6h18M3 12h18M3 18h18" />
-          </svg>
-        </button>
-      </nav>
-
-      {/* Mobile menu */}
-      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
-        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
-        {[
-          { label: 'Import', href: '/import' },
-          { label: 'Demo', href: '/demo' },
-          { label: 'Playground', href: '/playground' },
-          { label: 'Governance', href: '/governance' },
-          { label: 'Integrate', href: '/integrate', active: true },
-        ].map(link => (
-          <a key={link.href} href={link.href} style={{
-            fontFamily: mono, color: link.active ? T.green : T.text,
-          }}>{link.label}</a>
-        ))}
-      </div>
+      <Stepper />
 
       {/* ── Content ── */}
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '40px 24px 100px' }}>
 
-        <ProgressStepper current={2} />
 
         {/* Page heading */}
         <h1 style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.text, margin: '0 0 6px' }}>

@@ -118,6 +118,125 @@ export const CARBON_SAMPLE: ImportedDesignSystem = {
   customRules: [],
 }
 
+export const ACME_SAMPLE: ImportedDesignSystem = {
+  source: 'sample',
+  sourceLabel: 'Acme Design System',
+  tokens: {
+    color: {
+      'primary': '#0055FF',
+      'secondary': '#111111',
+      'success': '#22c55e',
+      'error': '#ef4444',
+      'warning': '#f59e0b',
+      'info': '#3b82f6',
+      'neutral-50': '#f9fafb',
+      'neutral-100': '#f3f4f6',
+      'neutral-200': '#e5e7eb',
+      'neutral-300': '#d1d5db',
+      'neutral-400': '#9ca3af',
+      'neutral-500': '#6b7280',
+      'neutral-600': '#4b5563',
+      'neutral-700': '#374151',
+      'neutral-800': '#1f2937',
+      'neutral-900': '#111827',
+    },
+    spacing: [4, 8, 12, 16, 24, 32, 48, 64],
+  },
+  typography: {
+    allowedStyles: ['h1', 'h2', 'h3', 'body', 'body-sm', 'caption', 'label'],
+  },
+  components: {
+    button: {
+      allowedVariants: ['primary', 'secondary', 'ghost'],
+      allowedSizes: ['sm', 'md', 'lg'],
+    },
+    input: {
+      allowedVariants: ['default', 'filled'],
+      allowedSizes: ['sm', 'md', 'lg'],
+    },
+    card: {
+      allowedVariants: ['default', 'outlined', 'elevated'],
+      allowedSizes: ['sm', 'md', 'lg'],
+    },
+  },
+  layout: {
+    allowedGridColumns: [4, 8, 12],
+  },
+  customRules: [],
+}
+
+export const MATERIAL_SAMPLE: ImportedDesignSystem = {
+  source: 'sample',
+  sourceLabel: 'Material Design 3 (Google)',
+  tokens: {
+    color: {
+      'primary': '#6750A4',
+      'on-primary': '#FFFFFF',
+      'primary-container': '#EADDFF',
+      'secondary': '#625B71',
+      'on-secondary': '#FFFFFF',
+      'secondary-container': '#E8DEF8',
+      'tertiary': '#7D5260',
+      'error': '#B3261E',
+      'on-error': '#FFFFFF',
+      'surface': '#FFFBFE',
+      'on-surface': '#1C1B1F',
+      'surface-variant': '#E7E0EC',
+      'outline': '#79747E',
+      'outline-variant': '#CAC4D0',
+      'inverse-surface': '#313033',
+      'inverse-on-surface': '#F4EFF4',
+      'inverse-primary': '#D0BCFF',
+    },
+    spacing: [4, 8, 12, 16, 24, 32, 48, 64, 96],
+  },
+  typography: {
+    allowedStyles: [
+      'display-large', 'display-medium', 'display-small',
+      'headline-large', 'headline-medium', 'headline-small',
+      'title-large', 'title-medium', 'title-small',
+      'body-large', 'body-medium', 'body-small',
+      'label-large', 'label-medium', 'label-small',
+    ],
+  },
+  components: {
+    button: {
+      allowedVariants: ['filled', 'outlined', 'text', 'elevated', 'tonal'],
+      allowedSizes: ['sm', 'md', 'lg'],
+    },
+    fab: {
+      allowedVariants: ['surface', 'primary', 'secondary', 'tertiary'],
+      allowedSizes: ['sm', 'md', 'lg'],
+    },
+    chip: {
+      allowedVariants: ['assist', 'filter', 'input', 'suggestion'],
+      allowedSizes: ['sm', 'md'],
+    },
+    card: {
+      allowedVariants: ['filled', 'outlined', 'elevated'],
+      allowedSizes: ['sm', 'md', 'lg'],
+    },
+    textField: {
+      allowedVariants: ['filled', 'outlined'],
+      allowedSizes: ['sm', 'md'],
+    },
+    navigationBar: {
+      allowedVariants: ['default'],
+      allowedSizes: ['md'],
+    },
+  },
+  layout: {
+    allowedGridColumns: [4, 8, 12],
+  },
+  customRules: [],
+}
+
+export const SAMPLE_SYSTEMS = [
+  { id: 'acme', name: 'Acme Design System', description: 'Default demo system with 16 color tokens, 3 component types', data: ACME_SAMPLE, tokens: 43, components: 3 },
+  { id: 'carbon', name: 'Carbon v11 (IBM)', description: 'Enterprise design system with 22 colors, 6 component types', data: CARBON_SAMPLE, tokens: 54, components: 6 },
+  { id: 'material', name: 'Material Design 3 (Google)', description: 'Google\'s design language with 17 colors, 6 component types', data: MATERIAL_SAMPLE, tokens: 57, components: 6 },
+]
+
 export const DEFAULT_GOVERNANCE_RULES: GovernanceRule[] = [
   { id: 'color-token-compliance', name: 'Color Token Compliance', description: 'All colors must reference approved design tokens', severity: 'high', autoFix: true, autoFixStrategy: 'snap_nearest_delta_e', blocked: false },
   { id: 'spacing-scale-compliance', name: 'Spacing Scale Compliance', description: 'Spacing values must use the approved scale', severity: 'medium', autoFix: true, autoFixStrategy: 'snap_nearest', blocked: false },
