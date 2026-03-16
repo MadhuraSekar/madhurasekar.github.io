@@ -8,7 +8,7 @@ import type {
   TokenDefinitions,
 } from './types'
 import { contrastRatio, deltaE2000, findNearestColor, adjustForegroundForContrast } from './color'
-import yaml from 'js-yaml'
+import * as yaml from 'js-yaml'
 
 /** Flatten nested color tokens into a flat Record<string, string> */
 export function flattenColors(obj: any, prefix = ''): Record<string, string> {
