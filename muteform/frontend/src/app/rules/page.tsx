@@ -12,25 +12,12 @@ import { loadConfig, scanArtifact } from '@/lib/engine'
 import { getFixture } from '@/lib/fixtures'
 import { loadSession, markStepComplete, syncCustomRule } from '@/lib/session'
 
-// ─── Design Tokens ──────────────────────────────────────────
-const T = {
-  bg: '#080909', surface: '#0c0d0f', surface2: '#101214',
-  border: '#161819', border2: '#1e2226',
-  blue: '#0055FF', text: '#f0f1f3', muted: '#6b7280', dim: '#374151',
-  green: '#22c55e', greenDim: '#22c55e18',
-  amber: '#f59e0b', amberDim: '#f59e0b18',
-  red: '#ef4444', redDim: '#ef444418',
-  blueDim: '#0055FF18',
-}
-const syne = "'Syne', sans-serif"
-const mono = "'DM Mono', monospace"
-
 // ─── Severity helpers ───────────────────────────────────────
 const SEV_COLORS: Record<string, { color: string; dim: string }> = {
-  critical: { color: T.red, dim: T.redDim },
-  high: { color: T.red, dim: T.redDim },
-  medium: { color: T.amber, dim: T.amberDim },
-  low: { color: T.muted, dim: `${T.muted}18` },
+  critical: { color: 'var(--error)', dim: 'var(--error-dim)' },
+  high:     { color: 'var(--error)', dim: 'var(--error-dim)' },
+  medium:   { color: 'var(--warning)', dim: 'var(--warning-dim)' },
+  low:      { color: 'var(--text-muted)', dim: 'var(--surface-elevated)' },
 }
 const SEVERITIES: Array<GovernanceRule['severity']> = ['critical', 'high', 'medium', 'low']
 
@@ -49,10 +36,10 @@ interface CategoryMeta {
 
 const CATEGORIES: CategoryMeta[] = [
   { id: 'color', label: 'Color Token Compliance', icon: '\u25CF', ruleId: 'color-token-compliance', description: 'All colors must reference approved design tokens', hasAutoFix: true },
-  { id: 'spacing', label: 'Spacing Scale Compliance', icon: '\u2194', ruleId: 'spacing-scale-compliance', description: 'Spacing values must use the approved scale', hasAutoFix: true },
-  { id: 'typography', label: 'Typography Style Compliance', icon: 'Aa', ruleId: 'typography-style-compliance', description: 'Typography styles must be from approved list', hasAutoFix: false },
-  { id: 'components', label: 'Component Variant Compliance', icon: '\u25A1', ruleId: 'component-variant-compliance', description: 'Component variants must be from approved list', hasAutoFix: false, severityLocked: 'critical' },
-  { id: 'layout', label: 'Layout Grid Compliance', icon: '\u2591', ruleId: 'layout-grid-compliance', description: 'Grid columns must use approved column counts', hasAutoFix: false },
+  { id: 'spacing', label: 'Spacing Scale', icon: '\u2194', ruleId: 'spacing-scale-compliance', description: 'Spacing values must use the approved scale', hasAutoFix: true },
+  { id: 'typography', label: 'Typography', icon: 'Aa', ruleId: 'typography-style-compliance', description: 'Typography styles must be from approved list', hasAutoFix: false },
+  { id: 'components', label: 'Components', icon: '\u25A1', ruleId: 'component-variant-compliance', description: 'Component variants must be from approved list', hasAutoFix: false, severityLocked: 'critical' },
+  { id: 'layout', label: 'Layout Grid', icon: '\u2591', ruleId: 'layout-grid-compliance', description: 'Grid columns must use approved column counts', hasAutoFix: false },
   { id: 'accessibility', label: 'Accessibility (WCAG AA)', icon: '\u2713', ruleId: 'contrast-wcag-aa', description: 'All text must meet WCAG AA contrast requirements (4.5:1)', hasAutoFix: false, severityLocked: 'critical' },
 ]
 
@@ -109,13 +96,11 @@ export default function RulesPage() {
         const total = violations.length ?? (result as any)?.totalViolations ?? 0
         setViolationCount(total)
 
-        // Build per-rule violation map
         const perRule: Record<string, number> = {}
         for (const v of violations) {
           const rId = v.ruleId ?? v.rule ?? 'unknown'
           perRule[rId] = (perRule[rId] || 0) + 1
         }
-        // Distribute total across categories if no per-rule data
         if (Object.keys(perRule).length === 0 && total > 0) {
           const perCat = Math.max(1, Math.floor(total / CATEGORIES.length))
           for (const cat of CATEGORIES) {
@@ -231,16 +216,15 @@ export default function RulesPage() {
     <div
       onClick={(e) => { e.stopPropagation(); onToggle() }}
       style={{
-        width: 40, height: 22, borderRadius: 11, cursor: 'pointer',
-        background: on ? T.green : T.dim,
+        width: 36, height: 20, borderRadius: 4, cursor: 'pointer',
+        background: on ? 'var(--accent)' : 'var(--border-strong)',
         position: 'relative', transition: 'background 200ms ease', flexShrink: 0,
       }}
     >
       <div style={{
-        width: 18, height: 18, borderRadius: '50%', background: '#fff',
-        position: 'absolute', top: 2,
-        left: on ? 20 : 2, transition: 'left 200ms ease',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        width: 14, height: 14, borderRadius: '50%', background: 'var(--text-primary)',
+        position: 'absolute', top: 3,
+        left: on ? 19 : 3, transition: 'left 200ms ease',
       }} />
     </div>
   )
@@ -253,17 +237,17 @@ export default function RulesPage() {
       value={value}
       onChange={e => onChange(e.target.value)}
       style={{
-        fontFamily: mono, fontSize: 14, fontWeight: 600,
-        color: value ? T.blue : T.muted,
-        background: value ? T.blueDim : T.surface2,
-        border: `1px solid ${value ? `${T.blue}55` : T.border2}`,
-        borderRadius: 6, padding: '6px 12px', cursor: 'pointer',
+        fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600,
+        color: value ? 'var(--accent)' : 'var(--text-muted)',
+        background: value ? 'var(--accent-dim)' : 'var(--surface-elevated)',
+        border: `1px solid ${value ? 'var(--accent)' : 'var(--border)'}`,
+        borderRadius: 4, padding: '6px 12px', cursor: 'pointer',
         outline: 'none', appearance: 'none',
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E")`,
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'right 10px center',
         paddingRight: 28,
-        transition: 'all 150ms ease',
+        transition: 'all 200ms ease',
       }}
     >
       <option value="" disabled>{placeholder}</option>
@@ -275,39 +259,43 @@ export default function RulesPage() {
 
   // ─── Render ─────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.text }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
       <Stepper />
 
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px 100px' }}>
-        {/* Header */}
+      <div style={{ maxWidth: 800, margin: '0 auto', padding: '48px 20px 120px' }}>
+        {/* ─── Page Header ──────────────────────────────── */}
         <h1 style={{
-          fontFamily: syne, fontSize: 32, fontWeight: 700, color: T.text,
-          marginBottom: 6, lineHeight: 1.2, letterSpacing: '-0.02em',
+          fontFamily: 'var(--font-serif)', fontSize: 36, fontWeight: 700,
+          color: 'var(--text-primary)', marginBottom: 8, lineHeight: 1.15,
+          letterSpacing: '-0.025em',
         }}>
-          Design the rules for {companyName}
+          Governance Rules
         </h1>
-        <p style={{ fontFamily: mono, fontSize: 13, color: T.muted, marginBottom: 36, lineHeight: 1.6 }}>
-          Each rule protects a decision your design system already made. Toggle what matters, set how strictly it enforces, and see violations before they ship.
+        <p style={{
+          fontFamily: 'var(--font-sans)', fontSize: 15, color: 'var(--text-secondary)',
+          marginBottom: 40, lineHeight: 1.6,
+        }}>
+          Configure rules for {companyName} design system
         </p>
 
         {/* ─── Design System Summary ─────────────────────── */}
         {ds && (
           <div style={{
-            padding: '16px 20px', background: T.surface, border: `1px solid ${T.border}`,
-            borderRadius: 10, marginBottom: 28, display: 'flex', alignItems: 'center',
+            padding: '14px 20px', background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 4, marginBottom: 28, display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
-            transition: 'border-color 150ms ease',
           }}>
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-              <StatBadge label="Colors" count={colorCount} color={T.blue} dim={T.blueDim} />
-              <StatBadge label="Spacing" count={spacingCount} color={T.green} dim={T.greenDim} />
-              <StatBadge label="Typography" count={typographyCount} color={T.amber} dim={T.amberDim} />
-              <StatBadge label="Components" count={componentCount} color={T.red} dim={T.redDim} />
+              <StatBadge label="Colors" count={colorCount} />
+              <StatBadge label="Spacing" count={spacingCount} />
+              <StatBadge label="Typography" count={typographyCount} />
+              <StatBadge label="Components" count={componentCount} />
             </div>
             <a href="/import" style={{
-              fontFamily: mono, fontSize: 11, color: T.blue, textDecoration: 'none',
-              padding: '4px 12px', borderRadius: 6, border: `1px solid ${T.blue}33`,
-              background: T.blueDim, transition: 'all 150ms ease',
+              fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--accent)',
+              textDecoration: 'none', padding: '4px 12px', borderRadius: 4,
+              border: '1px solid var(--accent)', background: 'var(--accent-dim)',
+              transition: 'all 200ms ease',
             }}>
               Edit
             </a>
@@ -316,12 +304,12 @@ export default function RulesPage() {
 
         {!ds && (
           <div style={{
-            padding: '16px 20px', background: T.surface, border: `1px solid ${T.border}`,
-            borderRadius: 10, marginBottom: 28,
+            padding: '14px 20px', background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 4, marginBottom: 28,
           }}>
-            <span style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)' }}>
               No design system imported yet.{' '}
-              <a href="/import" style={{ color: T.blue, textDecoration: 'none' }}>Import one</a>
+              <a href="/import" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Import one</a>
             </span>
           </div>
         )}
@@ -329,12 +317,12 @@ export default function RulesPage() {
         {/* ─── Violation Preview Banner ──────────────────── */}
         {violationCount !== null && (
           <div style={{
-            padding: '14px 20px', background: T.amberDim, border: `1px solid ${T.amber}44`,
-            borderRadius: 10, marginBottom: 28,
+            padding: '14px 20px', background: 'var(--warning-dim)', border: '1px solid var(--warning)',
+            borderRadius: 4, marginBottom: 28,
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <span style={{ fontFamily: mono, fontSize: 18, color: T.amber }}>!</span>
-            <span style={{ fontFamily: mono, fontSize: 13, color: T.amber, fontWeight: 600 }}>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 18, color: 'var(--warning)', fontWeight: 700 }}>!</span>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--warning)', fontWeight: 600 }}>
               These rules will catch {violationCount} violation{violationCount !== 1 ? 's' : ''} in a sample scan
             </span>
           </div>
@@ -356,34 +344,36 @@ export default function RulesPage() {
                 onMouseEnter={() => setHoveredCard(cat.id)}
                 onMouseLeave={() => setHoveredCard(null)}
                 style={{
-                  background: T.surface,
-                  border: `1px solid ${isHovered ? T.border2 : T.border}`,
-                  borderRadius: 12, padding: '20px 24px',
-                  transition: 'all 150ms ease',
+                  background: 'var(--surface)',
+                  border: `1px solid ${isHovered ? 'var(--border-strong)' : 'var(--border)'}`,
+                  borderRadius: 4, padding: '20px 24px',
+                  transition: 'all 200ms ease',
                   opacity: enabled ? 1 : 0.5,
                 }}
               >
                 {/* Card top row: icon, name, toggle */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 10 }}>
                   <span style={{
-                    fontFamily: mono, fontSize: 20, color: enabled ? T.text : T.dim,
+                    fontFamily: 'var(--font-sans)', fontSize: 20,
+                    color: enabled ? 'var(--text-primary)' : 'var(--text-muted)',
                     width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: enabled ? T.surface2 : 'transparent',
-                    borderRadius: 8, flexShrink: 0,
-                    border: `1px solid ${enabled ? T.border2 : 'transparent'}`,
-                    transition: 'all 150ms ease',
+                    background: enabled ? 'var(--surface-elevated)' : 'transparent',
+                    borderRadius: 4, flexShrink: 0,
+                    border: enabled ? '1px solid var(--border-strong)' : '1px solid transparent',
+                    transition: 'all 200ms ease',
                   }}>
                     {cat.icon}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontFamily: syne, fontSize: 16, fontWeight: 700, color: T.text,
-                      marginBottom: 4, lineHeight: 1.3,
+                      fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+                      color: 'var(--text-primary)', marginBottom: 4, lineHeight: 1.3,
                     }}>
                       {cat.label}
                     </div>
                     <div style={{
-                      fontFamily: mono, fontSize: 12, color: T.muted, lineHeight: 1.5,
+                      fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)',
+                      lineHeight: 1.5,
                     }}>
                       {cat.description}
                     </div>
@@ -398,16 +388,18 @@ export default function RulesPage() {
                 }}>
                   {/* Severity selector */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: T.dim, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <span style={{
+                      fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)',
+                      textTransform: 'uppercase', letterSpacing: '0.06em',
+                    }}>
                       Severity
                     </span>
                     {cat.severityLocked ? (
                       <span style={{
-                        fontFamily: mono, fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                        fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
                         color: SEV_COLORS[cat.severityLocked].color,
                         background: SEV_COLORS[cat.severityLocked].dim,
                         padding: '3px 10px', borderRadius: 4,
-                        border: `1px solid ${SEV_COLORS[cat.severityLocked].color}33`,
                         letterSpacing: '0.04em',
                       }}>
                         {cat.severityLocked} (locked)
@@ -417,15 +409,17 @@ export default function RulesPage() {
                         value={sev}
                         onChange={e => updateRule(cat.ruleId, { severity: e.target.value as GovernanceRule['severity'] })}
                         style={{
-                          fontFamily: mono, fontSize: 11, fontWeight: 600, color: sevStyle.color,
-                          background: sevStyle.dim, border: `1px solid ${sevStyle.color}33`,
+                          fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
+                          color: sevStyle.color,
+                          background: sevStyle.dim,
+                          border: '1px solid var(--border)',
                           borderRadius: 4, padding: '3px 10px', cursor: 'pointer',
                           outline: 'none', textTransform: 'uppercase', letterSpacing: '0.04em',
-                          transition: 'all 150ms ease',
+                          transition: 'all 200ms ease',
                         }}
                       >
                         {SEVERITIES.map(s => (
-                          <option key={s} value={s} style={{ color: T.text, background: T.surface2 }}>
+                          <option key={s} value={s} style={{ color: 'var(--text-primary)', background: 'var(--surface-elevated)' }}>
                             {s.toUpperCase()}
                           </option>
                         ))}
@@ -436,7 +430,10 @@ export default function RulesPage() {
                   {/* Auto-fix toggle */}
                   {cat.hasAutoFix && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontFamily: mono, fontSize: 10, color: T.dim, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      <span style={{
+                        fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)',
+                        textTransform: 'uppercase', letterSpacing: '0.06em',
+                      }}>
                         Auto-fix
                       </span>
                       <Toggle
@@ -448,8 +445,9 @@ export default function RulesPage() {
 
                   {rule?.autoFix && (
                     <span style={{
-                      fontFamily: mono, fontSize: 9, color: T.green, background: T.greenDim,
-                      padding: '2px 8px', borderRadius: 3, border: `1px solid ${T.green}33`,
+                      fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600,
+                      color: 'var(--success)', background: 'var(--success-dim)',
+                      padding: '2px 8px', borderRadius: 4,
                       textTransform: 'uppercase', letterSpacing: '0.04em',
                     }}>
                       AUTO-FIX ON
@@ -461,11 +459,11 @@ export default function RulesPage() {
                 {enabled && ruleViolations > 0 && (
                   <div style={{
                     marginLeft: 46, marginTop: 12,
-                    fontFamily: mono, fontSize: 11, color: T.amber,
+                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--warning)',
                     animation: 'fadeIn 400ms ease',
                     opacity: 1,
                   }}>
-                    This rule will catch {ruleViolations} violation{ruleViolations !== 1 ? 's' : ''} in the sample scan
+                    This rule catches {ruleViolations} violation{ruleViolations !== 1 ? 's' : ''} in sample scan
                   </div>
                 )}
               </div>
@@ -475,60 +473,68 @@ export default function RulesPage() {
 
         {/* ─── Custom Rule Builder — Sentence Style ─────── */}
         <div style={{
-          padding: '28px', background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 12, marginBottom: 16,
+          padding: '24px', background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 4, marginBottom: 16,
         }}>
           <h3 style={{
-            fontFamily: syne, fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 6,
+            fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700,
+            color: 'var(--text-primary)', marginBottom: 6,
           }}>
-            Custom rule builder
+            Custom Rule Builder
           </h3>
-          <p style={{ fontFamily: mono, fontSize: 11, color: T.muted, marginBottom: 24 }}>
+          <p style={{
+            fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', marginBottom: 24,
+          }}>
             Describe what should happen in plain language.
           </p>
 
           {/* Sentence builder */}
           <div style={{
             display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
-            fontFamily: mono, fontSize: 14, color: T.muted, lineHeight: 2.4,
+            fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 2.4,
           }}>
-            <span style={{ color: T.dim }}>When a</span>
-            <SentenceDropdown value={sbComponent} onChange={setSbComponent} options={SB_COMPONENTS} placeholder="component \u25BE" />
-            <span style={{ color: T.dim }}>uses</span>
-            <SentenceDropdown value={sbProperty} onChange={setSbProperty} options={SB_PROPERTIES} placeholder="property \u25BE" />
-            <span style={{ color: T.dim }}>that is</span>
-            <SentenceDropdown value={sbCondition} onChange={setSbCondition} options={SB_CONDITIONS} placeholder="condition \u25BE" />
-            <span style={{ color: T.dim }}>then</span>
-            <SentenceDropdown value={sbAction} onChange={setSbAction} options={SB_ACTIONS} placeholder="action \u25BE" />
+            <span style={{ color: 'var(--text-muted)' }}>When a</span>
+            <SentenceDropdown value={sbComponent} onChange={setSbComponent} options={SB_COMPONENTS} placeholder="component &#9662;" />
+            <span style={{ color: 'var(--text-muted)' }}>uses</span>
+            <SentenceDropdown value={sbProperty} onChange={setSbProperty} options={SB_PROPERTIES} placeholder="property &#9662;" />
+            <span style={{ color: 'var(--text-muted)' }}>that is</span>
+            <SentenceDropdown value={sbCondition} onChange={setSbCondition} options={SB_CONDITIONS} placeholder="condition &#9662;" />
+            <span style={{ color: 'var(--text-muted)' }}>then</span>
+            <SentenceDropdown value={sbAction} onChange={setSbAction} options={SB_ACTIONS} placeholder="action &#9662;" />
           </div>
 
           {/* Preview + Add when complete */}
           {sbComplete && (
             <div style={{ marginTop: 20 }}>
               <div style={{
-                padding: '14px 18px', background: T.surface2, borderRadius: 8,
-                border: `1px solid ${T.border2}`, marginBottom: 14,
+                padding: '14px 18px', background: 'var(--surface-elevated)', borderRadius: 4,
+                border: '1px solid var(--border-strong)', marginBottom: 14,
               }}>
-                <div style={{ fontFamily: mono, fontSize: 10, color: T.dim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                <div style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 10, color: 'var(--text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6,
+                }}>
                   Rule preview
                 </div>
-                <div style={{ fontFamily: mono, fontSize: 13, color: T.text, lineHeight: 1.6 }}>
+                <div style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6,
+                }}>
                   {sbToRule().description}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <span style={{
-                    fontFamily: mono, fontSize: 9, textTransform: 'uppercase',
+                    fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
                     color: SEV_COLORS[sbToRule().severity].color,
                     background: SEV_COLORS[sbToRule().severity].dim,
-                    padding: '2px 8px', borderRadius: 3,
-                    border: `1px solid ${SEV_COLORS[sbToRule().severity].color}33`,
+                    padding: '2px 8px', borderRadius: 4,
                   }}>
                     {sbToRule().severity}
                   </span>
                   {sbToRule().autoFix && (
                     <span style={{
-                      fontFamily: mono, fontSize: 9, color: T.green, background: T.greenDim,
-                      padding: '2px 8px', borderRadius: 3, border: `1px solid ${T.green}33`,
+                      fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600,
+                      color: 'var(--success)', background: 'var(--success-dim)',
+                      padding: '2px 8px', borderRadius: 4,
                       textTransform: 'uppercase',
                     }}>
                       AUTO-FIX
@@ -539,13 +545,13 @@ export default function RulesPage() {
               <button
                 onClick={handleAddSentenceRule}
                 style={{
-                  fontFamily: syne, fontSize: 14, fontWeight: 700, color: '#fff',
-                  background: T.blue, border: 'none', borderRadius: 8,
-                  padding: '10px 24px', cursor: 'pointer',
-                  transition: 'transform 150ms ease',
+                  fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+                  color: 'var(--bg)', background: 'var(--accent)',
+                  border: 'none', borderRadius: 4, padding: '10px 24px', cursor: 'pointer',
+                  transition: 'background 200ms ease',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.02)')}
-                onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
               >
                 Add rule
               </button>
@@ -555,8 +561,8 @@ export default function RulesPage() {
 
         {/* ─── Advanced form (collapsible) ───────────────── */}
         <div style={{
-          background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 12, marginBottom: 32, overflow: 'hidden',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 4, marginBottom: 32, overflow: 'hidden',
         }}>
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
@@ -564,27 +570,30 @@ export default function RulesPage() {
               width: '100%', padding: '14px 24px', background: 'transparent',
               border: 'none', cursor: 'pointer', display: 'flex',
               alignItems: 'center', justifyContent: 'space-between',
-              transition: 'all 150ms ease',
+              transition: 'all 200ms ease',
             }}
           >
-            <span style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)' }}>
               Advanced: add rule with form
             </span>
             <span style={{
-              fontFamily: mono, fontSize: 12, color: T.dim,
+              fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
               transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0)',
-              transition: 'transform 200ms ease',
+              transition: 'transform 200ms ease', display: 'inline-block',
             }}>
               {'\u25BC'}
             </span>
           </button>
 
           {showAdvanced && (
-            <div style={{ padding: '0 24px 24px', borderTop: `1px solid ${T.border}` }}>
+            <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 16 }}>
                 {/* Rule name */}
                 <div>
-                  <label style={{ fontFamily: mono, fontSize: 11, color: T.muted, display: 'block', marginBottom: 6 }}>
+                  <label style={{
+                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                    display: 'block', marginBottom: 6,
+                  }}>
                     Rule name
                   </label>
                   <input
@@ -593,30 +602,35 @@ export default function RulesPage() {
                     onChange={e => setCustomName(e.target.value)}
                     placeholder="e.g. Brand color only in headers"
                     style={{
-                      width: '100%', fontFamily: mono, fontSize: 12, color: T.text,
-                      background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: 6,
+                      width: '100%', fontFamily: 'var(--font-sans)', fontSize: 13,
+                      color: 'var(--text-primary)', background: 'var(--surface-elevated)',
+                      border: '1px solid var(--border-strong)', borderRadius: 4,
                       padding: '10px 14px', outline: 'none', boxSizing: 'border-box',
-                      transition: 'border-color 150ms ease',
+                      transition: 'border-color 200ms ease',
                     }}
-                    onFocus={e => (e.target.style.borderColor = T.blue)}
-                    onBlur={e => (e.target.style.borderColor = T.border2)}
+                    onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--border-strong)')}
                   />
                 </div>
 
                 {/* Category + Severity row */}
                 <div style={{ display: 'flex', gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontFamily: mono, fontSize: 11, color: T.muted, display: 'block', marginBottom: 6 }}>
+                    <label style={{
+                      fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                      display: 'block', marginBottom: 6,
+                    }}>
                       Category
                     </label>
                     <select
                       value={customCategory}
                       onChange={e => setCustomCategory(e.target.value as CategoryId)}
                       style={{
-                        width: '100%', fontFamily: mono, fontSize: 12, color: T.text,
-                        background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: 6,
+                        width: '100%', fontFamily: 'var(--font-sans)', fontSize: 13,
+                        color: 'var(--text-primary)', background: 'var(--surface-elevated)',
+                        border: '1px solid var(--border-strong)', borderRadius: 4,
                         padding: '10px 14px', outline: 'none', cursor: 'pointer',
-                        transition: 'border-color 150ms ease',
+                        transition: 'border-color 200ms ease',
                       }}
                     >
                       <option value="color">Color</option>
@@ -628,18 +642,22 @@ export default function RulesPage() {
                     </select>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontFamily: mono, fontSize: 11, color: T.muted, display: 'block', marginBottom: 6 }}>
+                    <label style={{
+                      fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                      display: 'block', marginBottom: 6,
+                    }}>
                       Severity
                     </label>
                     <select
                       value={customSeverity}
                       onChange={e => setCustomSeverity(e.target.value as GovernanceRule['severity'])}
                       style={{
-                        width: '100%', fontFamily: mono, fontSize: 12,
+                        width: '100%', fontFamily: 'var(--font-sans)', fontSize: 13,
                         color: SEV_COLORS[customSeverity].color,
-                        background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: 6,
+                        background: 'var(--surface-elevated)',
+                        border: '1px solid var(--border-strong)', borderRadius: 4,
                         padding: '10px 14px', outline: 'none', cursor: 'pointer',
-                        transition: 'all 150ms ease',
+                        transition: 'all 200ms ease',
                       }}
                     >
                       {SEVERITIES.map(s => (
@@ -651,16 +669,21 @@ export default function RulesPage() {
 
                 {/* Auto-fix toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <label style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>Auto-fix</label>
+                  <label style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)' }}>
+                    Auto-fix
+                  </label>
                   <Toggle on={customAutoFix} onToggle={() => setCustomAutoFix(!customAutoFix)} />
-                  <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)' }}>
                     {customAutoFix ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label style={{ fontFamily: mono, fontSize: 11, color: T.muted, display: 'block', marginBottom: 6 }}>
+                  <label style={{
+                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                    display: 'block', marginBottom: 6,
+                  }}>
                     Description
                   </label>
                   <textarea
@@ -669,13 +692,14 @@ export default function RulesPage() {
                     placeholder="Describe what this rule enforces..."
                     rows={3}
                     style={{
-                      width: '100%', fontFamily: mono, fontSize: 12, color: T.text,
-                      background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: 6,
+                      width: '100%', fontFamily: 'var(--font-sans)', fontSize: 13,
+                      color: 'var(--text-primary)', background: 'var(--surface-elevated)',
+                      border: '1px solid var(--border-strong)', borderRadius: 4,
                       padding: '10px 14px', outline: 'none', resize: 'vertical', boxSizing: 'border-box',
-                      transition: 'border-color 150ms ease',
+                      transition: 'border-color 200ms ease',
                     }}
-                    onFocus={e => (e.target.style.borderColor = T.blue)}
-                    onBlur={e => (e.target.style.borderColor = T.border2)}
+                    onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--border-strong)')}
                   />
                 </div>
 
@@ -684,14 +708,15 @@ export default function RulesPage() {
                   onClick={handleAddCustomRule}
                   disabled={!customName.trim()}
                   style={{
-                    fontFamily: syne, fontSize: 13, fontWeight: 700, color: '#fff',
-                    background: customName.trim() ? T.blue : T.dim,
-                    border: 'none', borderRadius: 6, padding: '10px 20px',
+                    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+                    color: 'var(--bg)',
+                    background: customName.trim() ? 'var(--accent)' : 'var(--border-strong)',
+                    border: 'none', borderRadius: 4, padding: '10px 20px',
                     cursor: customName.trim() ? 'pointer' : 'not-allowed',
-                    alignSelf: 'flex-start', transition: 'all 150ms ease',
+                    alignSelf: 'flex-start', transition: 'all 200ms ease',
                   }}
-                  onMouseEnter={e => { if (customName.trim()) e.currentTarget.style.transform = 'scale(1.02)' }}
-                  onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                  onMouseEnter={e => { if (customName.trim()) e.currentTarget.style.background = 'var(--accent-hover)' }}
+                  onMouseLeave={e => { if (customName.trim()) e.currentTarget.style.background = 'var(--accent)' }}
                 >
                   Add rule
                 </button>
@@ -703,7 +728,10 @@ export default function RulesPage() {
         {/* ─── Custom Rules List ─────────────────────────── */}
         {customRules.length > 0 && (
           <div style={{ marginBottom: 32 }}>
-            <h3 style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 12 }}>
+            <h3 style={{
+              fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+              color: 'var(--text-primary)', marginBottom: 12,
+            }}>
               Your custom rules
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -711,29 +739,39 @@ export default function RulesPage() {
                 const sevC = SEV_COLORS[cr.severity] || SEV_COLORS.medium
                 return (
                   <div key={cr.id} style={{
-                    padding: '14px 18px', background: T.surface, border: `1px solid ${T.border}`,
-                    borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10,
-                    transition: 'border-color 150ms ease',
+                    padding: '14px 18px', background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 4, display: 'flex', alignItems: 'center', gap: 10,
+                    transition: 'border-color 200ms ease',
                   }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontFamily: syne, fontSize: 13, fontWeight: 600, color: T.text }}>{cr.name}</span>
                         <span style={{
-                          fontFamily: mono, fontSize: 9, textTransform: 'uppercase',
+                          fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
+                          color: 'var(--text-primary)',
+                        }}>
+                          {cr.name}
+                        </span>
+                        <span style={{
+                          fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
                           color: sevC.color, background: sevC.dim,
-                          padding: '1px 6px', borderRadius: 3, border: `1px solid ${sevC.color}33`,
+                          padding: '1px 6px', borderRadius: 4,
                         }}>
                           {cr.severity}
                         </span>
                       </div>
                       {cr.description && (
-                        <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>{cr.description}</span>
+                        <span style={{
+                          fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
+                        }}>
+                          {cr.description}
+                        </span>
                       )}
                     </div>
                     {cr.autoFix && (
                       <span style={{
-                        fontFamily: mono, fontSize: 9, color: T.green, background: T.greenDim,
-                        padding: '2px 8px', borderRadius: 3, border: `1px solid ${T.green}33`,
+                        fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600,
+                        color: 'var(--success)', background: 'var(--success-dim)',
+                        padding: '2px 8px', borderRadius: 4,
                         textTransform: 'uppercase',
                       }}>
                         AUTO-FIX
@@ -753,16 +791,16 @@ export default function RulesPage() {
             router.push('/scan')
           }}
           style={{
-            width: '100%', padding: '20px 24px', borderRadius: 12,
-            background: T.green, color: '#000',
-            fontFamily: syne, fontSize: 18, fontWeight: 700,
+            width: '100%', padding: '18px 24px', borderRadius: 4,
+            background: 'var(--accent)', color: 'var(--bg)',
+            fontFamily: 'var(--font-sans)', fontSize: 17, fontWeight: 700,
             border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            transition: 'transform 150ms ease, opacity 150ms ease',
+            transition: 'background 200ms ease, transform 200ms ease',
             letterSpacing: '-0.01em',
           }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.opacity = '0.95' }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.opacity = '1' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-hover)'; e.currentTarget.style.transform = 'scale(1.01)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.transform = 'scale(1)' }}
         >
           Run scan
           <span style={{ fontSize: 22 }}>{'\u2192'}</span>
@@ -781,17 +819,18 @@ export default function RulesPage() {
 }
 
 // ─── Stat Badge sub-component ─────────────────────────────
-function StatBadge({ label, count, color, dim }: { label: string; count: number; color: string; dim: string }) {
+function StatBadge({ label, count }: { label: string; count: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{
-        fontFamily: "'DM Mono', monospace", fontSize: 14, fontWeight: 700, color,
-        background: dim, padding: '2px 8px', borderRadius: 4,
-        border: `1px solid ${color}33`, minWidth: 24, textAlign: 'center',
+        fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+        color: 'var(--accent)', background: 'var(--accent-dim)',
+        padding: '2px 8px', borderRadius: 4,
+        minWidth: 24, textAlign: 'center',
       }}>
         {count}
       </span>
-      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#6b7280' }}>
+      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)' }}>
         {label}
       </span>
     </div>

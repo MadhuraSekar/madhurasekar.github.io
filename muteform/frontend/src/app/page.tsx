@@ -1,20 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, FormEvent, CSSProperties } from 'react'
-
-/* ── design tokens ── */
-const T = {
-  bg: '#08090d', surface: '#0c0e12', surface2: '#111318',
-  border: '#1a1d24', border2: '#252830',
-  green: '#00e087', greenDim: '#00e08718',
-  red: '#ff4070', amber: '#ffb830', blue: '#4090ff',
-  muted: '#6b7280', dim: '#3a3f4a',
-  text: '#e8eaf0', textBright: '#f8f9fb',
-}
-const mono = "'JetBrains Mono', 'DM Mono', monospace"
-const sans = "'DM Sans', system-ui, sans-serif"
-const serif = "'Instrument Serif', Georgia, serif"
-const syne = "'Syne', sans-serif"
+import ThemeToggle from '@/components/ThemeToggle'
 
 /* ── fade-in on scroll hook ── */
 function useFadeIn(): [React.RefObject<HTMLDivElement>, boolean] {
@@ -65,121 +52,67 @@ function FadeIn({ children, delay, style }: {
   )
 }
 
-/* ── animated score ring ── */
-function ScoreRing({ score }: { score: number }) {
-  const [drawn, setDrawn] = useState(false)
-  const ref = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const obs = new IntersectionObserver(
-      function (entries) {
-        for (var i = 0; i < entries.length; i++) {
-          if (entries[i].isIntersecting) { setDrawn(true); obs.unobserve(el) }
-        }
-      },
-      { threshold: 0.3 }
-    )
-    obs.observe(el)
-    return function () { obs.disconnect() }
-  }, [])
-
-  const size = 96
-  const stroke = 5
-  const r = (size - stroke) / 2
-  const circ = 2 * Math.PI * r
-  const offset = drawn ? circ * (1 - score / 100) : circ
-
-  return (
-    <div ref={ref} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={T.border} strokeWidth={stroke} />
-        <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none"
-          stroke={T.green} strokeWidth={stroke}
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1)' }}
-        />
-        <text
-          x={size / 2} y={size / 2}
-          textAnchor="middle" dominantBaseline="central"
-          fill={T.textBright}
-          fontFamily={mono}
-          fontSize="22"
-          fontWeight="600"
-          style={{ transform: 'rotate(90deg)', transformOrigin: 'center' }}
-        >
-          {score}
-        </text>
-      </svg>
-      <span style={{
-        fontFamily: mono, fontSize: 10, fontWeight: 600, letterSpacing: 2,
-        color: T.green, background: T.greenDim, padding: '3px 10px', borderRadius: 4,
-      }}>
-        COMPLIANT
-      </span>
-    </div>
-  )
-}
-
-/* ── before/after comparison line ── */
-function ComparisonLine({ text, marker, color, bgTint }: {
-  text: string; marker: string; color: string; bgTint: string
+/* ── comparison line for hero code block ── */
+function CodeLine({ text, marker, isError }: {
+  text: string; marker: string; isError: boolean
 }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 16px',
-      background: bgTint,
-      borderRadius: 4,
-      marginBottom: 4,
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '8px 14px',
+      fontFamily: 'var(--font-mono)',
+      fontSize: 13,
+      lineHeight: 1.5,
     }}>
       <span style={{
-        fontFamily: mono, fontSize: 14, fontWeight: 700,
-        color: color, flexShrink: 0, width: 18, textAlign: 'center',
+        color: isError ? 'var(--error)' : 'var(--success)',
+        fontWeight: 700,
+        flexShrink: 0,
+        width: 16,
+        textAlign: 'center',
       }}>
         {marker}
       </span>
-      <span style={{
-        fontFamily: mono, fontSize: 13, color: T.text, lineHeight: 1.5,
-      }}>
-        {text}
-      </span>
+      <span style={{ color: 'var(--text-secondary)' }}>{text}</span>
     </div>
   )
 }
 
-/* ── social proof card ── */
+/* ── testimonial card ── */
 function QuoteCard({ quote, name, role, delay }: {
   quote: string; name: string; role: string; delay?: number
 }) {
   return (
     <FadeIn delay={delay}>
       <div style={{
-        background: T.surface,
-        borderRadius: 10,
-        padding: '28px 24px',
-        borderLeft: `3px solid ${T.green}`,
-        border: `1px solid ${T.border}`,
-        borderLeftColor: T.green,
-        borderLeftWidth: 3,
+        background: 'var(--surface)',
+        borderRadius: 4,
+        padding: '32px 28px',
+        border: '1px solid var(--border)',
         height: '100%',
         boxSizing: 'border-box' as const,
       }}>
         <p style={{
-          fontFamily: serif, fontSize: 17, fontStyle: 'italic',
-          color: T.textBright, lineHeight: 1.6, margin: '0 0 20px',
+          fontFamily: 'var(--font-serif)',
+          fontSize: 18,
+          fontStyle: 'italic',
+          color: 'var(--text-primary)',
+          lineHeight: 1.6,
+          margin: '0 0 24px',
         }}>
           &ldquo;{quote}&rdquo;
         </p>
         <div>
-          <div style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, color: T.text }}>
+          <div style={{
+            fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600,
+            color: 'var(--text-primary)',
+          }}>
             {name}
           </div>
-          <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, marginTop: 2 }}>
+          <div style={{
+            fontFamily: 'var(--font-sans)', fontSize: 13,
+            color: 'var(--text-muted)', marginTop: 2,
+          }}>
             {role}
           </div>
         </div>
@@ -216,60 +149,41 @@ export default function LandingPage() {
 
   /* ── shared styles ── */
   const section: CSSProperties = {
-    maxWidth: 1080,
+    maxWidth: 1120,
     margin: '0 auto',
-    padding: '100px 24px',
-  }
-  const heading: CSSProperties = {
-    fontFamily: serif,
-    color: T.textBright,
-    fontSize: 32,
-    fontWeight: 400,
-    lineHeight: 1.25,
-    margin: 0,
+    padding: '96px 24px',
   }
 
   return (
-    <div style={{ background: T.bg, color: T.text, fontFamily: sans, minHeight: '100vh' }}>
+    <div style={{
+      background: 'var(--bg)',
+      color: 'var(--text-primary)',
+      fontFamily: 'var(--font-sans)',
+      fontSize: 15,
+      lineHeight: 1.6,
+      minHeight: '100vh',
+    }}>
 
-      {/* ── keyframes ── */}
+      {/* ── global styles ── */}
       <style>{`
-        @keyframes scanLine {
-          0% { top: 0; opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { top: 100%; opacity: 0; }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 1; }
-        }
         a { color: inherit; text-decoration: none; }
-        ::selection { background: ${T.green}; color: ${T.bg}; }
-        .btn-hover { transition: all 150ms ease; }
-        .btn-hover:hover { transform: scale(1.02); }
-        @media (max-width: 768px) {
-          .hero-heading { font-size: 30px !important; }
-          .hero-sub { font-size: 15px !important; }
-          .section-pad { padding: 60px 16px !important; }
-          .footer-inner { flex-direction: column; text-align: center; }
-          .comparison-grid { grid-template-columns: 1fr !important; }
-          .quotes-grid { grid-template-columns: 1fr !important; }
-        }
-        .nav-links { }
+        ::selection { background: var(--accent); color: var(--bg); }
+
+        .nav-links { display: flex; align-items: center; gap: 32; }
         .nav-hamburger {
           display: none;
           background: none;
           border: none;
           cursor: pointer;
           padding: 4px;
+          color: var(--text-primary);
         }
         .nav-mobile-menu {
           position: fixed;
           top: 0; right: 0; bottom: 0;
           width: 280px;
-          background: ${T.surface};
-          border-left: 1px solid ${T.border};
+          background: var(--surface);
+          border-left: 1px solid var(--border);
           z-index: 200;
           display: flex;
           flex-direction: column;
@@ -283,7 +197,7 @@ export default function LandingPage() {
           align-self: flex-end;
           background: none;
           border: none;
-          color: ${T.text};
+          color: var(--text-primary);
           font-size: 28px;
           cursor: pointer;
           padding: 0 4px;
@@ -291,58 +205,88 @@ export default function LandingPage() {
         }
         .nav-mobile-menu a {
           font-size: 16px;
-          color: ${T.text};
+          font-family: var(--font-sans);
+          color: var(--text-primary);
           padding: 12px 0;
-          border-bottom: 1px solid ${T.border};
+          border-bottom: 1px solid var(--border);
         }
+
         @media (max-width: 768px) {
           .nav-links { display: none !important; }
           .nav-hamburger { display: block !important; }
+          .hero-grid { grid-template-columns: 1fr !important; }
+          .hero-heading { font-size: 36px !important; }
+          .stats-row { flex-direction: column; gap: 32px !important; }
+          .how-grid { grid-template-columns: 1fr !important; }
+          .quotes-grid { grid-template-columns: 1fr !important; }
+          .section-pad { padding: 64px 20px !important; }
+          .footer-inner { flex-direction: column; text-align: center; gap: 16px; }
         }
       `}</style>
 
-      {/* ════════════════════════════════════════════
-          1. NAV BAR
-      ════════════════════════════════════════════ */}
+      {/* ================================================================
+          NAV
+      ================================================================ */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 100,
-        background: T.bg + 'e6',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid ' + T.border,
+        background: 'var(--bg)',
+        backdropFilter: 'blur(16px)',
+        borderBottom: '1px solid var(--border)',
       }}>
         <div style={{
-          maxWidth: 1080, margin: '0 auto', padding: '0 24px',
+          maxWidth: 1120, margin: '0 auto', padding: '0 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          height: 56,
+          height: 60,
         }}>
           {/* logo */}
           <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 26, height: 26, borderRadius: 5,
-              background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: mono, fontWeight: 700, fontSize: 15, color: T.bg,
-            }}>M</div>
-            <span style={{ fontFamily: syne, fontWeight: 700, fontSize: 15, color: T.textBright, letterSpacing: -0.5 }}>
+              width: 28, height: 28, borderRadius: 4,
+              background: 'var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-serif)', fontWeight: 700, fontSize: 16,
+                color: 'var(--bg)',
+              }}>M</span>
+            </div>
+            <span style={{
+              fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 16,
+              color: 'var(--text-primary)', letterSpacing: '-0.01em',
+            }}>
               muteform
             </span>
           </a>
 
-          {/* links (desktop) */}
-          <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-            <a href="/demo" className="btn-hover" style={{ fontSize: 13, color: T.muted, fontWeight: 500, transition: 'color 150ms ease' }}>Demo</a>
-            <a href="#waitlist" className="btn-hover" style={{ fontSize: 13, color: T.muted, fontWeight: 500, transition: 'color 150ms ease' }}>Beta Access</a>
-            <a href="/import" className="btn-hover" style={{
-              fontSize: 13, fontWeight: 600, color: T.bg,
-              background: T.green, padding: '7px 16px', borderRadius: 6,
+          {/* center links (desktop) */}
+          <div className="nav-links">
+            <a href="/demo" style={{
+              fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
+              color: 'var(--text-secondary)', transition: 'color 150ms ease',
+            }}>Demo</a>
+            <a href="/integrate" style={{
+              fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
+              color: 'var(--text-secondary)', transition: 'color 150ms ease',
+            }}>Docs</a>
+          </div>
+
+          {/* right side (desktop) */}
+          <div className="nav-links" style={{ gap: 12 }}>
+            <a href="#waitlist" style={{
+              fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              padding: '7px 18px', borderRadius: 4,
               transition: 'all 150ms ease',
             }}>
-              Get Started &rarr;
+              Get beta access
             </a>
+            <ThemeToggle />
           </div>
+
           {/* hamburger (mobile) */}
-          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)}
-            aria-label="Open menu">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
+          <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 6h18M3 12h18M3 18h18" />
             </svg>
           </button>
@@ -352,236 +296,302 @@ export default function LandingPage() {
       {/* mobile menu */}
       <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
-        <a href="/demo" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Demo</a>
-        <a href="#waitlist" onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans }}>Beta Access</a>
-        <a href="/import" onClick={() => setMobileMenuOpen(false)} style={{
-          fontFamily: sans, fontWeight: 600, color: T.bg, background: T.green,
-          borderRadius: 8, textAlign: 'center', marginTop: 8, border: 'none',
-          padding: '12px 0',
-        }}>Get Started &rarr;</a>
+        <a href="/demo" onClick={() => setMobileMenuOpen(false)}>Demo</a>
+        <a href="/integrate" onClick={() => setMobileMenuOpen(false)}>Docs</a>
+        <a href="#waitlist" onClick={() => setMobileMenuOpen(false)} style={{
+          fontWeight: 600, color: 'var(--bg)', background: 'var(--accent)',
+          borderRadius: 4, textAlign: 'center', marginTop: 8,
+          padding: '12px 0', border: 'none',
+        }}>Get beta access</a>
       </div>
 
-      {/* ════════════════════════════════════════════
-          2. HERO
-      ════════════════════════════════════════════ */}
-      <section style={{ ...section, paddingTop: 80, paddingBottom: 60, textAlign: 'center' }}>
-        <FadeIn>
-          <p style={{
-            fontFamily: sans, fontSize: 18, fontWeight: 500,
-            color: T.muted, margin: '0 auto 12px', maxWidth: 600,
-            lineHeight: 1.5,
-          }}>
-            Your AI tools don&rsquo;t know your design system.
-          </p>
-        </FadeIn>
+      {/* ================================================================
+          HERO
+      ================================================================ */}
+      <section style={{ ...section, paddingTop: 80, paddingBottom: 64 }} className="section-pad">
+        <div className="hero-grid" style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 64,
+          alignItems: 'center',
+        }}>
+          {/* Left: text */}
+          <div>
+            <FadeIn>
+              <h1 className="hero-heading" style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: 60,
+                fontWeight: 400,
+                lineHeight: 1.1,
+                color: 'var(--text-primary)',
+                margin: '0 0 24px',
+                letterSpacing: '-0.02em',
+              }}>
+                Your design system,{'\n'}enforced everywhere.
+              </h1>
+            </FadeIn>
 
-        <FadeIn delay={80}>
-          <p style={{
-            fontFamily: sans, fontSize: 20, fontWeight: 600,
-            margin: '0 auto 28px', maxWidth: 600,
-          }}>
-            <span style={{
-              color: T.bg, background: T.green,
-              padding: '2px 10px', borderRadius: 4,
-              display: 'inline-block',
-            }}>
-              Muteform fixes that.
-            </span>
-          </p>
-        </FadeIn>
+            <FadeIn delay={100}>
+              <p style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: 17,
+                lineHeight: 1.7,
+                color: 'var(--text-secondary)',
+                margin: '0 0 36px',
+                maxWidth: 520,
+              }}>
+                Muteform turns your design rules into executable policy.
+                Every AI&nbsp;tool. Every generated interface. Automatically.
+              </p>
+            </FadeIn>
 
-        <FadeIn delay={140}>
-          <h1 className="hero-heading" style={{
-            fontFamily: serif, fontSize: 44, fontWeight: 400, lineHeight: 1.2,
-            color: T.textBright, margin: '0 auto 20px', maxWidth: 700,
-          }}>
-            Design governance for AI&#8209;generated interfaces
-          </h1>
-        </FadeIn>
-
-        <FadeIn delay={220}>
-          <p className="hero-sub" style={{
-            fontFamily: sans, fontSize: 17, lineHeight: 1.7,
-            color: T.muted, margin: '0 auto 36px', maxWidth: 620,
-          }}>
-            Muteform turns your design system into a living, executable contract.
-            Every AI&nbsp;agent. Every generated interface. Every pixel. Governed.
-          </p>
-        </FadeIn>
-
-        <FadeIn delay={320}>
-          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/import" className="btn-hover" style={{
-              fontFamily: sans, fontSize: 14, fontWeight: 600, color: T.bg,
-              background: T.green, padding: '11px 24px', borderRadius: 7,
-              display: 'inline-block', transition: 'all 150ms ease',
-            }}>
-              Start with your design system &rarr;
-            </a>
-            <a href="/demo" className="btn-hover" style={{
-              fontFamily: sans, fontSize: 14, fontWeight: 600, color: T.text,
-              border: '1px solid ' + T.border2, padding: '11px 24px', borderRadius: 7,
-              display: 'inline-block', transition: 'all 150ms ease',
-            }}>
-              Watch the Demo
-            </a>
+            <FadeIn delay={200}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                <a href="/import" style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  letterSpacing: '0.01em',
+                  color: 'var(--bg)',
+                  background: 'var(--accent)',
+                  padding: '12px 24px',
+                  borderRadius: 4,
+                  display: 'inline-block',
+                  transition: 'all 150ms ease',
+                }}>
+                  Start with your system
+                </a>
+                <a href="/demo" style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: 'var(--accent)',
+                  transition: 'opacity 150ms ease',
+                }}>
+                  See it in action &rarr;
+                </a>
+              </div>
+            </FadeIn>
           </div>
-        </FadeIn>
 
-        <FadeIn delay={460} style={{ marginTop: 48 }}>
-          <ScoreRing score={100} />
+          {/* Right: code comparison */}
+          <FadeIn delay={300}>
+            <div style={{
+              background: 'var(--code-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 4,
+              overflow: 'hidden',
+            }}>
+              {/* Without governance */}
+              <div style={{
+                borderBottom: '1px solid var(--border)',
+                padding: '14px 16px 12px',
+              }}>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+                  color: 'var(--error)', letterSpacing: '0.05em',
+                  textTransform: 'uppercase' as const, marginBottom: 10,
+                }}>
+                  Without governance
+                </div>
+                <CodeLine text={'color: #3478F6       \u2190 not a token'} marker={'\u2715'} isError={true} />
+                <CodeLine text={'padding: 22px        \u2190 off scale'} marker={'\u2715'} isError={true} />
+                <CodeLine text={'font-size: 15px      \u2190 not in system'} marker={'\u2715'} isError={true} />
+                <CodeLine text={'variant="ghost"      \u2190 unapproved'} marker={'\u2715'} isError={true} />
+              </div>
+
+              {/* After Muteform */}
+              <div style={{ padding: '14px 16px 16px' }}>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+                  color: 'var(--success)', letterSpacing: '0.05em',
+                  textTransform: 'uppercase' as const, marginBottom: 10,
+                }}>
+                  After Muteform
+                </div>
+                <CodeLine text="color: tokens.primary" marker={'\u2713'} isError={false} />
+                <CodeLine text="padding: spacing[4]" marker={'\u2713'} isError={false} />
+                <CodeLine text="font-size: type.body" marker={'\u2713'} isError={false} />
+                <CodeLine text='variant="primary"' marker={'\u2713'} isError={false} />
+              </div>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ================================================================
+          STATS ROW
+      ================================================================ */}
+      <section style={{ ...section, paddingTop: 48, paddingBottom: 48 }} className="section-pad">
+        <FadeIn>
+          <div className="stats-row" style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 80,
+            borderTop: '1px solid var(--border)',
+            borderBottom: '1px solid var(--border)',
+            padding: '48px 0',
+          }}>
+            {[
+              { number: '9', caption: 'violations detected' },
+              { number: '2ms', caption: 'to scan any UI' },
+              { number: '100', caption: 'health score after governance' },
+            ].map((stat) => (
+              <div key={stat.caption} style={{ textAlign: 'center' }}>
+                <div style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: 52,
+                  fontWeight: 400,
+                  color: 'var(--text-primary)',
+                  lineHeight: 1,
+                  marginBottom: 8,
+                }}>
+                  {stat.number}
+                </div>
+                <div style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 13,
+                  color: 'var(--text-muted)',
+                }}>
+                  {stat.caption}
+                </div>
+              </div>
+            ))}
+          </div>
         </FadeIn>
       </section>
 
-      {/* ════════════════════════════════════════════
-          3. HOW IT WORKS — SPLIT SCREEN COMPARISON
-      ════════════════════════════════════════════ */}
+      {/* ================================================================
+          PROBLEM SECTION
+      ================================================================ */}
       <section style={section} className="section-pad">
         <FadeIn>
-          <h2 style={{ ...heading, marginBottom: 48, textAlign: 'center' }}>How it works</h2>
-        </FadeIn>
-
-        <FadeIn delay={100}>
-          <div
-            className="comparison-grid"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 20,
-              marginBottom: 32,
-            }}
-          >
-            {/* Left — Without Muteform */}
-            <div style={{
-              background: `${T.red}08`,
-              border: `1px solid ${T.red}20`,
-              borderRadius: 12,
-              padding: '28px 24px',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                fontFamily: mono, fontSize: 11, fontWeight: 600,
-                color: T.red, letterSpacing: 1.5, marginBottom: 20,
-                textTransform: 'uppercase' as const,
-              }}>
-                Without Muteform
-              </div>
-
-              <div style={{
-                background: T.bg, borderRadius: 8, padding: '16px 12px',
-                border: `1px solid ${T.red}15`,
-              }}>
-                <ComparisonLine
-                  text={'color: #3478F6       \u2190 not a token'}
-                  marker={'\u00d7'}
-                  color={T.red}
-                  bgTint={`${T.red}08`}
-                />
-                <ComparisonLine
-                  text={'padding: 22px        \u2190 not in scale'}
-                  marker={'\u00d7'}
-                  color={T.red}
-                  bgTint={`${T.red}08`}
-                />
-                <ComparisonLine
-                  text={'font-size: 15px      \u2190 not in system'}
-                  marker={'\u00d7'}
-                  color={T.red}
-                  bgTint={`${T.red}08`}
-                />
-                <ComparisonLine
-                  text={'variant="ghost"      \u2190 not approved'}
-                  marker={'\u00d7'}
-                  color={T.red}
-                  bgTint={`${T.red}08`}
-                />
-              </div>
-            </div>
-
-            {/* Right — With Muteform */}
-            <div style={{
-              background: `${T.green}08`,
-              border: `1px solid ${T.green}20`,
-              borderRadius: 12,
-              padding: '28px 24px',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                fontFamily: mono, fontSize: 11, fontWeight: 600,
-                color: T.green, letterSpacing: 1.5, marginBottom: 20,
-                textTransform: 'uppercase' as const,
-              }}>
-                With Muteform
-              </div>
-
-              <div style={{
-                background: T.bg, borderRadius: 8, padding: '16px 12px',
-                border: `1px solid ${T.green}15`,
-              }}>
-                <ComparisonLine
-                  text="color: tokens.primary"
-                  marker={'\u2713'}
-                  color={T.green}
-                  bgTint={`${T.green}08`}
-                />
-                <ComparisonLine
-                  text="padding: spacing[4]"
-                  marker={'\u2713'}
-                  color={T.green}
-                  bgTint={`${T.green}08`}
-                />
-                <ComparisonLine
-                  text="font-size: type.body"
-                  marker={'\u2713'}
-                  color={T.green}
-                  bgTint={`${T.green}08`}
-                />
-                <ComparisonLine
-                  text='variant="primary"'
-                  marker={'\u2713'}
-                  color={T.green}
-                  bgTint={`${T.green}08`}
-                />
-              </div>
-            </div>
-          </div>
-        </FadeIn>
-
-        <FadeIn delay={200}>
-          <p style={{
-            fontFamily: mono, fontSize: 13, color: T.muted,
-            textAlign: 'center', margin: 0,
+          <h2 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 40,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            color: 'var(--text-primary)',
+            margin: '0 0 40px',
+            maxWidth: 680,
+            letterSpacing: '-0.01em',
           }}>
-            Happens automatically. Every time. Every AI tool.
-          </p>
+            AI generates UI faster than any team can review.
+          </h2>
         </FadeIn>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {[
+            'Every AI tool interprets your design system differently \u2014 or ignores it entirely.',
+            'Manual reviews can\u2019t keep up with the volume of generated components.',
+            'Without governance, design debt compounds with every prompt.',
+          ].map((statement, i) => (
+            <FadeIn key={i} delay={i * 80}>
+              <p style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: 16,
+                lineHeight: 1.7,
+                color: 'var(--text-secondary)',
+                margin: 0,
+              }}>
+                &mdash;&ensp;{statement}
+              </p>
+            </FadeIn>
+          ))}
+        </div>
       </section>
 
-      {/* ════════════════════════════════════════════
-          4. SOCIAL PROOF
-      ════════════════════════════════════════════ */}
+      {/* ================================================================
+          HOW IT WORKS
+      ================================================================ */}
       <section style={section} className="section-pad">
         <FadeIn>
-          <div style={{
-            fontFamily: mono, fontSize: 11, fontWeight: 600,
-            color: T.muted, letterSpacing: 1.5, marginBottom: 12,
-            textTransform: 'uppercase' as const, textAlign: 'center',
+          <h2 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 40,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            color: 'var(--text-primary)',
+            margin: '0 0 56px',
+            letterSpacing: '-0.01em',
           }}>
-            Beta Tester Reactions
-          </div>
-          <h2 style={{ ...heading, marginBottom: 48, textAlign: 'center' }}>
+            How it works
+          </h2>
+        </FadeIn>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
+          {[
+            { num: '1', title: 'Import your design system', desc: 'Connect Figma tokens, Tailwind configs, or any token JSON. Muteform learns your system in seconds.' },
+            { num: '2', title: 'Define governance rules', desc: 'Set policies for color, spacing, typography, and accessibility. Start with built-in rules or write your own.' },
+            { num: '3', title: 'AI generates. Muteform governs.', desc: 'Every AI-generated component is scanned against your rules in real time. Violations surface instantly.' },
+            { num: '4', title: 'Ship with confidence.', desc: 'Auto-fix what can be fixed. Block what can\u2019t. Your design system stays intact, no matter who\u2014or what\u2014writes the code.' },
+          ].map((step, i) => (
+            <FadeIn key={step.num} delay={i * 80}>
+              <div className="how-grid" style={{
+                display: 'grid',
+                gridTemplateColumns: '72px 1fr',
+                gap: 24,
+                alignItems: 'start',
+              }}>
+                <div style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: 48,
+                  fontWeight: 400,
+                  color: 'var(--text-muted)',
+                  lineHeight: 1,
+                }}>
+                  {step.num}
+                </div>
+                <div>
+                  <h3 style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    margin: '0 0 6px',
+                  }}>
+                    {step.title}
+                  </h3>
+                  <p style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 15,
+                    lineHeight: 1.7,
+                    color: 'var(--text-secondary)',
+                    margin: 0,
+                    maxWidth: 560,
+                  }}>
+                    {step.desc}
+                  </p>
+                </div>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+      </section>
+
+      {/* ================================================================
+          PROOF / TESTIMONIALS
+      ================================================================ */}
+      <section style={section} className="section-pad">
+        <FadeIn>
+          <h2 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 40,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            color: 'var(--text-primary)',
+            margin: '0 0 48px',
+            letterSpacing: '-0.01em',
+          }}>
             What teams are saying
           </h2>
         </FadeIn>
 
-        <div
-          className="quotes-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 20,
-          }}
-        >
+        <div className="quotes-grid" style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 20,
+        }}>
           <QuoteCard
             quote="Finally something that survives a Figma handoff."
             name="Sarah Chen"
@@ -603,27 +613,33 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════
-          5. WAITLIST CTA
-      ════════════════════════════════════════════ */}
+      {/* ================================================================
+          BOTTOM CTA
+      ================================================================ */}
       <section id="waitlist" style={{ ...section, textAlign: 'center' }} className="section-pad">
         <FadeIn>
-          <h2 style={{ ...heading, maxWidth: 560, margin: '0 auto 16px' }}>
-            Design systems were built for humans. AI needs governance.
+          <h2 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 40,
+            fontWeight: 400,
+            lineHeight: 1.25,
+            color: 'var(--text-primary)',
+            maxWidth: 640,
+            margin: '0 auto 40px',
+            letterSpacing: '-0.01em',
+          }}>
+            Design systems were built for humans.{'\n'}AI needs governance infrastructure.
           </h2>
         </FadeIn>
-        <FadeIn delay={80}>
-          <p style={{ fontSize: 17, color: T.muted, marginBottom: 36 }}>
-            Get early access to design governance.
-          </p>
-        </FadeIn>
 
-        <FadeIn delay={160}>
+        <FadeIn delay={100}>
           {formState === 'success' ? (
             <div style={{
-              fontFamily: mono, fontSize: 14, color: T.green,
-              background: T.greenDim, display: 'inline-block',
-              padding: '14px 28px', borderRadius: 8,
+              fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 500,
+              color: 'var(--success)',
+              background: 'var(--success-dim)',
+              display: 'inline-block',
+              padding: '14px 28px', borderRadius: 4,
             }}>
               You&rsquo;re on the list. We&rsquo;ll be in touch.
             </div>
@@ -632,7 +648,7 @@ export default function LandingPage() {
               onSubmit={handleWaitlist}
               style={{
                 display: 'flex', gap: 10, justifyContent: 'center',
-                maxWidth: 440, margin: '0 auto', flexWrap: 'wrap',
+                maxWidth: 460, margin: '0 auto', flexWrap: 'wrap',
               }}
             >
               <input
@@ -643,21 +659,26 @@ export default function LandingPage() {
                 onChange={function (e) { setEmail(e.target.value) }}
                 style={{
                   flex: 1, minWidth: 220,
-                  fontFamily: mono, fontSize: 14,
-                  color: T.text, background: T.surface,
-                  border: '1px solid ' + T.border2, borderRadius: 7,
-                  padding: '11px 16px', outline: 'none',
+                  fontFamily: 'var(--font-sans)', fontSize: 14,
+                  color: 'var(--text-primary)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border-strong)',
+                  borderRadius: 4,
+                  padding: '11px 16px',
+                  outline: 'none',
                   transition: 'border-color 150ms ease',
                 }}
               />
               <button
                 type="submit"
                 disabled={formState === 'sending'}
-                className="btn-hover"
                 style={{
-                  fontFamily: sans, fontSize: 14, fontWeight: 600,
-                  color: T.bg, background: T.green,
-                  border: 'none', borderRadius: 7, padding: '11px 24px',
+                  fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600,
+                  letterSpacing: '0.01em',
+                  color: 'var(--bg)',
+                  background: 'var(--accent)',
+                  border: 'none', borderRadius: 4,
+                  padding: '11px 24px',
                   cursor: formState === 'sending' ? 'wait' : 'pointer',
                   opacity: formState === 'sending' ? 0.7 : 1,
                   transition: 'all 150ms ease',
@@ -669,45 +690,59 @@ export default function LandingPage() {
           )}
 
           {formState === 'error' && (
-            <p style={{ fontFamily: mono, fontSize: 12, color: T.red, marginTop: 12 }}>
+            <p style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13,
+              color: 'var(--error)', marginTop: 12,
+            }}>
               {errorMsg || 'Something went wrong. Please try again.'}
             </p>
           )}
-
-          <p style={{
-            fontFamily: mono, fontSize: 12, color: T.dim, marginTop: 20,
-          }}>
-            Beta access for design teams
-          </p>
         </FadeIn>
       </section>
 
-      {/* ════════════════════════════════════════════
-          6. FOOTER
-      ════════════════════════════════════════════ */}
+      {/* ================================================================
+          FOOTER
+      ================================================================ */}
       <footer style={{
-        borderTop: '1px solid ' + T.border,
+        borderTop: '1px solid var(--border)',
         padding: '32px 24px',
       }}>
         <div className="footer-inner" style={{
-          maxWidth: 1080, margin: '0 auto',
+          maxWidth: 1120, margin: '0 auto',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexWrap: 'wrap', gap: 16,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 20, height: 20, borderRadius: 4,
-              background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: mono, fontWeight: 700, fontSize: 12, color: T.bg,
-            }}>M</div>
-            <span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>
-              &copy; 2024 Muteform
+              background: 'var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-serif)', fontWeight: 700, fontSize: 12,
+                color: 'var(--bg)',
+              }}>M</span>
+            </div>
+            <span style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13,
+              color: 'var(--text-muted)',
+            }}>
+              &copy; 2025 Muteform
             </span>
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
-            <a href="/demo" style={{ fontFamily: mono, fontSize: 12, color: T.dim, transition: 'color 150ms ease' }}>Demo</a>
-            <a href="/import" style={{ fontFamily: mono, fontSize: 12, color: T.dim, transition: 'color 150ms ease' }}>Get Started</a>
-            <a href="#waitlist" style={{ fontFamily: mono, fontSize: 12, color: T.dim, transition: 'color 150ms ease' }}>Beta Access</a>
+            <a href="/demo" style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13,
+              color: 'var(--text-muted)', transition: 'color 150ms ease',
+            }}>Demo</a>
+            <a href="/import" style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13,
+              color: 'var(--text-muted)', transition: 'color 150ms ease',
+            }}>Get Started</a>
+            <a href="#waitlist" style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13,
+              color: 'var(--text-muted)', transition: 'color 150ms ease',
+            }}>Beta Access</a>
           </div>
         </div>
       </footer>

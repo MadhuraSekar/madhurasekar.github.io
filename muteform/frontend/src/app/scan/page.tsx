@@ -9,22 +9,6 @@ import { buildGovernanceReport, reportToJSON, type GovernanceReport, type Enrich
 import { loadSession, saveScanResult, saveReport, markStepComplete, syncScanReport } from '@/lib/session'
 import { loadDesignSystem } from '@/lib/design-system-store'
 
-// ─── Design Tokens ──────────────────────────────────────────
-const T = {
-  bg: '#08090d', surface: '#0c0e12', surface2: '#111318',
-  border: '#1a1d24', border2: '#252830',
-  green: '#00e087', greenDim: '#00e08718', greenGlow: '#00e08733',
-  red: '#ff4070', redDim: '#ff407018',
-  amber: '#ffb830', amberDim: '#ffb83018',
-  blue: '#4090ff', blueDim: '#4090ff18',
-  purple: '#a855f7', purpleDim: '#a855f718',
-  muted: '#6b7280', dim: '#3a3f4a',
-  text: '#e8eaf0', textBright: '#f8f9fb',
-}
-const mono = "'JetBrains Mono', 'DM Mono', monospace"
-const syne = "'Syne', sans-serif"
-const sans = "'DM Sans', 'Inter', system-ui, sans-serif"
-
 // ─── Demo YAML Config ───────────────────────────────────────
 const DEMO_YAML = `name: "Acme Design System"
 version: "1.0.0"
@@ -113,7 +97,37 @@ const KEYFRAMES = `
   from { opacity: 0; }
   to { opacity: 1; }
 }
+@keyframes scoreReveal {
+  from { stroke-dashoffset: var(--circ); }
+  to { stroke-dashoffset: var(--target-offset); }
+}
 `
+
+// ─── Score color helper using CSS vars ──────────────────────
+function scoreColorVar(score: number): string {
+  if (score >= 90) return 'var(--success)'
+  if (score >= 60) return 'var(--warning)'
+  return 'var(--error)'
+}
+
+function scoreColorDimVar(score: number): string {
+  if (score >= 90) return 'var(--success-dim)'
+  if (score >= 60) return 'var(--warning-dim)'
+  return 'var(--error-dim)'
+}
+
+// ─── Severity color helper ──────────────────────────────────
+function severityColorVar(s: GovernanceSeverity): string {
+  if (s === 'block') return 'var(--error)'
+  if (s === 'warn') return 'var(--warning)'
+  return 'var(--success)'
+}
+
+function severityDimVar(s: GovernanceSeverity): string {
+  if (s === 'block') return 'var(--error-dim)'
+  if (s === 'warn') return 'var(--warning-dim)'
+  return 'var(--success-dim)'
+}
 
 // ─── ScoreRing Component ────────────────────────────────────
 function ScoreRing({
@@ -134,8 +148,7 @@ function ScoreRing({
   const [offset, setOffset] = useState(animate ? circumference : circumference - (score / 100) * circumference)
   const [displayScore, setDisplayScore] = useState(animate ? 0 : score)
 
-  const color = score >= 90 ? T.green : score >= 60 ? T.amber : T.red
-  const dimColor = score >= 90 ? T.greenDim : score >= 60 ? T.amberDim : T.redDim
+  const color = scoreColorVar(score)
 
   useEffect(() => {
     if (!animate) {
@@ -155,7 +168,6 @@ function ScoreRing({
     const frame = () => {
       const elapsed = Date.now() - startTime
       const progress = Math.min(elapsed / duration, 1)
-      // Cubic bezier approximation
       const eased = 1 - Math.pow(1 - progress, 3)
       setDisplayScore(Math.round(startScore + (endScore - startScore) * eased))
       if (progress < 1) requestAnimationFrame(frame)
@@ -168,10 +180,10 @@ function ScoreRing({
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
       <div style={{ position: 'relative', width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          {/* Background circle */}
+          {/* Track circle */}
           <circle
             cx={size / 2} cy={size / 2} r={radius}
-            fill="none" stroke={T.border2} strokeWidth={strokeWidth}
+            fill="none" stroke="var(--border)" strokeWidth={strokeWidth}
           />
           {/* Score arc */}
           <circle
@@ -182,7 +194,6 @@ function ScoreRing({
             strokeLinecap="round"
             style={{
               transition: animate ? '1.4s cubic-bezier(0.22, 1, 0.36, 1)' : 'none',
-              filter: `drop-shadow(0 0 8px ${dimColor})`,
             }}
           />
         </svg>
@@ -193,13 +204,13 @@ function ScoreRing({
           flexDirection: 'column',
         }}>
           <span style={{
-            fontFamily: mono, fontSize: size * 0.28, fontWeight: 700,
+            fontFamily: 'var(--font-serif)', fontSize: size * 0.3, fontWeight: 700,
             color: color, lineHeight: 1,
           }}>
             {displayScore}
           </span>
           <span style={{
-            fontFamily: mono, fontSize: size * 0.09, color: T.muted,
+            fontFamily: 'var(--font-mono)', fontSize: size * 0.09, color: 'var(--text-muted)',
             letterSpacing: '0.05em', marginTop: 2,
           }}>
             / 100
@@ -208,7 +219,7 @@ function ScoreRing({
       </div>
       {label && (
         <span style={{
-          fontFamily: mono, fontSize: 10, color: T.muted,
+          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
           letterSpacing: '0.12em', textTransform: 'uppercase',
         }}>
           {label}
@@ -254,12 +265,14 @@ function ViolationCard({
   index: number
   showFixed?: boolean
 }) {
-  const severityColor = violation.severity === 'block' ? T.red
-    : violation.severity === 'warn' ? T.amber
-    : T.green
-  const severityBg = violation.severity === 'block' ? T.redDim
-    : violation.severity === 'warn' ? T.amberDim
-    : T.greenDim
+  const sevColor = severityColorVar(violation.severity)
+  const sevDim = severityDimVar(violation.severity)
+
+  const borderLeftColor = violation.severity === 'block'
+    ? 'var(--error)'
+    : violation.severity === 'warn'
+    ? 'var(--warning)'
+    : 'var(--success)'
 
   const isColorType = violation.type === 'color_token'
   const isSpacingType = violation.type === 'spacing'
@@ -272,9 +285,10 @@ function ViolationCard({
 
   return (
     <div style={{
-      background: T.surface2,
-      border: `1px solid ${violation.fixApplied ? T.green + '33' : T.border2}`,
-      borderRadius: 8,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderLeft: `3px solid ${borderLeftColor}`,
+      borderRadius: 4,
       padding: 16,
       animation: `fadeInUp 300ms ease both`,
       animationDelay: `${index * 50}ms`,
@@ -283,21 +297,21 @@ function ViolationCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Rule name */}
           <div style={{
-            fontFamily: sans, fontSize: 14, fontWeight: 600, color: T.textBright,
+            fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
             marginBottom: 4,
           }}>
             {violation.ruleName}
           </div>
           {/* Node path */}
           <div style={{
-            fontFamily: mono, fontSize: 11, color: T.dim,
+            fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)',
             marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {violation.nodePath}
           </div>
           {/* Evidence */}
           <div style={{
-            fontFamily: sans, fontSize: 12, color: T.muted, lineHeight: 1.5,
+            fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5,
           }}>
             {violation.evidence}
           </div>
@@ -306,25 +320,25 @@ function ViolationCard({
           {isColorType && colorMatch && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>was:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>was:</span>
                 <div style={{
-                  width: 20, height: 20, borderRadius: 4,
+                  width: 20, height: 20, borderRadius: '50%',
                   background: colorMatch[1],
-                  border: `1px solid ${T.border2}`,
+                  border: '1px solid var(--border)',
                 }} />
-                <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{colorMatch[1]}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>{colorMatch[1]}</span>
               </div>
               {violation.fixApplied && suggestedColor && (
                 <>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{'-->'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>{'-->'}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>now:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>now:</span>
                     <div style={{
-                      width: 20, height: 20, borderRadius: 4,
+                      width: 20, height: 20, borderRadius: '50%',
                       background: suggestedColor[1],
-                      border: `1px solid ${T.green}44`,
+                      border: '1px solid var(--border)',
                     }} />
-                    <span style={{ fontFamily: mono, fontSize: 10, color: T.green }}>{suggestedColor[1]}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--success)' }}>{suggestedColor[1]}</span>
                   </div>
                 </>
               )}
@@ -335,11 +349,11 @@ function ViolationCard({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
               <div style={{
                 height: 6, borderRadius: 3,
-                background: violation.fixApplied ? T.green + '44' : T.red + '44',
+                background: violation.fixApplied ? 'var(--success-dim)' : 'var(--error-dim)',
                 width: Math.min(80, Math.max(16, parseInt(String(violation.suggestedFix)) || 32)),
                 transition: 'width 300ms ease',
               }} />
-              <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
                 {violation.fixApplied ? violation.suggestedFix + 'px' : 'off-scale'}
               </span>
             </div>
@@ -347,10 +361,10 @@ function ViolationCard({
 
           {isTypographyType && (
             <div style={{
-              fontFamily: sans, fontSize: 13, fontStyle: 'italic',
-              color: violation.fixApplied ? T.green : T.amber,
+              fontFamily: 'var(--font-sans)', fontSize: 13, fontStyle: 'italic',
+              color: violation.fixApplied ? 'var(--success)' : 'var(--warning)',
               marginTop: 8, padding: '4px 8px',
-              background: violation.fixApplied ? T.greenDim : T.amberDim,
+              background: violation.fixApplied ? 'var(--success-dim)' : 'var(--warning-dim)',
               borderRadius: 4, display: 'inline-block',
             }}>
               {violation.fixApplied ? violation.suggestedFix : violation.evidence.split('"')[1] || 'unknown style'}
@@ -359,10 +373,10 @@ function ViolationCard({
 
           {isComponentType && (
             <div style={{
-              fontFamily: mono, fontSize: 11,
-              color: violation.fixApplied ? T.green : T.amber,
+              fontFamily: 'var(--font-mono)', fontSize: 11,
+              color: violation.fixApplied ? 'var(--success)' : 'var(--warning)',
               marginTop: 8, padding: '3px 10px',
-              background: violation.fixApplied ? T.greenDim : T.amberDim,
+              background: violation.fixApplied ? 'var(--success-dim)' : 'var(--warning-dim)',
               borderRadius: 12, display: 'inline-block',
             }}>
               {violation.fixApplied
@@ -375,8 +389,8 @@ function ViolationCard({
         {/* Badges */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', flexShrink: 0 }}>
           <span style={{
-            fontFamily: mono, fontSize: 10, fontWeight: 600,
-            color: severityColor, background: severityBg,
+            fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+            color: sevColor, background: sevDim,
             padding: '3px 8px', borderRadius: 4,
             textTransform: 'uppercase', letterSpacing: '0.05em',
           }}>
@@ -384,8 +398,8 @@ function ViolationCard({
           </span>
           {showFixed && violation.fixApplied && (
             <span style={{
-              fontFamily: mono, fontSize: 10, fontWeight: 700,
-              color: T.green, background: T.greenDim,
+              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+              color: 'var(--bg)', background: 'var(--success)',
               padding: '3px 8px', borderRadius: 4,
               animation: 'pulseFixed 600ms ease-out',
               letterSpacing: '0.05em',
@@ -415,7 +429,7 @@ export default function ScanPage() {
   const [scanSteps, setScanSteps] = useState<{ label: string; done: boolean }[]>([
     { label: 'Loading fixture...', done: false },
     { label: 'Applying ruleset...', done: false },
-    { label: 'Running governance checks...', done: false },
+    { label: 'Running checks...', done: false },
     { label: 'Building report...', done: false },
   ])
 
@@ -498,7 +512,7 @@ export default function ScanPage() {
       }
     }
 
-    setParseError("Couldn't parse that input. Try pasting valid JSON with a 'nodes' array.")
+    setParseError("Could not parse that input. Try pasting valid JSON with a 'nodes' array, or raw HTML.")
     return null
   }, [])
 
@@ -529,7 +543,7 @@ export default function ScanPage() {
     setScanSteps([
       { label: 'Loading fixture...', done: false },
       { label: 'Applying ruleset...', done: false },
-      { label: 'Running governance checks...', done: false },
+      { label: 'Running checks...', done: false },
       { label: 'Building report...', done: false },
     ])
 
@@ -622,32 +636,30 @@ export default function ScanPage() {
     syncScanReport(session.user?.id ?? null, govReport).catch(() => {})
   }, [artifact, config, scanResult, report])
 
-  // ─── Severity color helper ────────────────────────
-  const severityColor = (s: GovernanceSeverity) =>
-    s === 'block' ? T.red : s === 'warn' ? T.amber : T.green
-
   // ─── Render ───────────────────────────────────────
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
       <Stepper />
       <div style={{
-        minHeight: '100vh', background: T.bg, color: T.text,
-        fontFamily: sans,
+        minHeight: '100vh',
+        background: 'var(--bg)',
+        color: 'var(--text-primary)',
+        fontFamily: 'var(--font-sans)',
       }}>
         {/* Context Banner */}
         <div style={{
           padding: '12px 24px',
-          background: T.surface,
-          borderBottom: `1px solid ${T.border}`,
+          background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
         }}>
           <span style={{
-            fontFamily: mono, fontSize: 12, color: T.muted,
+            fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
             <span style={{
-              width: 6, height: 6, borderRadius: '50%', background: T.green, display: 'inline-block',
+              width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', display: 'inline-block',
             }} />
             {systemName} &middot; {ruleCount} rules active
           </span>
@@ -660,17 +672,18 @@ export default function ScanPage() {
               ═══════════════════════════════════════════════ */}
           {phase === 'select' && (
             <div style={{ animation: 'fadeIn 300ms ease' }}>
-              <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <div style={{ marginBottom: 40 }}>
                 <h1 style={{
-                  fontFamily: syne, fontSize: 28, fontWeight: 700,
-                  color: T.textBright, margin: 0, marginBottom: 8,
+                  fontFamily: 'var(--font-serif)', fontSize: 32, fontWeight: 700,
+                  color: 'var(--text-primary)', margin: 0, marginBottom: 8,
+                  lineHeight: 1.2,
                 }}>
-                  Select an interface to scan
+                  Scan Artifact
                 </h1>
                 <p style={{
-                  fontFamily: sans, fontSize: 15, color: T.muted, margin: 0,
+                  fontFamily: 'var(--font-sans)', fontSize: 15, color: 'var(--text-secondary)', margin: 0,
                 }}>
-                  Choose an AI-generated UI or paste your own code
+                  Choose an AI-generated UI fixture or paste your own code to scan against the active ruleset.
                 </p>
               </div>
 
@@ -691,29 +704,32 @@ export default function ScanPage() {
                       onMouseEnter={() => setHoveredCard(f.id)}
                       onMouseLeave={() => setHoveredCard(null)}
                       style={{
-                        background: isSelected ? T.greenDim : T.surface2,
-                        border: `1px solid ${isSelected ? T.green : isHovered ? T.border2 : T.border}`,
-                        borderRadius: 10,
+                        background: 'var(--surface)',
+                        border: isSelected
+                          ? '1px solid var(--accent)'
+                          : isHovered
+                          ? '1px solid var(--border-strong)'
+                          : '1px solid var(--border)',
+                        borderRadius: 4,
                         padding: 20,
                         cursor: 'pointer',
                         textAlign: 'left',
-                        transition: 'all 150ms ease',
-                        transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                        transition: 'all 200ms ease',
                         outline: 'none',
                       }}
                     >
                       <div style={{
-                        fontFamily: syne, fontSize: 16, fontWeight: 700,
-                        color: T.textBright, marginBottom: 6,
+                        fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+                        color: 'var(--text-primary)', marginBottom: 6,
                       }}>
                         {f.name}
                       </div>
                       <div style={{
-                        fontFamily: mono, fontSize: 11, color: T.muted, marginBottom: 10,
+                        fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginBottom: 10,
                         display: 'flex', alignItems: 'center', gap: 8,
                       }}>
                         <span style={{
-                          background: T.purpleDim, color: T.purple,
+                          background: 'var(--accent-dim)', color: 'var(--accent)',
                           padding: '2px 6px', borderRadius: 3,
                           fontSize: 10, fontWeight: 600,
                         }}>
@@ -722,7 +738,7 @@ export default function ScanPage() {
                         <span>{f.nodeCount} nodes</span>
                       </div>
                       <div style={{
-                        fontFamily: sans, fontSize: 13, color: T.dim, lineHeight: 1.5,
+                        fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
                       }}>
                         {f.description}
                       </div>
@@ -740,26 +756,29 @@ export default function ScanPage() {
                   onMouseEnter={() => setHoveredCard('custom')}
                   onMouseLeave={() => setHoveredCard(null)}
                   style={{
-                    background: customExpanded ? T.surface2 : T.surface,
-                    border: `1px solid ${customExpanded ? T.green : hoveredCard === 'custom' ? T.border2 : T.border}`,
-                    borderRadius: 10,
+                    background: customExpanded ? 'var(--surface)' : 'var(--bg)',
+                    border: customExpanded
+                      ? '1px solid var(--accent)'
+                      : hoveredCard === 'custom'
+                      ? '1px solid var(--border-strong)'
+                      : '1px solid var(--border)',
+                    borderRadius: 4,
                     padding: 20,
                     cursor: 'pointer',
                     textAlign: 'left',
-                    transition: 'all 150ms ease',
-                    transform: hoveredCard === 'custom' && !customExpanded ? 'scale(1.02)' : 'scale(1)',
+                    transition: 'all 200ms ease',
                     outline: 'none',
                     borderStyle: customExpanded ? 'solid' : 'dashed',
                   }}
                 >
                   <div style={{
-                    fontFamily: syne, fontSize: 16, fontWeight: 700,
-                    color: customExpanded ? T.green : T.muted, marginBottom: 6,
+                    fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+                    color: customExpanded ? 'var(--accent)' : 'var(--text-muted)', marginBottom: 6,
                   }}>
-                    + Paste your own code
+                    + Paste your own
                   </div>
                   <div style={{
-                    fontFamily: sans, fontSize: 13, color: T.dim, lineHeight: 1.5,
+                    fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
                   }}>
                     JSON (InterfaceDefinition or nodes array) or HTML
                   </div>
@@ -770,9 +789,9 @@ export default function ScanPage() {
               {customExpanded && (
                 <div style={{
                   animation: 'fadeInUp 200ms ease',
-                  background: T.surface2,
-                  border: `1px solid ${T.border2}`,
-                  borderRadius: 10,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 4,
                   padding: 20,
                   marginBottom: 24,
                 }}>
@@ -782,21 +801,20 @@ export default function ScanPage() {
                     placeholder={'Paste JSON or HTML here...\n\n{\n  "nodes": [\n    {\n      "id": "btn-1",\n      "type": "interactive",\n      "path": "root > button",\n      "properties": { ... }\n    }\n  ],\n  "metadata": { ... }\n}'}
                     style={{
                       width: '100%', minHeight: 200,
-                      background: T.surface, color: T.text,
-                      fontFamily: mono, fontSize: 12, lineHeight: 1.6,
-                      border: `1px solid ${T.border}`,
-                      borderRadius: 8, padding: 16,
+                      background: 'var(--code-bg)', color: 'var(--text-primary)',
+                      fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.6,
+                      border: '1px solid var(--border)',
+                      borderRadius: 4, padding: 16,
                       resize: 'vertical', outline: 'none',
                       boxSizing: 'border-box',
+                      transition: 'border-color 200ms ease',
                     }}
-                    onFocus={e => { e.target.style.borderColor = T.green + '55' }}
-                    onBlur={e => { e.target.style.borderColor = T.border }}
                   />
                   {parseError && (
                     <div style={{
-                      fontFamily: mono, fontSize: 12, color: T.red,
+                      fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--error)',
                       marginTop: 10, padding: '8px 12px',
-                      background: T.redDim, borderRadius: 6,
+                      background: 'var(--error-dim)', borderRadius: 4,
                     }}>
                       {parseError}
                     </div>
@@ -808,13 +826,12 @@ export default function ScanPage() {
                     disabled={!customInput.trim()}
                     style={{
                       marginTop: 12,
-                      fontFamily: mono, fontSize: 13, fontWeight: 600,
-                      color: !customInput.trim() ? T.dim : '#000',
-                      background: !customInput.trim() ? T.surface : T.green,
-                      border: 'none', borderRadius: 8,
+                      fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
+                      color: 'var(--bg)',
+                      background: !customInput.trim() ? 'var(--border)' : 'var(--accent)',
+                      border: 'none', borderRadius: 4,
                       padding: '10px 24px', cursor: !customInput.trim() ? 'default' : 'pointer',
-                      transition: 'all 150ms ease',
-                      transform: hoveredBtn === 'custom-submit' && customInput.trim() ? 'scale(1.02)' : 'scale(1)',
+                      transition: 'all 200ms ease',
                       opacity: !customInput.trim() ? 0.5 : 1,
                     }}
                   >
@@ -835,8 +852,8 @@ export default function ScanPage() {
               justifyContent: 'center', minHeight: 400,
             }}>
               <div style={{
-                fontFamily: syne, fontSize: 22, fontWeight: 700,
-                color: T.textBright, marginBottom: 32,
+                fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 700,
+                color: 'var(--text-primary)', marginBottom: 32,
               }}>
                 Scanning interface
               </div>
@@ -844,15 +861,14 @@ export default function ScanPage() {
               {/* Progress bar */}
               <div style={{
                 width: '100%', maxWidth: 400, height: 4,
-                background: T.border, borderRadius: 2,
+                background: 'var(--surface-elevated)', borderRadius: 2,
                 overflow: 'hidden', marginBottom: 32,
               }}>
                 <div style={{
-                  height: '100%', background: T.green,
+                  height: '100%', background: 'var(--accent)',
                   borderRadius: 2,
                   width: `${scanProgress}%`,
                   transition: 'width 300ms ease',
-                  boxShadow: `0 0 12px ${T.greenGlow}`,
                 }} />
               </div>
 
@@ -868,18 +884,18 @@ export default function ScanPage() {
                       width: 20, height: 20,
                       borderRadius: '50%', display: 'flex',
                       alignItems: 'center', justifyContent: 'center',
-                      background: step.done ? T.greenDim : T.surface2,
-                      border: `1px solid ${step.done ? T.green + '44' : T.border}`,
-                      color: step.done ? T.green : T.dim,
-                      fontFamily: mono, fontSize: 11, fontWeight: 700,
+                      background: step.done ? 'var(--success-dim)' : 'var(--surface-elevated)',
+                      border: step.done ? '1px solid var(--success)' : '1px solid var(--border)',
+                      color: step.done ? 'var(--success)' : 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
                       transition: 'all 200ms ease',
                       flexShrink: 0,
                     }}>
                       {step.done ? '\u2713' : ''}
                     </span>
                     <span style={{
-                      fontFamily: mono, fontSize: 13,
-                      color: step.done ? T.green : T.muted,
+                      fontFamily: 'var(--font-mono)', fontSize: 13,
+                      color: step.done ? 'var(--success)' : 'var(--text-muted)',
                       transition: 'color 200ms ease',
                     }}>
                       {step.label}
@@ -905,12 +921,12 @@ export default function ScanPage() {
 
               {/* Category breakdown */}
               <div style={{
-                background: T.surface, border: `1px solid ${T.border}`,
-                borderRadius: 10, padding: 24, marginBottom: 24,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 4, padding: 24, marginBottom: 24,
               }}>
                 <div style={{
-                  fontFamily: syne, fontSize: 15, fontWeight: 700,
-                  color: T.textBright, marginBottom: 16,
+                  fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+                  color: 'var(--text-primary)', marginBottom: 16,
                 }}>
                   Category Breakdown
                 </div>
@@ -922,7 +938,7 @@ export default function ScanPage() {
                       return c.key === key
                     })
                     const score = cat?.score ?? 100
-                    const barColor = score >= 90 ? T.green : score >= 60 ? T.amber : T.red
+                    const barColor = scoreColorVar(score)
                     const label = key.charAt(0).toUpperCase() + key.slice(1)
                     return (
                       <div key={key}>
@@ -931,25 +947,25 @@ export default function ScanPage() {
                           marginBottom: 6,
                         }}>
                           <span style={{
-                            fontFamily: sans, fontSize: 13, color: T.text, fontWeight: 500,
+                            fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500,
                           }}>
                             {label}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{
-                              fontFamily: mono, fontSize: 11, color: T.dim,
+                              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)',
                             }}>
                               {Math.round(weight * 100)}%
                             </span>
                             <span style={{
-                              fontFamily: mono, fontSize: 12, color: barColor, fontWeight: 600,
+                              fontFamily: 'var(--font-mono)', fontSize: 12, color: barColor, fontWeight: 600,
                             }}>
                               {score}
                             </span>
                           </div>
                         </div>
                         <div style={{
-                          width: '100%', height: 6, background: T.border, borderRadius: 3,
+                          width: '100%', height: 6, background: 'var(--border)', borderRadius: 3,
                           overflow: 'hidden',
                         }}>
                           <div style={{
@@ -970,51 +986,51 @@ export default function ScanPage() {
                 gap: 12, marginBottom: 32,
               }}>
                 <div style={{
-                  background: T.surface, border: `1px solid ${T.green}22`,
-                  borderRadius: 10, padding: 20, textAlign: 'center',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 4, padding: 20, textAlign: 'center',
                 }}>
                   <div style={{
-                    fontFamily: mono, fontSize: 32, fontWeight: 700, color: T.green,
+                    fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 700, color: 'var(--success)',
                     lineHeight: 1,
                   }}>
                     {report.autoFixedCount + report.violations.filter(v => !v.fixApplied && v.severity === 'auto-fix').length}
                   </div>
                   <div style={{
-                    fontFamily: mono, fontSize: 11, color: T.muted, marginTop: 6,
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6,
                     letterSpacing: '0.05em',
                   }}>
                     Auto-fixable
                   </div>
                 </div>
                 <div style={{
-                  background: T.surface, border: `1px solid ${T.amber}22`,
-                  borderRadius: 10, padding: 20, textAlign: 'center',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 4, padding: 20, textAlign: 'center',
                 }}>
                   <div style={{
-                    fontFamily: mono, fontSize: 32, fontWeight: 700, color: T.amber,
+                    fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 700, color: 'var(--warning)',
                     lineHeight: 1,
                   }}>
                     {report.warningCount}
                   </div>
                   <div style={{
-                    fontFamily: mono, fontSize: 11, color: T.muted, marginTop: 6,
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6,
                     letterSpacing: '0.05em',
                   }}>
                     Warnings
                   </div>
                 </div>
                 <div style={{
-                  background: T.surface, border: `1px solid ${T.red}22`,
-                  borderRadius: 10, padding: 20, textAlign: 'center',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 4, padding: 20, textAlign: 'center',
                 }}>
                   <div style={{
-                    fontFamily: mono, fontSize: 32, fontWeight: 700, color: T.red,
+                    fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 700, color: 'var(--error)',
                     lineHeight: 1,
                   }}>
                     {report.blockedCount}
                   </div>
                   <div style={{
-                    fontFamily: mono, fontSize: 11, color: T.muted, marginTop: 6,
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6,
                     letterSpacing: '0.05em',
                   }}>
                     Blocked
@@ -1030,16 +1046,15 @@ export default function ScanPage() {
                 disabled={applyingGovernance}
                 style={{
                   width: '100%',
-                  fontFamily: syne, fontSize: 18, fontWeight: 700,
-                  color: '#000', background: T.green,
-                  border: 'none', borderRadius: 12,
-                  padding: '18px 32px',
+                  fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700,
+                  color: 'var(--bg)', background: 'var(--accent)',
+                  border: 'none', borderRadius: 4,
+                  padding: '16px 32px',
                   cursor: applyingGovernance ? 'wait' : 'pointer',
-                  transition: 'all 150ms ease',
-                  transform: hoveredBtn === 'apply' ? 'scale(1.02)' : 'scale(1)',
+                  transition: 'all 200ms ease',
                   filter: hoveredBtn === 'apply' ? 'brightness(0.92)' : 'brightness(1)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                  boxShadow: `0 0 30px ${T.greenGlow}`,
+                  letterSpacing: '0.02em',
                 }}
               >
                 {applyingGovernance ? (
@@ -1047,7 +1062,7 @@ export default function ScanPage() {
                 ) : (
                   <>
                     <span>Apply Governance</span>
-                    <span style={{ fontSize: 20 }}>{'\u2192'}</span>
+                    <span style={{ fontSize: 18 }}>{'\u2192'}</span>
                   </>
                 )}
               </button>
@@ -1075,13 +1090,13 @@ export default function ScanPage() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                 }}>
                   <span style={{
-                    fontFamily: mono, fontSize: 24, fontWeight: 700,
-                    color: T.green,
+                    fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 700,
+                    color: 'var(--success)',
                   }}>
                     +{report.afterScore - report.overallScore}
                   </span>
                   <span style={{
-                    fontFamily: mono, fontSize: 10, color: T.muted,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
                     letterSpacing: '0.1em', textTransform: 'uppercase',
                   }}>
                     points
@@ -1102,48 +1117,48 @@ export default function ScanPage() {
                 gap: 12, marginBottom: 32,
               }}>
                 <div style={{
-                  background: T.surface, border: `1px solid ${T.green}22`,
-                  borderRadius: 10, padding: 16, textAlign: 'center',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 4, padding: 16, textAlign: 'center',
                 }}>
                   <div style={{
-                    fontFamily: mono, fontSize: 28, fontWeight: 700, color: T.green, lineHeight: 1,
+                    fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 700, color: 'var(--success)', lineHeight: 1,
                   }}>
                     {report.autoFixedCount}
                   </div>
                   <div style={{
-                    fontFamily: mono, fontSize: 10, color: T.muted, marginTop: 4,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 4,
                     letterSpacing: '0.05em',
                   }}>
                     Auto-fixed
                   </div>
                 </div>
                 <div style={{
-                  background: T.surface, border: `1px solid ${T.amber}22`,
-                  borderRadius: 10, padding: 16, textAlign: 'center',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 4, padding: 16, textAlign: 'center',
                 }}>
                   <div style={{
-                    fontFamily: mono, fontSize: 28, fontWeight: 700, color: T.amber, lineHeight: 1,
+                    fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 700, color: 'var(--warning)', lineHeight: 1,
                   }}>
                     {report.warningCount}
                   </div>
                   <div style={{
-                    fontFamily: mono, fontSize: 10, color: T.muted, marginTop: 4,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 4,
                     letterSpacing: '0.05em',
                   }}>
                     Warnings
                   </div>
                 </div>
                 <div style={{
-                  background: T.surface, border: `1px solid ${T.red}22`,
-                  borderRadius: 10, padding: 16, textAlign: 'center',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 4, padding: 16, textAlign: 'center',
                 }}>
                   <div style={{
-                    fontFamily: mono, fontSize: 28, fontWeight: 700, color: T.red, lineHeight: 1,
+                    fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 700, color: 'var(--error)', lineHeight: 1,
                   }}>
                     {report.blockedCount}
                   </div>
                   <div style={{
-                    fontFamily: mono, fontSize: 10, color: T.muted, marginTop: 4,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 4,
                     letterSpacing: '0.05em',
                   }}>
                     Blocked
@@ -1153,12 +1168,12 @@ export default function ScanPage() {
 
               {/* Three-tab diff view */}
               <div style={{
-                background: T.surface, border: `1px solid ${T.border}`,
-                borderRadius: 10, overflow: 'hidden', marginBottom: 32,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 4, overflow: 'hidden', marginBottom: 32,
               }}>
                 {/* Tab bar */}
                 <div style={{
-                  display: 'flex', borderBottom: `1px solid ${T.border}`,
+                  display: 'flex', borderBottom: '1px solid var(--border)',
                 }}>
                   {(['original', 'violations', 'governed'] as const).map(tab => {
                     const isActive = activeTab === tab
@@ -1171,12 +1186,13 @@ export default function ScanPage() {
                         onClick={() => setActiveTab(tab)}
                         style={{
                           flex: 1, padding: '12px 16px',
-                          fontFamily: mono, fontSize: 12, fontWeight: 600,
-                          color: isActive ? T.green : T.muted,
-                          background: isActive ? T.greenDim : 'transparent',
-                          border: 'none', borderBottom: isActive ? `2px solid ${T.green}` : '2px solid transparent',
+                          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+                          color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                          background: isActive ? 'var(--accent-dim)' : 'transparent',
+                          border: 'none',
+                          borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
                           cursor: 'pointer',
-                          transition: 'all 150ms ease',
+                          transition: 'all 200ms ease',
                         }}
                       >
                         {tabLabel}
@@ -1193,15 +1209,15 @@ export default function ScanPage() {
                         const hasViolation = report.violations.some(v => v.nodeId === node.id)
                         return (
                           <div key={node.id} style={{
-                            fontFamily: mono, fontSize: 12, lineHeight: 1.6,
-                            padding: '10px 14px', borderRadius: 6,
-                            background: hasViolation ? T.redDim : T.surface2,
-                            border: `1px solid ${hasViolation ? T.red + '33' : T.border}`,
+                            fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.6,
+                            padding: '10px 14px', borderRadius: 4,
+                            background: hasViolation ? 'var(--error-dim)' : 'var(--surface-elevated)',
+                            border: hasViolation ? '1px solid var(--error)' : '1px solid var(--border)',
                           }}>
-                            <div style={{ color: T.textBright, fontWeight: 600, marginBottom: 4 }}>
+                            <div style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 4 }}>
                               {node.path}
                             </div>
-                            <div style={{ color: T.dim, fontSize: 11 }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
                               {node.type} &middot; id: {node.id}
                               {node.properties.colors && (
                                 <span> &middot; colors: {Object.values(node.properties.colors).join(', ')}</span>
@@ -1226,7 +1242,7 @@ export default function ScanPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {report.violations.length === 0 ? (
                         <div style={{
-                          fontFamily: mono, fontSize: 13, color: T.green,
+                          fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--success)',
                           textAlign: 'center', padding: 32,
                         }}>
                           No violations found
@@ -1245,21 +1261,21 @@ export default function ScanPage() {
                         const wasFixed = rewriteResult.appliedFixes.some(f => f.nodeId === node.id)
                         return (
                           <div key={node.id} style={{
-                            fontFamily: mono, fontSize: 12, lineHeight: 1.6,
-                            padding: '10px 14px', borderRadius: 6,
-                            background: wasFixed ? T.greenDim : T.surface2,
-                            border: `1px solid ${wasFixed ? T.green + '33' : T.border}`,
+                            fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.6,
+                            padding: '10px 14px', borderRadius: 4,
+                            background: wasFixed ? 'var(--success-dim)' : 'var(--surface-elevated)',
+                            border: wasFixed ? '1px solid var(--success)' : '1px solid var(--border)',
                           }}>
                             <div style={{
-                              color: wasFixed ? T.green : T.textBright,
+                              color: wasFixed ? 'var(--success)' : 'var(--text-primary)',
                               fontWeight: 600, marginBottom: 4,
                               display: 'flex', alignItems: 'center', gap: 8,
                             }}>
                               {node.path}
                               {wasFixed && (
                                 <span style={{
-                                  fontFamily: mono, fontSize: 9, fontWeight: 700,
-                                  color: T.green, background: T.greenDim,
+                                  fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+                                  color: 'var(--bg)', background: 'var(--success)',
                                   padding: '2px 6px', borderRadius: 3,
                                   animation: 'pulseFixed 600ms ease-out',
                                 }}>
@@ -1267,7 +1283,7 @@ export default function ScanPage() {
                                 </span>
                               )}
                             </div>
-                            <div style={{ color: T.dim, fontSize: 11 }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
                               {node.type} &middot; id: {node.id}
                               {node.properties.colors && (
                                 <span> &middot; colors: {Object.values(node.properties.colors).join(', ')}</span>
@@ -1300,11 +1316,10 @@ export default function ScanPage() {
                   onMouseEnter={() => setHoveredBtn('report')}
                   onMouseLeave={() => setHoveredBtn(null)}
                   style={{
-                    fontFamily: syne, fontSize: 17, fontWeight: 700,
-                    color: T.green, textDecoration: 'none',
+                    fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600,
+                    color: 'var(--accent)', textDecoration: 'none',
                     display: 'flex', alignItems: 'center', gap: 8,
-                    transition: 'all 150ms ease',
-                    transform: hoveredBtn === 'report' ? 'scale(1.02)' : 'scale(1)',
+                    transition: 'all 200ms ease',
                   }}
                 >
                   View full report {'\u2192'}
@@ -1326,13 +1341,12 @@ export default function ScanPage() {
                   onMouseEnter={() => setHoveredBtn('another')}
                   onMouseLeave={() => setHoveredBtn(null)}
                   style={{
-                    fontFamily: mono, fontSize: 13, fontWeight: 600,
-                    color: T.muted, background: 'transparent',
-                    border: `1px solid ${T.border2}`,
-                    borderRadius: 8, padding: '10px 20px',
+                    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
+                    color: 'var(--text-secondary)', background: 'transparent',
+                    border: '1px solid var(--border-strong)',
+                    borderRadius: 4, padding: '10px 20px',
                     cursor: 'pointer',
-                    transition: 'all 150ms ease',
-                    transform: hoveredBtn === 'another' ? 'scale(1.02)' : 'scale(1)',
+                    transition: 'all 200ms ease',
                   }}
                 >
                   Scan another

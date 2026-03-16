@@ -3,15 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { loadSession } from '@/lib/session'
-
-const T = {
-  bg: '#080909', surface: '#0c0d0f', surface2: '#101214',
-  border: '#161819', border2: '#1e2226',
-  green: '#22c55e', greenDim: '#22c55e18',
-  text: '#f0f1f3', muted: '#6b7280', dim: '#374151',
-}
-const mono = "'DM Mono', monospace"
-const syne = "'Syne', sans-serif"
+import ThemeToggle from '@/components/ThemeToggle'
 
 const STEPS = [
   { label: 'Import', href: '/import', step: 0 },
@@ -26,8 +18,6 @@ export default function Stepper() {
   const pathname = usePathname()
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
   const [userName, setUserName] = useState<string | null>(null)
-  const [hoveredStep, setHoveredStep] = useState<number | null>(null)
-  const [hoveredMcp, setHoveredMcp] = useState(false)
 
   useEffect(() => {
     const session = loadSession()
@@ -37,19 +27,20 @@ export default function Stepper() {
     }
   }, [])
 
-  // Only show on product pages
   if (!PRODUCT_PATHS.some(p => pathname === p)) return null
 
   const currentIdx = STEPS.findIndex(s => pathname === s.href)
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center',
+      display: 'flex',
+      alignItems: 'center',
       padding: '12px 24px',
-      background: T.surface,
-      borderBottom: `1px solid ${T.border}`,
+      background: 'var(--surface)',
+      borderBottom: '1px solid var(--border)',
       position: 'relative',
       zIndex: 50,
+      fontFamily: 'var(--font-sans)',
     }}>
       <style>{`
         .stepper-steps-scroll {
@@ -74,13 +65,19 @@ export default function Stepper() {
         transition: 'opacity 150ms ease',
       }}>
         <div style={{
-          width: 26, height: 26, borderRadius: 6,
-          background: T.green,
+          width: 26, height: 26, borderRadius: 4,
+          background: 'var(--accent)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <span style={{ fontFamily: mono, fontSize: 13, fontWeight: 700, color: T.bg }}>M</span>
+          <span style={{
+            fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 700,
+            color: 'var(--bg)',
+          }}>M</span>
         </div>
-        <span style={{ fontFamily: syne, fontSize: 15, fontWeight: 700, color: T.text }}>muteform</span>
+        <span style={{
+          fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700,
+          color: 'var(--text-primary)', letterSpacing: '-0.01em',
+        }}>muteform</span>
       </a>
 
       {/* Steps */}
@@ -88,57 +85,78 @@ export default function Stepper() {
         {STEPS.map((step, i) => {
           const isActive = i === currentIdx
           const isCompleted = completedSteps.includes(i)
-          const isClickable = isCompleted || isActive
           const isFuture = !isActive && !isCompleted
-          const isHovered = hoveredStep === i
+          const isClickable = isCompleted || isActive
 
           return (
             <div key={step.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
               {isClickable ? (
                 <a
                   href={step.href}
-                  onMouseEnter={() => setHoveredStep(i)}
-                  onMouseLeave={() => setHoveredStep(null)}
                   style={{
-                    fontFamily: mono, fontSize: 12, fontWeight: 600, textDecoration: 'none',
-                    color: isActive ? '#000' : T.green,
-                    background: isActive ? T.green : (isHovered ? `${T.green}22` : T.greenDim),
-                    padding: '6px 14px', borderRadius: 6,
-                    border: isCompleted && !isActive ? `1px solid ${T.green}33` : '1px solid transparent',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 500,
+                    textDecoration: 'none',
+                    color: isActive ? 'var(--text-primary)' : 'var(--accent)',
+                    padding: '6px 12px',
+                    borderRadius: 4,
                     whiteSpace: 'nowrap',
-                    display: 'flex', alignItems: 'center', gap: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 7,
                     transition: 'all 150ms ease',
-                    transform: isHovered && !isActive ? 'scale(1.02)' : 'scale(1)',
                   }}
                 >
-                  <span style={{
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: isActive ? 'rgba(0,0,0,0.15)' : `${T.green}33`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: mono, fontSize: 10, fontWeight: 700,
-                    color: isActive ? '#000' : T.green,
-                  }}>
-                    {isCompleted ? '\u2713' : i + 1}
-                  </span>
+                  {isCompleted ? (
+                    <span style={{
+                      width: 20, height: 20, borderRadius: '50%',
+                      background: 'var(--accent)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span style={{
+                      width: 20, height: 20, borderRadius: '50%',
+                      border: '2px solid var(--accent)',
+                      background: 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
+                      color: 'var(--accent)',
+                      flexShrink: 0,
+                    }}>
+                      {i + 1}
+                    </span>
+                  )}
                   {step.label}
                 </a>
               ) : (
                 <span style={{
-                  fontFamily: mono, fontSize: 12, fontWeight: 600,
-                  color: T.dim,
-                  padding: '6px 14px', borderRadius: 6,
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: 'var(--text-muted)',
+                  padding: '6px 12px',
+                  borderRadius: 4,
                   whiteSpace: 'nowrap',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  opacity: isFuture ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  opacity: isFuture ? 0.7 : 1,
                   cursor: 'default',
                 }}>
                   <span style={{
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: T.surface2,
+                    width: 20, height: 20, borderRadius: '50%',
+                    background: 'var(--surface-elevated)',
+                    border: '1px solid var(--border)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: mono, fontSize: 10, fontWeight: 700,
-                    color: T.dim,
-                    border: `1px solid ${T.border2}`,
+                    fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
+                    color: 'var(--text-muted)',
+                    flexShrink: 0,
                   }}>
                     {i + 1}
                   </span>
@@ -149,64 +167,31 @@ export default function Stepper() {
               {/* Connection line between steps */}
               {i < STEPS.length - 1 && (
                 <div style={{
-                  width: 32, height: 2, margin: '0 2px',
-                  background: isCompleted ? T.green : T.border,
-                  borderRadius: 1,
+                  width: 32, height: 1, margin: '0 2px',
+                  background: isCompleted ? 'var(--accent)' : 'var(--border)',
                   transition: 'background 400ms ease',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}>
-                  {/* Animated fill for the progress line */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 0, left: 0,
-                    width: '100%', height: '100%',
-                    background: T.green,
-                    transform: isCompleted ? 'scaleX(1)' : 'scaleX(0)',
-                    transformOrigin: 'left center',
-                    transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1)',
-                  }} />
-                </div>
+                }} />
               )}
             </div>
           )
         })}
       </div>
 
-      {/* Right side: MCP link + user name */}
+      {/* Right side: user name + ThemeToggle */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
+        display: 'flex', alignItems: 'center', gap: 10,
         marginLeft: 16, flexShrink: 0,
       }}>
-        <a
-          href="/integrate"
-          onMouseEnter={() => setHoveredMcp(true)}
-          onMouseLeave={() => setHoveredMcp(false)}
-          style={{
-            fontFamily: mono, fontSize: 11, fontWeight: 600,
-            color: pathname === '/integrate' ? T.green : T.muted,
-            textDecoration: 'none',
-            padding: '5px 12px', borderRadius: 6,
-            whiteSpace: 'nowrap',
-            background: pathname === '/integrate' ? T.greenDim : (hoveredMcp ? `${T.text}08` : 'transparent'),
-            transition: 'all 150ms ease',
-          }}
-        >
-          MCP
-        </a>
-
         {userName && (
           <span style={{
-            fontFamily: mono, fontSize: 11, color: T.muted,
+            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+            color: 'var(--text-secondary)',
             whiteSpace: 'nowrap',
-            padding: '4px 10px',
-            background: T.surface2,
-            borderRadius: 5,
-            border: `1px solid ${T.border}`,
           }}>
             {userName}
           </span>
         )}
+        <ThemeToggle />
       </div>
     </div>
   )

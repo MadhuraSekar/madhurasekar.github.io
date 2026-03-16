@@ -1,6 +1,5 @@
 'use client'
-
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Stepper from '@/components/Stepper'
 import {
@@ -15,20 +14,14 @@ import {
   loadSession, saveSession, syncUserToSupabase, syncImportedSystem, markStepComplete,
 } from '@/lib/session'
 
-// ─── Design tokens ────────────────────────────────────────────
-const T = {
-  bg: '#080909', surface: '#0c0d0f', surface2: '#101214',
-  border: '#161819', border2: '#1e2226',
-  blue: '#0055FF', text: '#f0f1f3', muted: '#6b7280', dim: '#374151',
-  green: '#22c55e', greenDim: '#22c55e18',
-  amber: '#f59e0b', amberDim: '#f59e0b18',
-  red: '#ef4444', redDim: '#ef444418',
-  blueDim: '#0055FF18',
-}
-const syne = "'Syne', sans-serif"
-const mono = "'DM Mono', monospace"
+// ─── Font shorthands ─────────────────────────────────────────
+const serif = 'var(--font-serif)'
+const sans = 'var(--font-sans)'
+const mono = 'var(--font-mono)'
 
 // ─── Sample system visual identity ───────────────────────────
+// These are actual design system brand colors (data, not UI chrome).
+// They render as swatches to visually identify each sample system.
 const SAMPLE_VISUALS: Record<string, { swatches: string[]; label: string }> = {
   acme: {
     swatches: ['#0055FF', '#111111', '#22c55e', '#f59e0b', '#9ca3af'],
@@ -42,14 +35,6 @@ const SAMPLE_VISUALS: Record<string, { swatches: string[]; label: string }> = {
     swatches: ['#6750A4', '#625B71', '#7D5260'],
     label: 'Material Design 3',
   },
-}
-
-// ─── Category colors for success pills ──────────────────────
-const CATEGORY_COLORS: Record<string, string> = {
-  colors: '#0055FF',
-  spacing: '#22c55e',
-  components: '#f59e0b',
-  typography: '#a78bfa',
 }
 
 const SAMPLE_JSON = `{
@@ -71,7 +56,7 @@ const SAMPLE_JSON = `{
   }
 }`
 
-// ─── Helpers ──────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────
 function hexToLuma(hex: string): number {
   const c = hex.replace('#', '')
   const r = parseInt(c.slice(0, 2), 16) / 255
@@ -87,28 +72,28 @@ function ColorSwatches({ colors }: { colors: Record<string, string> }) {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-      gap: 10,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))',
+      gap: 8,
     }}>
       {entries.map(([name, hex]) => {
         const luma = hexToLuma(hex)
-        const labelColor = luma > 0.5 ? '#111' : '#fff'
         return (
           <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{
-              height: 52,
-              borderRadius: 8,
+              height: 48,
+              borderRadius: 4,
               background: hex,
-              border: `1px solid ${T.border2}`,
+              border: '1px solid var(--border)',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              alignItems: 'flex-end',
+              justifyContent: 'flex-start',
+              padding: 6,
             }}>
               <span style={{
                 fontFamily: mono,
                 fontSize: 10,
-                color: labelColor,
-                opacity: 0.75,
+                color: luma > 0.5 ? 'var(--text-primary)' : 'var(--surface)',
+                opacity: 0.8,
               }}>
                 {hex}
               </span>
@@ -116,9 +101,10 @@ function ColorSwatches({ colors }: { colors: Record<string, string> }) {
             <span style={{
               fontFamily: mono,
               fontSize: 11,
-              color: T.muted,
-              textAlign: 'center',
-              wordBreak: 'break-word',
+              color: 'var(--text-muted)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}>
               {name}
             </span>
@@ -131,29 +117,29 @@ function ColorSwatches({ colors }: { colors: Record<string, string> }) {
 
 // ─── Spacing Bars ────────────────────────────────────────────
 function SpacingBars({ scale }: { scale: number[] }) {
-  if (scale.length === 0) return null
-  const max = Math.max(...scale)
+  const max = Math.max(...scale, 1)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {scale.map(val => (
-        <div key={val} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {scale.map((v, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{
             fontFamily: mono,
             fontSize: 11,
-            color: T.muted,
+            color: 'var(--text-muted)',
             width: 32,
             textAlign: 'right',
             flexShrink: 0,
           }}>
-            {val}px
+            {v}
           </span>
           <div style={{
-            height: 10,
-            width: `${(val / max) * 100}%`,
-            background: T.blue,
+            height: 6,
             borderRadius: 3,
-            opacity: 0.7,
+            background: 'var(--accent)',
+            opacity: 0.5,
+            width: `${(v / max) * 100}%`,
             minWidth: 4,
+            transition: 'width 0.3s ease',
           }} />
         </div>
       ))}
@@ -174,42 +160,36 @@ function ConfirmationPanel({
 
   return (
     <div style={{
-      marginTop: 24,
-      border: `1px solid ${T.border2}`,
-      borderRadius: 12,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 4,
       overflow: 'hidden',
     }}>
-      {/* Panel header */}
+      {/* Header */}
       <div style={{
-        padding: '16px 20px',
-        background: T.surface,
-        borderBottom: `1px solid ${T.border2}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
+        padding: '20px 24px',
+        borderBottom: '1px solid var(--border)',
       }}>
-        <span style={{ fontSize: 16, color: T.green }}>&#10003;</span>
-        <div>
-          <div style={{
-            fontFamily: syne,
-            fontWeight: 700,
-            fontSize: 15,
-            color: T.text,
-          }}>
-            Parsed: {ds.sourceLabel}
-          </div>
-          <div style={{
-            fontFamily: mono,
-            fontSize: 12,
-            color: T.muted,
-            marginTop: 2,
-          }}>
-            {colorCount} color tokens &middot; {ds.tokens.spacing.length} spacing values &middot; {ds.typography.allowedStyles.length} typography styles &middot; {compCount} components
-          </div>
+        <h2 style={{
+          fontFamily: serif,
+          fontWeight: 400,
+          fontSize: 24,
+          color: 'var(--text-primary)',
+          margin: '0 0 6px',
+        }}>
+          {ds.sourceLabel}
+        </h2>
+        <div style={{
+          fontFamily: mono,
+          fontSize: 12,
+          color: 'var(--text-muted)',
+          marginTop: 4,
+        }}>
+          {colorCount} color tokens &middot; {ds.tokens.spacing.length} spacing values &middot; {ds.typography.allowedStyles.length} typography styles &middot; {compCount} components
         </div>
       </div>
 
-      <div style={{ padding: 20, background: T.bg, display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 32 }}>
 
         {/* Warnings */}
         {warnings.length > 0 && (
@@ -218,10 +198,10 @@ function ConfirmationPanel({
               <div key={w} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10,
                 padding: '10px 14px',
-                background: T.amberDim,
-                border: `1px solid ${T.amber}28`,
-                borderRadius: 8,
-                fontFamily: mono, fontSize: 12, color: T.amber,
+                background: 'var(--warning-dim)',
+                border: '1px solid var(--warning)',
+                borderRadius: 4,
+                fontFamily: sans, fontSize: 13, color: 'var(--warning)',
               }}>
                 <span style={{ flexShrink: 0, marginTop: 1 }}>&#9888;</span>
                 <span>{w}</span>
@@ -234,8 +214,8 @@ function ConfirmationPanel({
         {colorCount > 0 && (
           <div>
             <h3 style={{
-              fontFamily: syne, fontWeight: 700, fontSize: 13,
-              color: T.muted, textTransform: 'uppercase',
+              fontFamily: sans, fontWeight: 500, fontSize: 12,
+              color: 'var(--text-muted)', textTransform: 'uppercase',
               letterSpacing: '0.08em', margin: '0 0 12px',
             }}>
               Color Tokens ({colorCount})
@@ -248,8 +228,8 @@ function ConfirmationPanel({
         {ds.tokens.spacing.length > 0 && (
           <div>
             <h3 style={{
-              fontFamily: syne, fontWeight: 700, fontSize: 13,
-              color: T.muted, textTransform: 'uppercase',
+              fontFamily: sans, fontWeight: 500, fontSize: 12,
+              color: 'var(--text-muted)', textTransform: 'uppercase',
               letterSpacing: '0.08em', margin: '0 0 12px',
             }}>
               Spacing Scale
@@ -262,8 +242,8 @@ function ConfirmationPanel({
         {ds.typography.allowedStyles.length > 0 && (
           <div>
             <h3 style={{
-              fontFamily: syne, fontWeight: 700, fontSize: 13,
-              color: T.muted, textTransform: 'uppercase',
+              fontFamily: sans, fontWeight: 500, fontSize: 12,
+              color: 'var(--text-muted)', textTransform: 'uppercase',
               letterSpacing: '0.08em', margin: '0 0 12px',
             }}>
               Typography Styles
@@ -271,10 +251,10 @@ function ConfirmationPanel({
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {ds.typography.allowedStyles.map(s => (
                 <span key={s} style={{
-                  fontFamily: mono, fontSize: 12, color: T.text,
-                  background: T.surface2,
-                  border: `1px solid ${T.border2}`,
-                  borderRadius: 5, padding: '4px 10px',
+                  fontFamily: mono, fontSize: 12, color: 'var(--text-primary)',
+                  background: 'var(--surface-elevated)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 4, padding: '4px 10px',
                 }}>
                   {s}
                 </span>
@@ -287,8 +267,8 @@ function ConfirmationPanel({
         {compCount > 0 && (
           <div>
             <h3 style={{
-              fontFamily: syne, fontWeight: 700, fontSize: 13,
-              color: T.muted, textTransform: 'uppercase',
+              fontFamily: sans, fontWeight: 500, fontSize: 12,
+              color: 'var(--text-muted)', textTransform: 'uppercase',
               letterSpacing: '0.08em', margin: '0 0 12px',
             }}>
               Components &amp; Variants
@@ -296,21 +276,22 @@ function ConfirmationPanel({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {Object.entries(ds.components).map(([name, def]) => (
                 <div key={name} style={{
-                  background: T.surface2,
-                  border: `1px solid ${T.border2}`,
-                  borderRadius: 8, padding: '12px 14px',
+                  background: 'var(--surface-elevated)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 4, padding: '12px 14px',
                 }}>
                   <div style={{
-                    fontFamily: syne, fontWeight: 700, fontSize: 13,
-                    color: T.text, textTransform: 'capitalize', marginBottom: 8,
+                    fontFamily: sans, fontWeight: 600, fontSize: 13,
+                    color: 'var(--text-primary)', textTransform: 'capitalize', marginBottom: 8,
                   }}>
                     {name}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {def.allowedVariants.map(v => (
                       <span key={v} style={{
-                        fontFamily: mono, fontSize: 11, color: T.blue,
-                        background: T.blueDim, border: `1px solid ${T.blue}28`,
+                        fontFamily: mono, fontSize: 11, color: 'var(--accent)',
+                        background: 'var(--accent-dim)',
+                        border: '1px solid var(--accent)',
                         borderRadius: 4, padding: '2px 8px',
                       }}>
                         {v}
@@ -318,8 +299,9 @@ function ConfirmationPanel({
                     ))}
                     {def.allowedSizes.map(s => (
                       <span key={s} style={{
-                        fontFamily: mono, fontSize: 11, color: T.muted,
-                        background: T.surface, border: `1px solid ${T.border2}`,
+                        fontFamily: mono, fontSize: 11, color: 'var(--text-muted)',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
                         borderRadius: 4, padding: '2px 8px',
                       }}>
                         {s}
@@ -336,7 +318,7 @@ function ConfirmationPanel({
   )
 }
 
-// ─── Name/Company Modal Overlay ──────────────────────────────
+// ─── Identity Modal ──────────────────────────────────────────
 function IdentityModal({
   onSave,
 }: {
@@ -354,42 +336,41 @@ function IdentityModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'rgba(0,0,0,0.7)',
+      background: 'rgba(10,9,8,0.7)',
       backdropFilter: 'blur(4px)',
-      padding: 20,
+      padding: 24,
     }}>
       <div style={{
         width: '100%',
         maxWidth: 420,
-        background: T.surface,
-        border: `1px solid ${T.border2}`,
-        borderRadius: 16,
-        padding: '36px 32px 32px',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 4,
+        padding: '40px 32px 32px',
       }}>
         <h2 style={{
-          fontFamily: syne,
-          fontWeight: 700,
-          fontSize: 22,
-          color: T.text,
+          fontFamily: serif,
+          fontWeight: 400,
+          fontSize: 28,
+          color: 'var(--text-primary)',
           margin: '0 0 8px',
-          letterSpacing: '-0.3px',
+          lineHeight: 1.2,
         }}>
           Before we start &mdash; who are you?
         </h2>
         <p style={{
-          fontFamily: mono,
-          fontSize: 13,
-          color: T.muted,
-          margin: '0 0 28px',
-          lineHeight: 1.5,
+          fontFamily: sans,
+          fontSize: 14,
+          color: 'var(--text-secondary)',
+          margin: '0 0 32px',
+          lineHeight: 1.6,
         }}>
           We&apos;ll save your progress so you can pick up where you left off.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>Name</label>
+            <label style={{ fontFamily: sans, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>Name</label>
             <input
               type="text"
               value={name}
@@ -397,19 +378,19 @@ function IdentityModal({
               placeholder="Jane Doe"
               autoFocus
               style={{
-                fontFamily: mono, fontSize: 14, color: T.text,
-                background: T.bg, border: `1px solid ${T.border2}`,
-                borderRadius: 8, padding: '12px 14px', outline: 'none',
+                fontFamily: sans, fontSize: 14, color: 'var(--text-primary)',
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '10px 12px', outline: 'none',
                 transition: 'border-color 0.15s',
                 width: '100%', boxSizing: 'border-box',
               }}
-              onFocus={e => (e.currentTarget.style.borderColor = T.blue)}
-              onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
             />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>Company</label>
+            <label style={{ fontFamily: sans, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>Company</label>
             <input
               type="text"
               value={company}
@@ -417,14 +398,14 @@ function IdentityModal({
               placeholder="Acme Corp"
               onKeyDown={e => e.key === 'Enter' && canSave && onSave(name.trim(), company.trim())}
               style={{
-                fontFamily: mono, fontSize: 14, color: T.text,
-                background: T.bg, border: `1px solid ${T.border2}`,
-                borderRadius: 8, padding: '12px 14px', outline: 'none',
+                fontFamily: sans, fontSize: 14, color: 'var(--text-primary)',
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '10px 12px', outline: 'none',
                 transition: 'border-color 0.15s',
                 width: '100%', boxSizing: 'border-box',
               }}
-              onFocus={e => (e.currentTarget.style.borderColor = T.blue)}
-              onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
             />
           </div>
 
@@ -432,17 +413,14 @@ function IdentityModal({
             onClick={() => canSave && onSave(name.trim(), company.trim())}
             disabled={!canSave}
             style={{
-              fontFamily: mono, fontSize: 14, fontWeight: 700,
-              color: '#000', background: T.green,
-              border: 'none', borderRadius: 10,
-              padding: '14px 24px', cursor: canSave ? 'pointer' : 'not-allowed',
+              fontFamily: sans, fontSize: 14, fontWeight: 600,
+              color: 'var(--bg)', background: 'var(--accent)',
+              border: 'none', borderRadius: 4,
+              padding: '12px 24px', cursor: canSave ? 'pointer' : 'not-allowed',
               opacity: canSave ? 1 : 0.4,
               marginTop: 8,
-              transition: 'transform 0.15s, opacity 0.15s',
-              letterSpacing: '0.01em',
+              transition: 'opacity 0.15s',
             }}
-            onMouseEnter={e => { if (canSave) e.currentTarget.style.transform = 'scale(1.02)' }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
           >
             Save and continue
           </button>
@@ -472,51 +450,48 @@ function MethodCard({
       style={{
         flex: 1,
         minWidth: 200,
-        minHeight: 200,
-        background: T.surface,
-        border: `2px solid ${selected ? T.green : T.border}`,
-        borderRadius: 14,
-        padding: '28px 24px',
+        background: 'var(--surface)',
+        border: selected ? '1px solid var(--accent)' : '1px solid var(--border)',
+        borderRadius: 4,
+        padding: '24px 20px',
         cursor: 'pointer',
         textAlign: 'left',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
-        gap: 14,
-        transition: 'border-color 0.2s, transform 0.15s, background 0.15s',
+        gap: 12,
+        transition: 'border-color 0.15s',
       }}
       onMouseEnter={e => {
-        if (!selected) e.currentTarget.style.borderColor = T.border2
-        e.currentTarget.style.transform = 'scale(1.02)'
+        if (!selected) e.currentTarget.style.borderColor = 'var(--border-strong)'
       }}
       onMouseLeave={e => {
-        if (!selected) e.currentTarget.style.borderColor = T.border
-        e.currentTarget.style.transform = 'scale(1)'
+        if (!selected) e.currentTarget.style.borderColor = 'var(--border)'
       }}
     >
       <div style={{
-        fontSize: 32,
+        fontSize: 28,
         lineHeight: 1,
-        opacity: selected ? 1 : 0.6,
-        transition: 'opacity 0.15s',
+        color: selected ? 'var(--accent)' : 'var(--text-muted)',
+        transition: 'color 0.15s',
       }}>
         {icon}
       </div>
       <div>
         <div style={{
-          fontFamily: syne,
-          fontWeight: 700,
-          fontSize: 17,
-          color: selected ? T.text : T.muted,
-          marginBottom: 6,
+          fontFamily: sans,
+          fontWeight: 600,
+          fontSize: 15,
+          color: selected ? 'var(--text-primary)' : 'var(--text-secondary)',
+          marginBottom: 4,
           transition: 'color 0.15s',
         }}>
           {title}
         </div>
         <div style={{
-          fontFamily: mono,
+          fontFamily: sans,
           fontSize: 13,
-          color: T.dim,
+          color: 'var(--text-muted)',
           lineHeight: 1.5,
         }}>
           {description}
@@ -527,14 +502,14 @@ function MethodCard({
           marginTop: 'auto',
           fontFamily: mono,
           fontSize: 11,
-          color: T.green,
+          color: 'var(--accent)',
           display: 'flex',
           alignItems: 'center',
           gap: 6,
         }}>
           <span style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: T.green, display: 'inline-block',
+            width: 6, height: 6, borderRadius: '50%',
+            background: 'var(--accent)', display: 'inline-block',
           }} />
           Selected
         </div>
@@ -558,41 +533,36 @@ function SampleCard({
     <button
       onClick={onClick}
       style={{
-        background: T.surface,
-        border: `1px solid ${T.border}`,
-        borderRadius: 12,
-        padding: '22px 20px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 4,
+        padding: '20px',
         cursor: 'pointer',
         textAlign: 'left',
         display: 'flex',
         flexDirection: 'column',
-        gap: 14,
-        transition: 'border-color 0.15s, transform 0.15s, background 0.15s',
+        gap: 12,
+        transition: 'border-color 0.15s',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = T.border2
-        e.currentTarget.style.background = T.surface2
-        e.currentTarget.style.transform = 'scale(1.02)'
+        e.currentTarget.style.borderColor = 'var(--border-strong)'
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = T.border
-        e.currentTarget.style.background = T.surface
-        e.currentTarget.style.transform = 'scale(1)'
+        e.currentTarget.style.borderColor = 'var(--border)'
       }}
     >
-      {/* Color swatch row */}
+      {/* Color swatch row — these are design system brand colors (data), not UI chrome */}
       {visuals && (
         <div style={{ display: 'flex', gap: isCarbonSingle ? 0 : 8, alignItems: 'center' }}>
           {visuals.swatches.map((color, i) => (
             <div
               key={i}
               style={{
-                width: isCarbonSingle ? 48 : 28,
-                height: isCarbonSingle ? 48 : 28,
+                width: isCarbonSingle ? 40 : 24,
+                height: isCarbonSingle ? 40 : 24,
                 borderRadius: '50%',
                 background: color,
-                border: `2px solid ${T.surface}`,
-                boxShadow: `0 0 0 1px ${T.border2}`,
+                border: '1px solid var(--border)',
                 flexShrink: 0,
               }}
             />
@@ -601,19 +571,19 @@ function SampleCard({
       )}
 
       <div style={{
-        fontFamily: syne, fontWeight: 700, fontSize: 16,
-        color: T.text,
+        fontFamily: sans, fontWeight: 600, fontSize: 15,
+        color: 'var(--text-primary)',
       }}>
         {sample.name}
       </div>
       <div style={{
-        fontFamily: mono, fontSize: 12, color: T.muted,
+        fontFamily: sans, fontSize: 13, color: 'var(--text-muted)',
         lineHeight: 1.5,
       }}>
         {sample.description}
       </div>
       <div style={{
-        fontFamily: mono, fontSize: 12, color: T.dim,
+        fontFamily: mono, fontSize: 12, color: 'var(--text-muted)',
       }}>
         {sample.tokens} tokens &middot; {sample.components} components
       </div>
@@ -634,13 +604,11 @@ function SuccessScreen({
   const compCount = Object.keys(ds.components).length
   const typoCount = ds.typography.allowedStyles.length
 
-  const colorSwatchList = Object.values(ds.tokens.color).slice(0, 8)
-
   const pills = [
-    { label: `${colorCount} colors`, category: 'colors', swatches: colorSwatchList },
-    { label: `${spacingCount} spacing values`, category: 'spacing', swatches: [] },
-    { label: `${compCount} components`, category: 'components', swatches: [] },
-    { label: `${typoCount} typography styles`, category: 'typography', swatches: [] },
+    { label: `${colorCount} colors`, category: 'colors' },
+    { label: `${spacingCount} spacing values`, category: 'spacing' },
+    { label: `${compCount} components`, category: 'components' },
+    { label: `${typoCount} typography styles`, category: 'typography' },
   ]
 
   return (
@@ -648,7 +616,7 @@ function SuccessScreen({
       position: 'fixed',
       inset: 0,
       zIndex: 9998,
-      background: T.bg,
+      background: 'var(--bg)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -658,21 +626,21 @@ function SuccessScreen({
     }}>
       {/* Animated checkmark */}
       <div style={{
-        width: 88,
-        height: 88,
+        width: 80,
+        height: 80,
         borderRadius: '50%',
-        background: T.green,
+        background: 'var(--success)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 32,
         animation: 'checkPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
       }}>
-        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
           <path
-            d="M12 22L19 29L32 15"
-            stroke="#000"
-            strokeWidth="4"
+            d="M11 20L17 26L29 14"
+            stroke="var(--bg)"
+            strokeWidth="3.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -681,36 +649,35 @@ function SuccessScreen({
 
       {/* Title */}
       <h1 style={{
-        fontFamily: syne,
-        fontWeight: 700,
-        fontSize: 36,
-        color: T.text,
+        fontFamily: serif,
+        fontWeight: 400,
+        fontSize: 40,
+        color: 'var(--text-primary)',
         margin: '0 0 12px',
         textAlign: 'center',
-        letterSpacing: '-0.5px',
         lineHeight: 1.2,
       }}>
-        {ds.sourceLabel} imported successfully
+        {ds.sourceLabel} is live in Muteform.
       </h1>
 
       <p style={{
-        fontFamily: mono,
-        fontSize: 14,
-        color: T.muted,
+        fontFamily: sans,
+        fontSize: 15,
+        color: 'var(--text-secondary)',
         margin: '0 0 40px',
         textAlign: 'center',
       }}>
         Your design system is ready. Here&apos;s what we found:
       </p>
 
-      {/* Stats pills */}
+      {/* Category pills */}
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
-        gap: 14,
+        gap: 12,
         justifyContent: 'center',
         marginBottom: 48,
-        maxWidth: 640,
+        maxWidth: 600,
       }}>
         {pills.map(pill => (
           <div
@@ -718,38 +685,18 @@ function SuccessScreen({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
-              background: T.surface,
-              border: `1px solid ${T.border2}`,
-              borderLeft: `4px solid ${CATEGORY_COLORS[pill.category]}`,
-              borderRadius: 10,
-              padding: '12px 18px',
-              minWidth: 160,
+              gap: 8,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 4,
+              padding: '10px 16px',
             }}
           >
-            {/* Inline color swatches for colors pill */}
-            {pill.swatches.length > 0 && (
-              <div style={{ display: 'flex', gap: 3, marginRight: 4 }}>
-                {pill.swatches.map((hex, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: 3,
-                      background: hex,
-                      border: `1px solid ${T.border2}`,
-                      flexShrink: 0,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
             <span style={{
               fontFamily: mono,
               fontSize: 13,
-              color: T.text,
-              fontWeight: 600,
+              color: 'var(--text-primary)',
+              fontWeight: 500,
               whiteSpace: 'nowrap',
             }}>
               {pill.label}
@@ -762,15 +709,14 @@ function SuccessScreen({
       <button
         onClick={onContinue}
         style={{
-          fontFamily: mono, fontSize: 16, fontWeight: 700,
-          color: '#000', background: T.green,
-          border: 'none', borderRadius: 12,
-          padding: '18px 40px', cursor: 'pointer',
-          letterSpacing: '0.01em',
-          transition: 'transform 0.15s, opacity 0.15s',
+          fontFamily: sans, fontSize: 16, fontWeight: 600,
+          color: 'var(--bg)', background: 'var(--accent)',
+          border: 'none', borderRadius: 4,
+          padding: '16px 40px', cursor: 'pointer',
+          transition: 'opacity 0.15s',
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+        onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
       >
         Set your governance rules &#8594;
       </button>
@@ -837,7 +783,7 @@ export default function ImportPage() {
     setToast(msg)
   }
 
-  const handleSaveUser = useCallback(async (name: string, company: string) => {
+  async function handleSaveUser(name: string, company: string) {
     const session = loadSession()
     const user = { name, company, createdAt: new Date().toISOString() }
     session.user = user
@@ -849,7 +795,7 @@ export default function ImportPage() {
       session.user!.id = id
       saveSession(session)
     }
-  }, [])
+  }
 
   function handleParsed(ds: ImportedDesignSystem) {
     setParsed(ds)
@@ -950,9 +896,9 @@ export default function ImportPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: T.bg,
-      color: T.text,
-      fontFamily: mono,
+      background: 'var(--bg)',
+      color: 'var(--text-primary)',
+      fontFamily: sans,
     }}>
       <Stepper />
 
@@ -972,21 +918,20 @@ export default function ImportPage() {
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 1000,
-          background: T.surface2,
-          border: `1px solid ${T.green}44`,
-          borderRadius: 8,
+          background: 'var(--surface-elevated)',
+          border: '1px solid var(--success)',
+          borderRadius: 4,
           padding: '10px 20px',
-          fontFamily: mono,
+          fontFamily: sans,
           fontSize: 13,
-          color: T.green,
-          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+          color: 'var(--success)',
         }}>
           {toast}
         </div>
       )}
 
       <main style={{
-        maxWidth: 860,
+        maxWidth: 720,
         margin: '0 auto',
         padding: '48px 24px 80px',
       }}>
@@ -994,13 +939,14 @@ export default function ImportPage() {
         {/* Page heading */}
         <div style={{ marginBottom: 40 }}>
           <h1 style={{
-            fontFamily: syne, fontWeight: 700, fontSize: 32,
-            color: T.text, margin: '0 0 10px', letterSpacing: '-0.5px',
+            fontFamily: serif, fontWeight: 400, fontSize: 40,
+            color: 'var(--text-primary)', margin: '0 0 8px',
+            lineHeight: 1.15,
           }}>
             Import Design System
           </h1>
           <p style={{
-            fontFamily: mono, fontSize: 14, color: T.muted,
+            fontFamily: sans, fontSize: 15, color: 'var(--text-secondary)',
             margin: 0, lineHeight: 1.6,
           }}>
             Load your token file to generate governance rules automatically.
@@ -1011,9 +957,9 @@ export default function ImportPage() {
         {/* Existing system banner */}
         {existingSystem && !importSuccess && !parsed && (
           <div style={{
-            background: T.surface,
-            border: `1px solid ${T.green}33`,
-            borderRadius: 10,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 4,
             padding: '16px 20px',
             marginBottom: 32,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1021,42 +967,42 @@ export default function ImportPage() {
           }}>
             <div>
               <div style={{
-                fontFamily: syne, fontWeight: 700, fontSize: 14, color: T.green,
+                fontFamily: sans, fontWeight: 600, fontSize: 14, color: 'var(--success)',
               }}>
                 Already imported: {existingSystem.sourceLabel}
               </div>
               <div style={{
-                fontFamily: mono, fontSize: 12, color: T.muted, marginTop: 4,
+                fontFamily: mono, fontSize: 12, color: 'var(--text-muted)', marginTop: 4,
               }}>
                 {Object.keys(existingSystem.tokens.color).length} colors &middot; {existingSystem.tokens.spacing.length} spacing &middot; {Object.keys(existingSystem.components).length} components
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={handleReImport}
                 style={{
-                  fontFamily: mono, fontSize: 12, fontWeight: 600,
-                  color: T.muted, background: T.surface2,
-                  border: `1px solid ${T.border2}`, borderRadius: 8,
+                  fontFamily: sans, fontSize: 13, fontWeight: 500,
+                  color: 'var(--text-secondary)', background: 'transparent',
+                  border: '1px solid var(--border)', borderRadius: 4,
                   padding: '8px 16px', cursor: 'pointer',
-                  transition: 'transform 0.15s',
+                  transition: 'border-color 0.15s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
               >
                 Re-import
               </button>
               <button
                 onClick={() => router.push('/rules')}
                 style={{
-                  fontFamily: mono, fontSize: 12, fontWeight: 600,
-                  color: '#000', background: T.green,
-                  border: 'none', borderRadius: 8,
+                  fontFamily: sans, fontSize: 13, fontWeight: 600,
+                  color: 'var(--bg)', background: 'var(--accent)',
+                  border: 'none', borderRadius: 4,
                   padding: '8px 16px', cursor: 'pointer',
-                  transition: 'transform 0.15s',
+                  transition: 'opacity 0.15s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
               >
                 Set governance rules &#8594;
               </button>
@@ -1088,7 +1034,7 @@ export default function ImportPage() {
                 onClick={() => selectMethod('url')}
               />
               <MethodCard
-                icon={<span style={{ fontFamily: mono }}>&#9733;</span>}
+                icon={<span style={{ fontFamily: mono }}>&#9633;</span>}
                 title="Sample Systems"
                 description="Try with a pre-built design system to explore the tool"
                 selected={activeMethod === 'sample'}
@@ -1099,19 +1045,19 @@ export default function ImportPage() {
             {/* ── PATH A: Paste JSON ── */}
             {activeMethod === 'paste' && (
               <div style={{
-                background: T.surface, border: `1px solid ${T.border}`,
-                borderRadius: 12, padding: 24,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 4, padding: 24,
                 marginBottom: 24,
               }}>
                 <h2 style={{
-                  fontFamily: syne, fontWeight: 700, fontSize: 16,
-                  color: T.text, margin: '0 0 6px',
+                  fontFamily: serif, fontWeight: 400, fontSize: 22,
+                  color: 'var(--text-primary)', margin: '0 0 4px',
                 }}>
                   Paste JSON
                 </h2>
                 <p style={{
-                  fontFamily: mono, fontSize: 13, color: T.muted,
-                  margin: '0 0 18px', lineHeight: 1.5,
+                  fontFamily: sans, fontSize: 14, color: 'var(--text-secondary)',
+                  margin: '0 0 16px', lineHeight: 1.5,
                 }}>
                   Paste your design token JSON below. A realistic example is pre-filled.
                 </p>
@@ -1121,20 +1067,20 @@ export default function ImportPage() {
                   onChange={e => setPasteInput(e.target.value)}
                   rows={16}
                   style={{
-                    width: '100%', fontFamily: mono, fontSize: 12,
-                    color: T.text, background: T.bg,
-                    border: `1px solid ${T.border2}`, borderRadius: 8,
+                    width: '100%', fontFamily: mono, fontSize: 13,
+                    color: 'var(--text-primary)', background: 'var(--code-bg)',
+                    border: '1px solid var(--border)', borderRadius: 6,
                     padding: '12px 14px', resize: 'vertical', outline: 'none',
                     boxSizing: 'border-box', lineHeight: 1.6,
                     transition: 'border-color 0.15s',
                   }}
-                  onFocus={e => (e.currentTarget.style.borderColor = T.blue)}
-                  onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
                 />
 
-                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
+                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
                   {parseStatus && (
-                    <span style={{ fontFamily: mono, fontSize: 12, color: T.muted }}>
+                    <span style={{ fontFamily: sans, fontSize: 13, color: 'var(--text-muted)' }}>
                       {parseStatus}
                     </span>
                   )}
@@ -1142,16 +1088,16 @@ export default function ImportPage() {
                     onClick={handlePasteJson}
                     disabled={!pasteInput.trim()}
                     style={{
-                      fontFamily: mono, fontSize: 13, fontWeight: 600,
-                      color: '#fff', background: T.blue,
-                      border: 'none', borderRadius: 8,
+                      fontFamily: sans, fontSize: 14, fontWeight: 600,
+                      color: 'var(--bg)', background: 'var(--accent)',
+                      border: 'none', borderRadius: 4,
                       padding: '10px 20px',
                       cursor: !pasteInput.trim() ? 'not-allowed' : 'pointer',
-                      opacity: !pasteInput.trim() ? 0.5 : 1,
-                      transition: 'transform 0.15s, opacity 0.15s',
+                      opacity: !pasteInput.trim() ? 0.4 : 1,
+                      transition: 'opacity 0.15s',
                     }}
-                    onMouseEnter={e => { if (pasteInput.trim()) e.currentTarget.style.transform = 'scale(1.02)' }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                    onMouseEnter={e => { if (pasteInput.trim()) e.currentTarget.style.opacity = '0.85' }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = pasteInput.trim() ? '1' : '0.4' }}
                   >
                     Parse
                   </button>
@@ -1159,10 +1105,10 @@ export default function ImportPage() {
 
                 {fetchError && activeMethod === 'paste' && (
                   <div style={{
-                    marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8,
-                    padding: '10px 14px', background: T.redDim,
-                    border: `1px solid ${T.red}28`, borderRadius: 8,
-                    fontFamily: mono, fontSize: 12, color: T.red,
+                    marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 8,
+                    padding: '10px 14px', background: 'var(--error-dim)',
+                    border: '1px solid var(--error)', borderRadius: 4,
+                    fontFamily: sans, fontSize: 13, color: 'var(--error)',
                   }}>
                     <span style={{ flexShrink: 0 }}>&#10005;</span>
                     <span>{fetchError}</span>
@@ -1174,24 +1120,24 @@ export default function ImportPage() {
             {/* ── PATH B: URL Fetch ── */}
             {activeMethod === 'url' && (
               <div style={{
-                background: T.surface, border: `1px solid ${T.border}`,
-                borderRadius: 12, padding: 24,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 4, padding: 24,
                 marginBottom: 24,
               }}>
                 <h2 style={{
-                  fontFamily: syne, fontWeight: 700, fontSize: 16,
-                  color: T.text, margin: '0 0 6px',
+                  fontFamily: serif, fontWeight: 400, fontSize: 22,
+                  color: 'var(--text-primary)', margin: '0 0 4px',
                 }}>
                   Fetch from URL
                 </h2>
                 <p style={{
-                  fontFamily: mono, fontSize: 13, color: T.muted,
-                  margin: '0 0 18px', lineHeight: 1.5,
+                  fontFamily: sans, fontSize: 14, color: 'var(--text-secondary)',
+                  margin: '0 0 16px', lineHeight: 1.5,
                 }}>
                   Provide a publicly accessible URL to a JSON token file.
                 </p>
 
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <input
                     type="url"
                     value={urlInput}
@@ -1200,29 +1146,29 @@ export default function ImportPage() {
                     placeholder="https://example.com/tokens.json"
                     style={{
                       flex: 1, minWidth: 200, fontFamily: mono, fontSize: 13,
-                      color: T.text, background: T.bg,
-                      border: `1px solid ${T.border2}`, borderRadius: 8,
-                      padding: '10px 14px', outline: 'none',
+                      color: 'var(--text-primary)', background: 'var(--surface)',
+                      border: '1px solid var(--border)', borderRadius: 6,
+                      padding: '10px 12px', outline: 'none',
                       transition: 'border-color 0.15s',
                     }}
-                    onFocus={e => (e.currentTarget.style.borderColor = T.blue)}
-                    onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
                   />
                   <button
                     onClick={handleFetchUrl}
                     disabled={fetchStatus === 'loading' || !urlInput.trim()}
                     style={{
-                      fontFamily: mono, fontSize: 13, fontWeight: 600,
-                      color: '#fff', background: T.blue,
-                      border: 'none', borderRadius: 8,
+                      fontFamily: sans, fontSize: 14, fontWeight: 600,
+                      color: 'var(--bg)', background: 'var(--accent)',
+                      border: 'none', borderRadius: 4,
                       padding: '10px 20px',
                       cursor: (fetchStatus === 'loading' || !urlInput.trim()) ? 'not-allowed' : 'pointer',
-                      opacity: (fetchStatus === 'loading' || !urlInput.trim()) ? 0.5 : 1,
+                      opacity: (fetchStatus === 'loading' || !urlInput.trim()) ? 0.4 : 1,
                       whiteSpace: 'nowrap',
-                      transition: 'transform 0.15s, opacity 0.15s',
+                      transition: 'opacity 0.15s',
                     }}
-                    onMouseEnter={e => { if (urlInput.trim() && fetchStatus !== 'loading') e.currentTarget.style.transform = 'scale(1.02)' }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                    onMouseEnter={e => { if (urlInput.trim() && fetchStatus !== 'loading') e.currentTarget.style.opacity = '0.85' }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = (urlInput.trim() && fetchStatus !== 'loading') ? '1' : '0.4' }}
                   >
                     {fetchStatus === 'loading' ? 'Fetching...' : 'Fetch & Parse'}
                   </button>
@@ -1230,7 +1176,7 @@ export default function ImportPage() {
 
                 {parseStatus && fetchStatus === 'loading' && (
                   <div style={{
-                    marginTop: 12, fontFamily: mono, fontSize: 12, color: T.muted,
+                    marginTop: 12, fontFamily: sans, fontSize: 13, color: 'var(--text-muted)',
                   }}>
                     {parseStatus}
                   </div>
@@ -1238,10 +1184,10 @@ export default function ImportPage() {
 
                 {fetchError && activeMethod === 'url' && (
                   <div style={{
-                    marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8,
-                    padding: '10px 14px', background: T.redDim,
-                    border: `1px solid ${T.red}28`, borderRadius: 8,
-                    fontFamily: mono, fontSize: 12, color: T.red,
+                    marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 8,
+                    padding: '10px 14px', background: 'var(--error-dim)',
+                    border: '1px solid var(--error)', borderRadius: 4,
+                    fontFamily: sans, fontSize: 13, color: 'var(--error)',
                   }}>
                     <span style={{ flexShrink: 0 }}>&#10005;</span>
                     <span>{fetchError}</span>
@@ -1254,7 +1200,7 @@ export default function ImportPage() {
             {activeMethod === 'sample' && (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                 gap: 16,
                 marginBottom: 24,
               }}>
@@ -1274,26 +1220,19 @@ export default function ImportPage() {
                 <ConfirmationPanel ds={parsed} warnings={warnings} />
                 <div style={{
                   marginTop: 20, display: 'flex', alignItems: 'center',
-                  justifyContent: 'flex-end', gap: 14,
+                  justifyContent: 'flex-end', gap: 12,
                 }}>
                   <button
                     onClick={handleConfirmImport}
                     style={{
-                      fontFamily: mono, fontSize: 14, fontWeight: 600,
-                      color: '#000', background: T.green,
-                      border: 'none', borderRadius: 8,
+                      fontFamily: sans, fontSize: 14, fontWeight: 600,
+                      color: 'var(--bg)', background: 'var(--accent)',
+                      border: 'none', borderRadius: 4,
                       padding: '12px 28px', cursor: 'pointer',
-                      letterSpacing: '0.02em',
-                      transition: 'transform 0.15s, opacity 0.15s',
+                      transition: 'opacity 0.15s',
                     }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.opacity = '0.85'
-                      e.currentTarget.style.transform = 'scale(1.02)'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.opacity = '1'
-                      e.currentTarget.style.transform = 'scale(1)'
-                    }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
                   >
                     Confirm &amp; Save Import
                   </button>
@@ -1308,9 +1247,6 @@ export default function ImportPage() {
       <style>{`
         @media (max-width: 700px) {
           main { padding: 32px 16px 60px !important; }
-        }
-        @media (max-width: 600px) {
-          /* Stack method cards vertically on mobile */
         }
       `}</style>
     </div>

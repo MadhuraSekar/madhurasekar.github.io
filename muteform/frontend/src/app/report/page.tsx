@@ -5,28 +5,18 @@ import Stepper from '@/components/Stepper'
 import { loadReport, loadSession, markStepComplete } from '@/lib/session'
 import { reportToJSON, type GovernanceReport, type EnrichedViolation } from '@/lib/governance'
 
-// ─── Design Tokens ──────────────────────────────────────────
-const T = {
-  bg: '#08090d', surface: '#0c0e12', surface2: '#111318',
-  border: '#1a1d24', border2: '#252830',
-  green: '#00e087', greenDim: '#00e08718',
-  red: '#ff4070', redDim: '#ff407018',
-  amber: '#ffb830', amberDim: '#ffb83018',
-  blue: '#4090ff', blueDim: '#4090ff18',
-  purple: '#a855f7', purpleDim: '#a855f718',
-  muted: '#6b7280', dim: '#3a3f4a',
-  text: '#e8eaf0', textBright: '#f8f9fb',
-}
-const mono = "'JetBrains Mono', 'DM Mono', monospace"
-const syne = "'Syne', sans-serif"
-const sans = "'DM Sans', system-ui, sans-serif"
-
 // ─── Helpers ────────────────────────────────────────────────
 
 function scoreColor(score: number): string {
-  if (score >= 90) return T.green
-  if (score >= 60) return T.amber
-  return T.red
+  if (score >= 90) return 'var(--success)'
+  if (score >= 60) return 'var(--warning)'
+  return 'var(--error)'
+}
+
+function scoreColorDim(score: number): string {
+  if (score >= 90) return 'var(--success-dim)'
+  if (score >= 60) return 'var(--warning-dim)'
+  return 'var(--error-dim)'
 }
 
 function formatDate(iso: string): string {
@@ -47,7 +37,7 @@ function reportToMarkdown(report: GovernanceReport, company: string): string {
   lines.push(`**Scanned:** ${report.fixtureName} from ${report.fixtureSource}`)
   lines.push(`**Date:** ${formatDate(report.timestamp)}`)
   lines.push('')
-  lines.push(`## Score: ${report.overallScore} → ${report.afterScore} (+${report.afterScore - report.overallScore})`)
+  lines.push(`## Score: ${report.overallScore} \u2192 ${report.afterScore} (+${report.afterScore - report.overallScore})`)
   lines.push('')
   lines.push(`## Category Scores`)
   lines.push('')
@@ -110,17 +100,17 @@ const keyframesCSS = `
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes pulseFixed {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 ${T.green}44; }
-  50% { transform: scale(1.08); box-shadow: 0 0 0 6px ${T.green}00; }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 ${T.green}00; }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
 }
 @keyframes barGrow {
   from { width: 0%; }
 }
 @keyframes scoreGlow {
-  0% { filter: drop-shadow(0 0 6px ${T.green}66); }
-  50% { filter: drop-shadow(0 0 14px ${T.green}44); }
-  100% { filter: drop-shadow(0 0 6px ${T.green}66); }
+  0% { opacity: 1; }
+  50% { opacity: 0.85; }
+  100% { opacity: 1; }
 }
 .report-btn:hover {
   transform: scale(1.02) !important;
@@ -135,7 +125,6 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
   const strokeWidth = 8
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
-  const color = scoreColor(score)
 
   useEffect(() => {
     if (!visible) return
@@ -145,7 +134,6 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
     const animate = (now: number) => {
       const elapsed = now - start
       const progress = Math.min(elapsed / duration, 1)
-      // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3)
       setAnimatedScore(Math.round(eased * score))
       if (progress < 1) {
@@ -157,7 +145,6 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
   }, [visible, score])
 
   useEffect(() => {
-    // Use IntersectionObserver to trigger on visibility
     const el = document.getElementById('score-ring-container')
     if (!el) { setVisible(true); return }
     const obs = new IntersectionObserver(
@@ -183,12 +170,12 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
         {/* Track */}
         <circle
           cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={T.border2} strokeWidth={strokeWidth}
+          fill="none" stroke="var(--border)" strokeWidth={strokeWidth}
         />
         {/* Score arc */}
         <circle
           cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={color} strokeWidth={strokeWidth}
+          fill="none" stroke={scoreColor(score)} strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -202,13 +189,13 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
         alignItems: 'center', justifyContent: 'center',
       }}>
         <span style={{
-          fontFamily: mono, fontSize: size * 0.3, fontWeight: 800,
-          color, lineHeight: 1,
+          fontFamily: 'var(--font-serif)', fontSize: size * 0.3, fontWeight: 800,
+          color: scoreColor(score), lineHeight: 1,
         }}>
           {animatedScore}
         </span>
         <span style={{
-          fontFamily: mono, fontSize: 9, color: T.muted,
+          fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)',
           letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 4,
         }}>
           / 100
@@ -226,23 +213,23 @@ function ViolationPreview({ v }: { v: EnrichedViolation }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Was:</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>Was:</span>
           <div style={{
-            width: 18, height: 18, borderRadius: '50%', background: hex,
-            border: `2px solid ${T.red}88`, flexShrink: 0,
+            width: 14, height: 14, borderRadius: '50%', background: hex,
+            border: '2px solid var(--error)', flexShrink: 0,
           }} />
-          <span style={{ fontFamily: mono, fontSize: 10, color: T.red }}>{hex}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--error)' }}>{hex}</span>
         </div>
         {v.suggestedFix && v.suggestedFix.startsWith('#') && (
           <>
-            <span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>{'\u2192'}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>{'\u2192'}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Now:</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>Now:</span>
               <div style={{
-                width: 18, height: 18, borderRadius: '50%', background: v.suggestedFix,
-                border: `2px solid ${T.green}88`, flexShrink: 0,
+                width: 14, height: 14, borderRadius: '50%', background: v.suggestedFix,
+                border: '2px solid var(--success)', flexShrink: 0,
               }} />
-              <span style={{ fontFamily: mono, fontSize: 10, color: T.green }}>{v.suggestedFix}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--success)' }}>{v.suggestedFix}</span>
             </div>
           </>
         )}
@@ -255,19 +242,21 @@ function ViolationPreview({ v }: { v: EnrichedViolation }) {
     const sug = parseInt(v.suggestedFix.match(/(\d+)/)?.[1] || String(cur))
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Was:</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>Was:</span>
         <div style={{
           width: Math.min(cur * 2, 60), height: 8, borderRadius: 4,
-          background: `${T.red}80`,
+          background: 'var(--error)',
+          opacity: 0.5,
         }} />
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.red }}>{cur}px</span>
-        <span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>{'\u2192'}</span>
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Now:</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--error)' }}>{cur}px</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>{'\u2192'}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>Now:</span>
         <div style={{
           width: Math.min(sug * 2, 60), height: 8, borderRadius: 4,
-          background: `${T.green}80`,
+          background: 'var(--success)',
+          opacity: 0.5,
         }} />
-        <span style={{ fontFamily: mono, fontSize: 10, color: T.green }}>{sug}px</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--success)' }}>{sug}px</span>
       </div>
     )
   }
@@ -275,23 +264,25 @@ function ViolationPreview({ v }: { v: EnrichedViolation }) {
   if (v.type === 'typography') {
     return (
       <div style={{
-        fontFamily: mono, fontSize: 11, color: T.muted, marginTop: 6,
+        fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6,
         display: 'flex', alignItems: 'center', gap: 6,
       }}>
         <span style={{
           padding: '2px 8px', borderRadius: 4,
-          background: T.redDim, color: T.red,
-          border: `1px solid ${T.red}22`, fontSize: 10,
+          background: 'var(--error-dim)', color: 'var(--error)',
+          border: '1px solid var(--error)', fontSize: 10,
+          borderColor: 'color-mix(in srgb, var(--error) 20%, transparent)',
         }}>
           {v.evidence.match(/"([^"]+)"/)?.[1] || v.evidence}
         </span>
         {v.suggestedFix && (
           <>
-            <span style={{ color: T.dim }}>{'\u2192'}</span>
+            <span style={{ color: 'var(--text-muted)' }}>{'\u2192'}</span>
             <span style={{
               padding: '2px 8px', borderRadius: 4,
-              background: T.greenDim, color: T.green,
-              border: `1px solid ${T.green}22`, fontSize: 10,
+              background: 'var(--success-dim)', color: 'var(--success)',
+              border: '1px solid var(--success)', fontSize: 10,
+              borderColor: 'color-mix(in srgb, var(--success) 20%, transparent)',
             }}>
               {v.suggestedFix}
             </span>
@@ -307,19 +298,21 @@ function ViolationPreview({ v }: { v: EnrichedViolation }) {
         display: 'flex', alignItems: 'center', gap: 6, marginTop: 6,
       }}>
         <span style={{
-          fontFamily: mono, fontSize: 10, padding: '2px 10px',
-          borderRadius: 12, background: T.redDim, color: T.red,
-          border: `1px solid ${T.red}22`,
+          fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 10px',
+          borderRadius: 12, background: 'var(--error-dim)', color: 'var(--error)',
+          border: '1px solid var(--error)',
+          borderColor: 'color-mix(in srgb, var(--error) 20%, transparent)',
         }}>
           {v.evidence.match(/"([^"]+)"/)?.[1] || 'unknown'}
         </span>
         {v.suggestedFix && (
           <>
-            <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>{'\u2192'}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>{'\u2192'}</span>
             <span style={{
-              fontFamily: mono, fontSize: 10, padding: '2px 10px',
-              borderRadius: 12, background: T.greenDim, color: T.green,
-              border: `1px solid ${T.green}22`,
+              fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 10px',
+              borderRadius: 12, background: 'var(--success-dim)', color: 'var(--success)',
+              border: '1px solid var(--success)',
+              borderColor: 'color-mix(in srgb, var(--success) 20%, transparent)',
             }}>
               {v.suggestedFix}
             </span>
@@ -330,7 +323,7 @@ function ViolationPreview({ v }: { v: EnrichedViolation }) {
   }
 
   return (
-    <div style={{ fontFamily: sans, fontSize: 11, color: T.muted, marginTop: 6 }}>
+    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
       {v.fixDescription}
     </div>
   )
@@ -345,18 +338,19 @@ function SectionHeader({ label, count, color, dimColor }: {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '14px 0', marginTop: 32,
-      borderBottom: `1px solid ${T.border}`,
+      borderBottom: '1px solid var(--border)',
     }}>
       <span style={{
-        fontFamily: mono, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
         color, background: dimColor,
         padding: '3px 10px', borderRadius: 4,
-        border: `1px solid ${color}33`,
+        border: `1px solid ${color}`,
+        borderColor: 'color-mix(in srgb, currentColor 25%, transparent)',
       }}>
         {label}
       </span>
-      <span style={{ fontFamily: mono, fontSize: 13, fontWeight: 700, color }}>{count}</span>
-      <div style={{ flex: 1, height: 1, background: T.border }} />
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color }}>{count}</span>
+      <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
     </div>
   )
 }
@@ -366,32 +360,32 @@ function SectionHeader({ label, count, color, dimColor }: {
 function AutoFixedCard({ v, index }: { v: EnrichedViolation; index: number }) {
   return (
     <div style={{
-      padding: '16px 20px', background: T.surface,
-      border: `1px solid ${T.green}18`,
-      borderRadius: 10, marginTop: 8,
-      borderLeft: `3px solid ${T.green}44`,
+      padding: '16px 20px', background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 4, marginTop: 8,
+      borderLeft: '3px solid var(--success)',
       animation: `fadeInCard 0.4s ease ${index * 50}ms both`,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontFamily: sans, fontSize: 13, fontWeight: 700,
-            color: T.textBright, lineHeight: 1.3,
+            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+            color: 'var(--text-primary)', lineHeight: 1.3,
           }}>
             {v.ruleName}
           </div>
           <div style={{
-            fontFamily: mono, fontSize: 10, color: T.dim,
+            fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
             marginTop: 4, wordBreak: 'break-all',
           }}>
             {v.nodePath}
           </div>
         </div>
         <span style={{
-          fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
-          color: T.green, background: T.greenDim,
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+          color: 'var(--success)', background: 'var(--success-dim)',
           padding: '3px 10px', borderRadius: 4,
-          border: `1px solid ${T.green}33`,
+          border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
           whiteSpace: 'nowrap', flexShrink: 0,
           animation: 'pulseFixed 0.6s ease 0.5s both',
         }}>
@@ -409,32 +403,32 @@ function AutoFixedCard({ v, index }: { v: EnrichedViolation; index: number }) {
 function WarningCard({ v, index }: { v: EnrichedViolation; index: number }) {
   return (
     <div style={{
-      padding: '16px 20px', background: T.surface,
-      border: `1px solid ${T.amber}18`,
-      borderRadius: 10, marginTop: 8,
-      borderLeft: `3px solid ${T.amber}44`,
+      padding: '16px 20px', background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 4, marginTop: 8,
+      borderLeft: '3px solid var(--warning)',
       animation: `fadeInCard 0.4s ease ${index * 50}ms both`,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontFamily: sans, fontSize: 13, fontWeight: 700,
-            color: T.textBright, lineHeight: 1.3,
+            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+            color: 'var(--text-primary)', lineHeight: 1.3,
           }}>
             {v.ruleName}
           </div>
           <div style={{
-            fontFamily: mono, fontSize: 10, color: T.dim,
+            fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
             marginTop: 4, wordBreak: 'break-all',
           }}>
             {v.nodePath}
           </div>
         </div>
         <span style={{
-          fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
-          color: T.amber, background: T.amberDim,
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+          color: 'var(--warning)', background: 'var(--warning-dim)',
           padding: '3px 10px', borderRadius: 4,
-          border: `1px solid ${T.amber}33`,
+          border: '1px solid color-mix(in srgb, var(--warning) 25%, transparent)',
           whiteSpace: 'nowrap', flexShrink: 0,
         }}>
           WARNING
@@ -442,16 +436,16 @@ function WarningCard({ v, index }: { v: EnrichedViolation; index: number }) {
       </div>
 
       <div style={{
-        fontFamily: sans, fontSize: 12, color: T.muted,
+        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
         marginTop: 10, lineHeight: 1.6,
       }}>
-        <span style={{ color: T.text, fontWeight: 600 }}>Found: </span>{v.evidence}
+        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Found: </span>{v.evidence}
       </div>
       <div style={{
-        fontFamily: sans, fontSize: 12, color: T.muted,
+        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
         marginTop: 4, lineHeight: 1.6,
       }}>
-        <span style={{ color: T.amber, fontWeight: 600 }}>Recommended: </span>{v.fixDescription}
+        <span style={{ color: 'var(--warning)', fontWeight: 600 }}>Recommended: </span>{v.fixDescription}
       </div>
     </div>
   )
@@ -462,32 +456,32 @@ function WarningCard({ v, index }: { v: EnrichedViolation; index: number }) {
 function BlockedCard({ v, index }: { v: EnrichedViolation; index: number }) {
   return (
     <div style={{
-      padding: '16px 20px', background: T.surface,
-      border: `1px solid ${T.red}18`,
-      borderRadius: 10, marginTop: 8,
-      borderLeft: `3px solid ${T.red}44`,
+      padding: '16px 20px', background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 4, marginTop: 8,
+      borderLeft: '3px solid var(--error)',
       animation: `fadeInCard 0.4s ease ${index * 50}ms both`,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontFamily: sans, fontSize: 13, fontWeight: 700,
-            color: T.textBright, lineHeight: 1.3,
+            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+            color: 'var(--text-primary)', lineHeight: 1.3,
           }}>
             {v.ruleName}
           </div>
           <div style={{
-            fontFamily: mono, fontSize: 10, color: T.dim,
+            fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
             marginTop: 4, wordBreak: 'break-all',
           }}>
             {v.nodePath}
           </div>
         </div>
         <span style={{
-          fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
-          color: T.red, background: T.redDim,
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+          color: 'var(--error)', background: 'var(--error-dim)',
           padding: '3px 10px', borderRadius: 4,
-          border: `1px solid ${T.red}33`,
+          border: '1px solid color-mix(in srgb, var(--error) 25%, transparent)',
           whiteSpace: 'nowrap', flexShrink: 0,
         }}>
           BLOCKED
@@ -495,16 +489,16 @@ function BlockedCard({ v, index }: { v: EnrichedViolation; index: number }) {
       </div>
 
       <div style={{
-        fontFamily: sans, fontSize: 12, color: T.muted,
+        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
         marginTop: 10, lineHeight: 1.6,
       }}>
-        <span style={{ color: T.text, fontWeight: 600 }}>Issue: </span>{v.evidence}
+        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Issue: </span>{v.evidence}
       </div>
       <div style={{
-        fontFamily: sans, fontSize: 12, color: T.muted,
+        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
         marginTop: 4, lineHeight: 1.6,
       }}>
-        <span style={{ color: T.red, fontWeight: 600 }}>Action required: </span>{v.fixDescription}
+        <span style={{ color: 'var(--error)', fontWeight: 600 }}>Action required: </span>{v.fixDescription}
       </div>
     </div>
   )
@@ -526,11 +520,11 @@ function CopyButton({ label, onCopy }: { label: string; onCopy: () => void }) {
       className="report-btn"
       onClick={handleClick}
       style={{
-        fontFamily: mono, fontSize: 11, fontWeight: 600,
-        padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
-        background: copied ? T.greenDim : T.surface,
-        color: copied ? T.green : T.textBright,
-        border: `1px solid ${copied ? T.green + '44' : T.border}`,
+        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+        padding: '10px 20px', borderRadius: 4, cursor: 'pointer',
+        background: copied ? 'var(--success-dim)' : 'var(--surface)',
+        color: copied ? 'var(--success)' : 'var(--text-primary)',
+        border: copied ? '1px solid var(--success)' : '1px solid var(--border)',
         letterSpacing: '0.04em',
         transition: 'all 150ms ease',
       }}
@@ -543,33 +537,32 @@ function CopyButton({ label, onCopy }: { label: string; onCopy: () => void }) {
 // ─── CategoryBar ────────────────────────────────────────────
 
 function CategoryBar({ name, score, delay }: { name: string; score: number; delay: number }) {
-  const color = scoreColor(score)
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       marginBottom: 14,
     }}>
       <span style={{
-        fontFamily: sans, fontSize: 12, color: T.muted,
+        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)',
         width: 140, flexShrink: 0,
       }}>
         {name}
       </span>
       <div style={{
         flex: 1, height: 8, borderRadius: 4,
-        background: T.border,
+        background: 'var(--border)',
         overflow: 'hidden',
       }}>
         <div style={{
           height: '100%', borderRadius: 4,
           width: `${score}%`,
-          background: `linear-gradient(90deg, ${color}cc, ${color})`,
+          background: scoreColor(score),
           animation: `barGrow 0.8s ease ${delay}ms both`,
         }} />
       </div>
       <span style={{
-        fontFamily: mono, fontSize: 12, fontWeight: 700,
-        color, width: 32, textAlign: 'right',
+        fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+        color: scoreColor(score), width: 32, textAlign: 'right',
         flexShrink: 0,
       }}>
         {score}
@@ -599,7 +592,7 @@ export default function ReportPage() {
   // ─── Empty State ────────────────────────────────────────
   if (!report) {
     return (
-      <div style={{ minHeight: '100vh', background: T.bg, color: T.text }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
         <style>{keyframesCSS}</style>
         <Stepper />
         <div style={{
@@ -608,13 +601,13 @@ export default function ReportPage() {
           animation: 'fadeInPage 0.5s ease both',
         }}>
           <div style={{
-            fontFamily: sans, fontSize: 20, fontWeight: 700,
-            color: T.textBright, marginBottom: 8,
+            fontFamily: 'var(--font-sans)', fontSize: 20, fontWeight: 700,
+            color: 'var(--text-primary)', marginBottom: 8,
           }}>
             No report yet.
           </div>
           <div style={{
-            fontFamily: sans, fontSize: 14, color: T.muted, marginBottom: 28,
+            fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-muted)', marginBottom: 28,
           }}>
             Run a governance scan first.
           </div>
@@ -622,10 +615,10 @@ export default function ReportPage() {
             href="/scan"
             className="report-btn"
             style={{
-              fontFamily: mono, fontSize: 13, fontWeight: 700,
-              color: '#000', background: T.green,
+              fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+              color: 'var(--bg)', background: 'var(--accent)',
               textDecoration: 'none',
-              padding: '12px 32px', borderRadius: 8,
+              padding: '12px 32px', borderRadius: 4,
               border: 'none',
               display: 'inline-block',
               letterSpacing: '0.02em',
@@ -646,7 +639,7 @@ export default function ReportPage() {
   const delta = report.afterScore - report.overallScore
 
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.text }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
       <style>{keyframesCSS}</style>
       <Stepper />
 
@@ -657,62 +650,62 @@ export default function ReportPage() {
 
         {/* ─── Header ──────────────────────────────────────── */}
         <div style={{
-          background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: '32px 36px', marginBottom: 24,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 4, padding: '32px 36px', marginBottom: 24,
         }}>
-          <div style={{
-            fontFamily: syne, fontSize: 24, fontWeight: 800,
-            color: T.textBright, marginBottom: 20,
+          <h1 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 800,
+            color: 'var(--text-primary)', marginBottom: 20, marginTop: 0,
           }}>
-            Muteform Governance Report
-          </div>
+            Governance Report
+          </h1>
 
           <div style={{
             display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 20px',
           }}>
-            <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.06em' }}>Company</span>
-            <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>{company}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>Company</span>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>{company}</span>
 
-            <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.06em' }}>Design System</span>
-            <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>Acme Design System</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>Design System</span>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>Acme Design System</span>
 
-            <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.06em' }}>Scanned</span>
-            <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>
-              {report.fixtureName} <span style={{ color: T.muted }}>from</span> {report.fixtureSource}
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>Fixture</span>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>
+              {report.fixtureName} <span style={{ color: 'var(--text-muted)' }}>from</span> {report.fixtureSource}
             </span>
 
-            <span style={{ fontFamily: mono, fontSize: 11, color: T.dim, letterSpacing: '0.06em' }}>Date</span>
-            <span style={{ fontFamily: sans, fontSize: 13, color: T.text }}>{formatDate(report.timestamp)}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>Date</span>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>{formatDate(report.timestamp)}</span>
           </div>
         </div>
 
         {/* ─── Score Card ──────────────────────────────────── */}
         <div style={{
-          background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: '36px 36px 28px',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 4, padding: '36px 36px 28px',
           marginBottom: 24,
           display: 'flex', flexDirection: 'column', alignItems: 'center',
         }}>
           <ScoreRing score={report.afterScore} size={120} />
 
           <div style={{
-            fontFamily: mono, fontSize: 13, color: T.muted,
+            fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-muted)',
             marginTop: 16, textAlign: 'center', lineHeight: 1.6,
           }}>
             <span style={{ color: scoreColor(report.overallScore), fontWeight: 700 }}>{report.overallScore}</span>
-            <span style={{ color: T.dim, margin: '0 8px' }}>{'\u2192'}</span>
+            <span style={{ color: 'var(--text-muted)', margin: '0 8px' }}>{'\u2192'}</span>
             <span style={{ color: scoreColor(report.afterScore), fontWeight: 700 }}>{report.afterScore}</span>
-            <span style={{ color: T.dim, margin: '0 6px' }}>{'\u00B7'}</span>
+            <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>{'\u00B7'}</span>
             {delta > 0 ? (
               <span style={{
-                color: T.green, fontWeight: 700,
-                background: T.greenDim, padding: '2px 10px', borderRadius: 4,
-                border: `1px solid ${T.green}33`,
+                color: 'var(--success)', fontWeight: 700,
+                background: 'var(--success-dim)', padding: '2px 10px', borderRadius: 4,
+                border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
               }}>
                 +{delta} points after governance
               </span>
             ) : (
-              <span style={{ color: T.muted }}>
+              <span style={{ color: 'var(--text-muted)' }}>
                 {delta === 0 ? 'no change' : `${delta} points`}
               </span>
             )}
@@ -723,26 +716,26 @@ export default function ReportPage() {
             display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap', justifyContent: 'center',
           }}>
             <span style={{
-              fontFamily: mono, fontSize: 11, fontWeight: 600,
-              color: T.green, background: T.greenDim,
-              padding: '5px 14px', borderRadius: 6,
-              border: `1px solid ${T.green}33`,
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+              color: 'var(--success)', background: 'var(--success-dim)',
+              padding: '5px 14px', borderRadius: 4,
+              border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
             }}>
               {report.autoFixedCount} auto-fixed
             </span>
             <span style={{
-              fontFamily: mono, fontSize: 11, fontWeight: 600,
-              color: T.amber, background: T.amberDim,
-              padding: '5px 14px', borderRadius: 6,
-              border: `1px solid ${T.amber}33`,
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+              color: 'var(--warning)', background: 'var(--warning-dim)',
+              padding: '5px 14px', borderRadius: 4,
+              border: '1px solid color-mix(in srgb, var(--warning) 25%, transparent)',
             }}>
               {report.warningCount} warnings
             </span>
             <span style={{
-              fontFamily: mono, fontSize: 11, fontWeight: 600,
-              color: T.red, background: T.redDim,
-              padding: '5px 14px', borderRadius: 6,
-              border: `1px solid ${T.red}33`,
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+              color: 'var(--error)', background: 'var(--error-dim)',
+              padding: '5px 14px', borderRadius: 4,
+              border: '1px solid color-mix(in srgb, var(--error) 25%, transparent)',
             }}>
               {report.blockedCount} blocked
             </span>
@@ -751,12 +744,12 @@ export default function ReportPage() {
 
         {/* ─── Category Breakdown ──────────────────────────── */}
         <div style={{
-          background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: '28px 36px', marginBottom: 24,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 4, padding: '28px 36px', marginBottom: 24,
         }}>
           <div style={{
-            fontFamily: sans, fontSize: 14, fontWeight: 700,
-            color: T.textBright, marginBottom: 20,
+            fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700,
+            color: 'var(--text-primary)', marginBottom: 20,
             letterSpacing: '0.02em',
           }}>
             Category Breakdown
@@ -770,7 +763,7 @@ export default function ReportPage() {
         {/* ─── Auto-Fixed Section ──────────────────────────── */}
         {autoFixed.length > 0 && (
           <div>
-            <SectionHeader label="AUTO-FIXED" count={autoFixed.length} color={T.green} dimColor={T.greenDim} />
+            <SectionHeader label="AUTO-FIXED" count={autoFixed.length} color="var(--success)" dimColor="var(--success-dim)" />
             {autoFixed.map((v, i) => (
               <AutoFixedCard key={v.id} v={v} index={i} />
             ))}
@@ -780,7 +773,7 @@ export default function ReportPage() {
         {/* ─── Warnings Section ────────────────────────────── */}
         {warnings.length > 0 && (
           <div>
-            <SectionHeader label="WARNINGS" count={warnings.length} color={T.amber} dimColor={T.amberDim} />
+            <SectionHeader label="WARNINGS" count={warnings.length} color="var(--warning)" dimColor="var(--warning-dim)" />
             {warnings.map((v, i) => (
               <WarningCard key={v.id} v={v} index={i} />
             ))}
@@ -790,7 +783,7 @@ export default function ReportPage() {
         {/* ─── Blocked Section ─────────────────────────────── */}
         {blocked.length > 0 && (
           <div>
-            <SectionHeader label="BLOCKED" count={blocked.length} color={T.red} dimColor={T.redDim} />
+            <SectionHeader label="BLOCKED" count={blocked.length} color="var(--error)" dimColor="var(--error-dim)" />
             {blocked.map((v, i) => (
               <BlockedCard key={v.id} v={v} index={i} />
             ))}
@@ -801,9 +794,9 @@ export default function ReportPage() {
         <div style={{
           display: 'flex', gap: 10, marginTop: 48, flexWrap: 'wrap',
           padding: '24px 0',
-          borderTop: `1px solid ${T.border}`,
+          borderTop: '1px solid var(--border)',
           position: 'sticky', bottom: 0,
-          background: T.bg,
+          background: 'var(--bg)',
           zIndex: 10,
         }}>
           <CopyButton
@@ -823,9 +816,9 @@ export default function ReportPage() {
             href="/scan"
             className="report-btn"
             style={{
-              fontFamily: mono, fontSize: 11, fontWeight: 700,
-              padding: '10px 24px', borderRadius: 8, cursor: 'pointer',
-              background: T.green, color: '#000',
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+              padding: '10px 24px', borderRadius: 4, cursor: 'pointer',
+              background: 'var(--accent)', color: 'var(--bg)',
               border: 'none', textDecoration: 'none',
               letterSpacing: '0.02em',
               display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -843,26 +836,26 @@ export default function ReportPage() {
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '24px 32px', marginTop: 24,
-            background: T.surface, border: `1px solid ${T.border}`,
-            borderRadius: 14, textDecoration: 'none',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 4, textDecoration: 'none',
             transition: 'all 150ms ease',
           }}
         >
           <div>
             <div style={{
-              fontFamily: sans, fontSize: 16, fontWeight: 700,
-              color: T.textBright, marginBottom: 6,
+              fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700,
+              color: 'var(--text-primary)', marginBottom: 6,
             }}>
               Set up MCP integration
             </div>
             <div style={{
-              fontFamily: sans, fontSize: 13, color: T.muted, lineHeight: 1.5,
+              fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5,
             }}>
               Enforce governance automatically in your AI coding workflow.
             </div>
           </div>
           <span style={{
-            fontFamily: mono, fontSize: 22, color: T.green,
+            fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--accent)',
             flexShrink: 0, marginLeft: 20,
           }}>
             {'\u2192'}
