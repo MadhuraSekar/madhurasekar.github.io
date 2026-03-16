@@ -213,31 +213,25 @@ export default function DemoPage() {
   const [score, setScore] = useState(0)
   const [phase, setPhase] = useState<'loading' | 'scanned' | 'governed'>('loading')
   const [copied, setCopied] = useState(false)
-  const autoRan = useRef(false)
 
-  // Auto-run on page load: select onboarding fixture, scan after 800ms
+  // Auto-run on page load — synchronous, no delay needed (scan takes ~2ms)
   useEffect(() => {
-    if (autoRan.current) return
-    autoRan.current = true
-
-    const timer = setTimeout(() => {
-      const fixture = getFixture('onboarding')
-      if (!fixture) return
+    const fixture = getFixture('onboarding')
+    if (!fixture) return
+    try {
       const policy = loadConfig(DEMO_YAML)
       setConfig(policy)
       const result = scanArtifact(fixture.artifact, policy)
       setScanResult(result)
       setScore(result.score)
-
-      // Build initial report (no fixes yet)
       const initialReport = buildGovernanceReport(
         fixture.name, fixture.source, fixture.artifact, result, null, policy
       )
       setReport(initialReport)
       setPhase('scanned')
-    }, 800)
-
-    return () => clearTimeout(timer)
+    } catch (e) {
+      console.error('Demo scan failed:', e)
+    }
   }, [])
 
   const handleGovernance = useCallback(() => {

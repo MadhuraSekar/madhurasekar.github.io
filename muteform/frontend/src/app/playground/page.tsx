@@ -156,42 +156,34 @@ export default function PlaygroundPage() {
   const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null)
   const [report, setReport] = useState<GovernanceReport | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [scanning, setScanning] = useState(false)
   const [copied, setCopied] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const firstRun = useRef(false)
 
-  const handleScan = useCallback((yaml?: string, fixtureId?: string) => {
-    setScanning(true)
+  const runScan = useCallback((yaml: string, fixtureId: string) => {
     setError(null)
     setRewriteResult(null)
     setReport(null)
+    try {
+      const policy = loadConfig(yaml)
+      const fixture = getFixture(fixtureId)
+      if (!fixture) { setError(`Fixture "${fixtureId}" not found.`); return }
+      const result = scanArtifact(fixture.artifact, policy)
+      setScanResult(result)
+      const r = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, result, null, policy)
+      setReport(r)
+    } catch (e: any) {
+      setError(e.message || 'Failed to parse YAML or run scan.')
+    }
+  }, [])
 
-    setTimeout(() => {
-      try {
-        const y = yaml || yamlText
-        const fid = fixtureId || selectedFixture
-        const policy = loadConfig(y)
-        const fixture = getFixture(fid)
-        if (!fixture) { setError(`Fixture "${fid}" not found.`); setScanning(false); return }
-        const result = scanArtifact(fixture.artifact, policy)
-        setScanResult(result)
-        const r = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, result, null, policy)
-        setReport(r)
-      } catch (e: any) {
-        setError(e.message || 'Failed to parse YAML or run scan.')
-      } finally {
-        setScanning(false)
-      }
-    }, 50)
-  }, [yamlText, selectedFixture])
+  const handleScan = useCallback((yaml?: string, fixtureId?: string) => {
+    runScan(yaml || yamlText, fixtureId || selectedFixture)
+  }, [yamlText, selectedFixture, runScan])
 
-  // Auto-run on load
+  // Auto-run on load — synchronous, no delay
   useEffect(() => {
-    if (firstRun.current) return
-    firstRun.current = true
-    handleScan()
-  }, [handleScan])
+    runScan(buildYaml(DEFAULT_RULES), 'dashboard')
+  }, [runScan])
 
   const handleToggleRule = (ruleId: string) => {
     const updated = rules.map(r => r.id === ruleId ? { ...r, enabled: !r.enabled } : r)
@@ -350,14 +342,14 @@ export default function PlaygroundPage() {
           </div>
 
           {/* RUN SCAN button */}
-          <button onClick={() => handleScan()} disabled={scanning} style={{
+          <button onClick={() => handleScan()} style={{
             width: '100%', padding: '14px 0',
-            background: scanning ? T.dim : `linear-gradient(135deg, ${T.green}, #00c070)`,
+            background: `linear-gradient(135deg, ${T.green}, #00c070)`,
             border: 'none', borderRadius: 8, fontFamily: mono, fontSize: 14, fontWeight: 700,
-            color: scanning ? T.muted : T.bg, cursor: scanning ? 'wait' : 'pointer',
+            color: T.bg, cursor: 'pointer',
             letterSpacing: 1.5, textTransform: 'uppercase',
-            boxShadow: scanning ? 'none' : `0 0 24px ${T.greenGlow}`,
-          }}>{scanning ? 'Scanning...' : 'Run Scan'}</button>
+            boxShadow: `0 0 24px ${T.greenGlow}`,
+          }}>Run Scan</button>
 
           {error && (
             <div style={{
