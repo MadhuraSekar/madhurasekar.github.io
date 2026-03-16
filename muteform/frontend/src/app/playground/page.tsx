@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
-import type { MuteformConfig, Violation, ScanResult, RewriteResult } from '@/lib/engine'
-import { FIXTURES, getFixture, type FixtureEntry } from '@/lib/fixtures'
+import type { MuteformConfig, ScanResult, RewriteResult } from '@/lib/engine'
+import { FIXTURES, getFixture } from '@/lib/fixtures'
 import { buildGovernanceReport, reportToJSON, type GovernanceReport, type EnrichedViolation, type GovernanceSeverity } from '@/lib/governance'
 
-// ─── Design Tokens ───────────────────────────────────────────
 const T = {
   bg: '#08090d', surface: '#0c0e12', surface2: '#111318',
   border: '#1a1d24', border2: '#252830',
@@ -19,10 +18,10 @@ const T = {
   text: '#e8eaf0', textBright: '#f8f9fb',
 }
 const mono = "'JetBrains Mono', 'DM Mono', monospace"
+const syne = "'Syne', sans-serif"
 const sans = "'DM Sans', 'Inter', system-ui, sans-serif"
 const serif = "'Instrument Serif', Georgia, serif"
 
-// ─── Default YAML with toggleable rules ──────────────────────
 const DEFAULT_RULES = [
   { id: 'color-token-compliance', severity: 'high', description: 'All colors must reference approved design tokens', check: 'color.value IN tokens.colors.*', auto_fix: 'snap_nearest_delta_e', enabled: true },
   { id: 'spacing-scale-compliance', severity: 'medium', description: 'Spacing values must use the approved scale', check: 'spacing.value IN tokens.spacing.scale', auto_fix: 'snap_nearest', enabled: true },
@@ -37,37 +36,9 @@ function buildYaml(rules: typeof DEFAULT_RULES): string {
   const rulesYaml = enabledRules.map(r =>
     `  - id: "${r.id}"\n    severity: ${r.severity}\n    description: "${r.description}"\n    check: "${r.check}"\n    auto_fix: ${r.auto_fix === 'false' ? 'false' : `"${r.auto_fix}"`}`
   ).join('\n')
-
-  return `name: "Acme Design System"
-version: "1.0.0"
-
-tokens:
-  colors:
-    primary: "#0055FF"
-    neutral900: "#111111"
-    success: "#22c55e"
-    warning: "#f59e0b"
-    accent: "#9ca3af"
-  spacing:
-    scale: [4, 8, 12, 16, 24, 32, 48, 64]
-  typography:
-    families:
-      display: "Instrument Serif"
-      body: "DM Sans"
-      mono: "JetBrains Mono"
-    allowed_styles: [h1, h2, h3, body, body-sm, caption, label]
-  components:
-    button:
-      allowed_variants: [primary, secondary]
-      allowed_sizes: [sm, md, lg]
-  layout:
-    grid_columns: [4, 8, 12]
-
-rules:
-${rulesYaml}`
+  return `name: "Acme Design System"\nversion: "1.0.0"\n\ntokens:\n  colors:\n    primary: "#0055FF"\n    neutral900: "#111111"\n    success: "#22c55e"\n    warning: "#f59e0b"\n    accent: "#9ca3af"\n  spacing:\n    scale: [4, 8, 12, 16, 24, 32, 48, 64]\n  typography:\n    families:\n      display: "Instrument Serif"\n      body: "DM Sans"\n      mono: "JetBrains Mono"\n    allowed_styles: [h1, h2, h3, body, body-sm, caption, label]\n  components:\n    button:\n      allowed_variants: [primary, secondary]\n      allowed_sizes: [sm, md, lg]\n  layout:\n    grid_columns: [4, 8, 12]\n\nrules:\n${rulesYaml}`
 }
 
-// ─── Severity helpers ────────────────────────────────────────
 const GOV_SEV: Record<GovernanceSeverity, { color: string; dim: string; label: string }> = {
   'auto-fix': { color: T.green, dim: T.greenDim, label: 'FIXED' },
   'warn': { color: T.amber, dim: T.amberDim, label: 'WARN' },
@@ -77,77 +48,135 @@ const GOV_SEV: Record<GovernanceSeverity, { color: string; dim: string; label: s
 function severityColor(s: string): string {
   switch (s) { case 'critical': return T.red; case 'high': return T.red; case 'medium': return T.amber; default: return T.muted }
 }
-
 function scoreColor(score: number): string {
   if (score < 50) return T.red; if (score < 80) return T.amber; return T.green
 }
 
-// ─── Score Ring ──────────────────────────────────────────────
-function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
+function ScoreRing({ score, size = 140, label }: { score: number; size?: number; label?: string }) {
   const [displayed, setDisplayed] = useState(0)
   const animRef = useRef<number>()
-
   useEffect(() => {
     setDisplayed(0)
     const start = performance.now()
-    const duration = 1000
-    const animate = (now: number) => {
-      const t = Math.min((now - start) / duration, 1)
-      const eased = 1 - Math.pow(1 - t, 3)
-      setDisplayed(Math.round(eased * score))
-      if (t < 1) animRef.current = requestAnimationFrame(animate)
+    const run = (now: number) => {
+      const t = Math.min((now - start) / 1000, 1)
+      setDisplayed(Math.round((1 - Math.pow(1 - t, 3)) * score))
+      if (t < 1) animRef.current = requestAnimationFrame(run)
     }
-    animRef.current = requestAnimationFrame(animate)
+    animRef.current = requestAnimationFrame(run)
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current) }
   }, [score])
-
-  const r = (size - 14) / 2
-  const circ = 2 * Math.PI * r
+  const r = (size - 14) / 2, circ = 2 * Math.PI * r
   const offset = circ - (circ * displayed) / 100
   const color = scoreColor(displayed)
-
   return (
     <div style={{ position: 'relative', width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
         <circle cx={size / 2} cy={size / 2} r={r} stroke={T.border} strokeWidth={7} fill="none" />
         <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={7} fill="none"
-          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: 'stroke 0.3s ease' }} />
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: 'stroke 0.3s ease' }} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontFamily: mono, fontSize: size * 0.28, fontWeight: 700, color, lineHeight: 1 }}>{displayed}</span>
-        <span style={{ fontFamily: sans, fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 4 }}>health</span>
+        <span style={{ fontFamily: sans, fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 4 }}>{label || 'health'}</span>
       </div>
     </div>
   )
 }
 
-// ─── Value Preview ───────────────────────────────────────────
 function ValuePreview({ property, value }: { property: string; value: any }) {
   const str = typeof value === 'string' ? value : JSON.stringify(value)
   if (property.startsWith('colors.') && typeof value === 'string' && value.startsWith('#')) {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ display: 'inline-block', width: 14, height: 14, background: value, borderRadius: 3, border: `1px solid ${T.border2}` }} />
-        <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{value}</span>
-      </span>
-    )
+    return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-block', width: 14, height: 14, background: value, borderRadius: 3, border: `1px solid ${T.border2}` }} /><span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{value}</span></span>
   }
   if (property.startsWith('spacing.')) {
     const num = parseInt(str, 10)
-    if (!isNaN(num)) {
-      return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ display: 'inline-block', width: Math.min(num * 1.5, 80), height: 8, background: T.blue, borderRadius: 2, opacity: 0.7 }} />
-          <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{str}</span>
-        </span>
-      )
-    }
+    if (!isNaN(num)) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-block', width: Math.min(num * 1.5, 80), height: 8, background: T.blue, borderRadius: 2, opacity: 0.7 }} /><span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{str}</span></span>
   }
   return <span style={{ fontFamily: mono, fontSize: 12, color: T.text }}>{str}</span>
 }
 
-// ─── Main Page ───────────────────────────────────────────────
+function reportToMarkdown(report: GovernanceReport): string {
+  let md = `# Governance Report\n\n**Screen:** ${report.fixtureName}\n**Source:** ${report.fixtureSource}\n**Score:** ${report.overallScore} → ${report.afterScore}\n\n`
+  md += `## Auto-Fixed (${report.autoFixedCount})\n\n`
+  report.violations.filter(v => v.fixApplied).forEach(v => { md += `- **${v.ruleName}** — ${v.nodePath}: ${v.fixDescription}\n` })
+  md += `\n## Warnings (${report.warningCount})\n\n`
+  report.violations.filter(v => !v.fixApplied && v.severity === 'warn').forEach(v => { md += `- **${v.ruleName}** — ${v.nodePath}: ${v.evidence}\n` })
+  md += `\n## Blocked (${report.blockedCount})\n\n`
+  report.violations.filter(v => !v.fixApplied && v.severity === 'block').forEach(v => { md += `- **${v.ruleName}** — ${v.nodePath}: ${v.evidence}\n` })
+  return md
+}
+
+// ─── Node Card for diff tabs ─────────────────────────────────
+function NodeCard({ node, violations, isGoverned }: { node: any; violations: EnrichedViolation[]; isGoverned: boolean }) {
+  const nodeViolations = violations.filter(v => v.nodeId === node.id)
+  const hasViolation = nodeViolations.length > 0 && !isGoverned
+  const wasFixed = isGoverned && nodeViolations.some(v => v.fixApplied)
+  return (
+    <div style={{
+      padding: '8px 12px', background: T.surface, borderRadius: 6,
+      border: `1px solid ${hasViolation ? T.red : wasFixed ? T.green : T.border}`,
+      borderBottom: hasViolation ? `3px solid ${T.red}` : wasFixed ? `3px solid ${T.green}` : undefined,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+        <span style={{ fontFamily: mono, fontSize: 9, color: T.blue, background: T.blueDim, padding: '1px 5px', borderRadius: 3 }}>{node.type}</span>
+        <span style={{ fontFamily: mono, fontSize: 9, color: T.muted, flex: 1 }}>{node.path}</span>
+        {hasViolation && <span style={{ fontFamily: mono, fontSize: 8, color: T.red, background: T.redDim, padding: '1px 5px', borderRadius: 3 }}>{nodeViolations.length} issue{nodeViolations.length > 1 ? 's' : ''}</span>}
+        {wasFixed && <span style={{ fontFamily: mono, fontSize: 8, color: T.green, background: T.greenDim, padding: '1px 5px', borderRadius: 3 }}>FIXED</span>}
+      </div>
+      {hasViolation && nodeViolations.map(v => (
+        <div key={v.id} style={{ fontFamily: mono, fontSize: 8, color: T.red, marginTop: 3, padding: '3px 6px', background: T.redDim, borderRadius: 3 }}>{v.ruleName}: {v.evidence}</div>
+      ))}
+      {wasFixed && nodeViolations.filter(v => v.fixApplied).map(v => (
+        <div key={v.id} style={{ fontFamily: mono, fontSize: 8, color: T.green, marginTop: 3, padding: '3px 6px', background: T.greenDim, borderRadius: 3 }}>{v.fixDescription}</div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Violation Card for violations tab ───────────────────────
+function ViolationCard({ v }: { v: EnrichedViolation }) {
+  const sev = GOV_SEV[v.severity]
+  return (
+    <div style={{ padding: '10px 12px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, borderLeft: `3px solid ${sev.color}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+        <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 600, color: sev.color, background: sev.dim, padding: '1px 5px', borderRadius: 3 }}>{sev.label}</span>
+        <span style={{ fontFamily: syne, fontSize: 10, fontWeight: 600, color: T.text, flex: 1 }}>{v.ruleName}</span>
+        <span style={{ fontFamily: mono, fontSize: 8, color: T.dim }}>{v.ruleSource}</span>
+      </div>
+      <div style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>{v.nodePath}</div>
+      <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, marginTop: 3 }}>{v.evidence}</div>
+      {v.type === 'color_token' && (() => {
+        const hex = v.evidence.match(/#[0-9a-fA-F]{6}/)?.[0] || '#ff0000'
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 4, background: hex, border: `2px solid ${T.red}` }} />
+            {v.suggestedFix && <><span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>→</span><div style={{ width: 24, height: 24, borderRadius: 4, background: v.suggestedFix.startsWith('#') ? v.suggestedFix : T.green, border: `2px solid ${T.green}` }} /></>}
+          </div>
+        )
+      })()}
+      {v.type === 'spacing' && (() => {
+        const cur = parseInt(v.evidence.match(/(\d+)/)?.[1] || '10')
+        const sug = parseInt(v.suggestedFix?.match(/(\d+)/)?.[1] || String(cur))
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <div style={{ width: Math.min(cur * 1.5, 50), height: 8, borderRadius: 2, background: `${T.red}80` }} />
+            <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>→</span>
+            <div style={{ width: Math.min(sug * 1.5, 50), height: 8, borderRadius: 2, background: `${T.green}80` }} />
+          </div>
+        )
+      })()}
+      {v.type === 'component' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+          <span style={{ fontFamily: mono, fontSize: 9, padding: '2px 6px', borderRadius: 3, background: T.redDim, color: T.red }}>{v.evidence.match(/"([^"]+)"/)?.[1] || 'unknown'}</span>
+          <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>→</span>
+          <span style={{ fontFamily: mono, fontSize: 9, padding: '2px 6px', borderRadius: 3, background: T.greenDim, color: T.green }}>{v.suggestedFix}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PlaygroundPage() {
   const [rules, setRules] = useState(DEFAULT_RULES)
   const [yamlText, setYamlText] = useState(buildYaml(DEFAULT_RULES))
@@ -156,56 +185,39 @@ export default function PlaygroundPage() {
   const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null)
   const [report, setReport] = useState<GovernanceReport | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [scanning, setScanning] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const firstRun = useRef(false)
+  const [diffTab, setDiffTab] = useState<'original' | 'violations' | 'governed'>('original')
+
+  const runScan = useCallback((yaml: string, fixtureId: string) => {
+    setError(null); setRewriteResult(null); setReport(null)
+    try {
+      const policy = loadConfig(yaml)
+      const fixture = getFixture(fixtureId)
+      if (!fixture) { setError(`Fixture "${fixtureId}" not found.`); return }
+      const result = scanArtifact(fixture.artifact, policy)
+      setScanResult(result)
+      const r = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, result, null, policy)
+      setReport(r)
+    } catch (e: any) { setError(e.message || 'Failed to parse YAML or run scan.') }
+  }, [])
 
   const handleScan = useCallback((yaml?: string, fixtureId?: string) => {
-    setScanning(true)
-    setError(null)
-    setRewriteResult(null)
-    setReport(null)
+    runScan(yaml || yamlText, fixtureId || selectedFixture)
+  }, [yamlText, selectedFixture, runScan])
 
-    setTimeout(() => {
-      try {
-        const y = yaml || yamlText
-        const fid = fixtureId || selectedFixture
-        const policy = loadConfig(y)
-        const fixture = getFixture(fid)
-        if (!fixture) { setError(`Fixture "${fid}" not found.`); setScanning(false); return }
-        const result = scanArtifact(fixture.artifact, policy)
-        setScanResult(result)
-        const r = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, result, null, policy)
-        setReport(r)
-      } catch (e: any) {
-        setError(e.message || 'Failed to parse YAML or run scan.')
-      } finally {
-        setScanning(false)
-      }
-    }, 50)
-  }, [yamlText, selectedFixture])
-
-  // Auto-run on load
-  useEffect(() => {
-    if (firstRun.current) return
-    firstRun.current = true
-    handleScan()
-  }, [handleScan])
+  useEffect(() => { runScan(buildYaml(DEFAULT_RULES), 'dashboard') }, [runScan])
 
   const handleToggleRule = (ruleId: string) => {
     const updated = rules.map(r => r.id === ruleId ? { ...r, enabled: !r.enabled } : r)
     setRules(updated)
     const newYaml = buildYaml(updated)
     setYamlText(newYaml)
-    // Immediately rerun scan
     handleScan(newYaml)
   }
 
   const handleFixtureSelect = (id: string) => {
-    setSelectedFixture(id)
-    setRewriteResult(null)
-    setReport(null)
+    setSelectedFixture(id); setRewriteResult(null); setReport(null)
     handleScan(yamlText, id)
   }
 
@@ -219,45 +231,34 @@ export default function PlaygroundPage() {
       setRewriteResult(result)
       const r = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, scanResult, result, policy)
       setReport(r)
-    } catch (e: any) {
-      setError(e.message)
-    }
+      setDiffTab('original')
+    } catch (e: any) { setError(e.message) }
   }, [scanResult, yamlText, selectedFixture])
 
-  const handleCopy = () => {
-    if (!report) return
-    navigator.clipboard.writeText(reportToJSON(report))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const copyText = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
   }
 
   const fixture = getFixture(selectedFixture)
   const navItems = [
-    { label: 'Demo', href: '/demo' },
-    { label: 'Playground', href: '/playground' },
-    { label: 'Rules', href: '/rules' },
-    { label: 'Governance', href: '/governance' },
+    { label: 'Import', href: '/import' }, { label: 'Demo', href: '/demo' },
+    { label: 'Playground', href: '/playground' }, { label: 'Governance', href: '/governance' }, { label: 'Integrate', href: '/integrate' },
   ]
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: sans }}>
       <style>{`
         @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        @media (max-width: 768px) { .two-col-left, .two-col-right { padding: 16px !important; } }
+        @media (max-width: 768px) { .two-col { flex-direction: column !important; } .two-col-left, .two-col-right { width: 100% !important; padding: 16px !important; border-right: none !important; } }
       `}</style>
 
-      {/* Nav */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 32px', height: 56, borderBottom: `1px solid ${T.border}`, background: T.surface,
-      }}>
+      <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', height: 56, borderBottom: `1px solid ${T.border}`, background: T.surface }}>
         <a href="/" style={{ fontFamily: serif, fontStyle: 'italic', fontSize: 22, color: T.textBright, textDecoration: 'none' }}>muteform</a>
         <div className="nav-links" style={{ display: 'flex', gap: 28 }}>
           {navItems.map(n => (
-            <a key={n.label} href={n.href} style={{
-              fontFamily: sans, fontSize: 14, fontWeight: 500,
-              color: n.label === 'Playground' ? T.green : T.muted, textDecoration: 'none',
-            }}>{n.label}</a>
+            <a key={n.label} href={n.href} style={{ fontFamily: mono, fontSize: 11, color: n.label === 'Playground' ? T.green : T.muted, textDecoration: 'none' }}>{n.label}</a>
           ))}
         </div>
         <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">
@@ -266,70 +267,39 @@ export default function PlaygroundPage() {
       </nav>
       <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
-        {navItems.map(n => (
-          <a key={n.label} href={n.href} onClick={() => setMobileMenuOpen(false)}
-            style={{ fontFamily: sans, color: n.label === 'Playground' ? T.green : undefined }}>{n.label}</a>
-        ))}
+        {navItems.map(n => <a key={n.label} href={n.href} onClick={() => setMobileMenuOpen(false)} style={{ fontFamily: sans, color: n.label === 'Playground' ? T.green : undefined }}>{n.label}</a>)}
       </div>
 
-      {/* Two-column Layout */}
       <div className="two-col" style={{ display: 'flex', gap: 0, maxWidth: 1440, margin: '0 auto', minHeight: 'calc(100vh - 56px)' }}>
-        {/* LEFT: Editor + Rules + Fixtures */}
-        <div className="two-col-left" style={{
-          width: '55%', padding: '24px 20px 24px 32px', borderRight: `1px solid ${T.border}`,
-          display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto',
-        }}>
-          {/* Rule Toggles */}
+        {/* LEFT */}
+        <div className="two-col-left" style={{ width: '55%', padding: '24px 20px 24px 32px', borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto' }}>
           <div>
-            <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
-              Rules (toggle to rerun scan)
-            </div>
+            <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>Rules (toggle to rerun scan)</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {rules.map(r => (
                 <div key={r.id} onClick={() => handleToggleRule(r.id)} style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                  background: r.enabled ? T.surface : T.bg,
-                  border: `1px solid ${r.enabled ? T.green + '44' : T.border}`,
+                  background: r.enabled ? T.surface : T.bg, border: `1px solid ${r.enabled ? T.green + '44' : T.border}`,
                   borderRadius: 8, cursor: 'pointer', transition: 'all 0.2s',
                 }}>
-                  <div style={{
-                    width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                    background: r.enabled ? T.green : 'transparent',
-                    border: `2px solid ${r.enabled ? T.green : T.dim}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
+                  <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, background: r.enabled ? T.green : 'transparent', border: `2px solid ${r.enabled ? T.green : T.dim}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {r.enabled && <span style={{ color: T.bg, fontSize: 9, fontWeight: 700 }}>✓</span>}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontFamily: mono, fontSize: 11, color: r.enabled ? T.text : T.dim }}>{r.id}</span>
-                  </div>
-                  <span style={{
-                    fontFamily: mono, fontSize: 9, fontWeight: 600,
-                    color: severityColor(r.severity), padding: '1px 6px', borderRadius: 3,
-                    background: `${severityColor(r.severity)}18`, letterSpacing: '0.04em',
-                  }}>{r.severity.toUpperCase()}</span>
+                  <span style={{ fontFamily: mono, fontSize: 11, color: r.enabled ? T.text : T.dim, flex: 1 }}>{r.id}</span>
+                  <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: severityColor(r.severity), padding: '1px 6px', borderRadius: 3, background: `${severityColor(r.severity)}18` }}>{r.severity.toUpperCase()}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* YAML Editor */}
           <div>
             <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>Policy YAML</div>
-            <textarea
-              value={yamlText}
-              onChange={e => setYamlText(e.target.value)}
-              spellCheck={false}
-              style={{
-                width: '100%', minHeight: 300, background: T.surface, color: T.text,
-                fontFamily: mono, fontSize: 12, lineHeight: 1.7,
-                border: `1px solid ${T.border}`, borderRadius: 8, outline: 'none',
-                padding: '14px 18px', resize: 'vertical', caretColor: T.green,
-              }}
-            />
+            <textarea value={yamlText} onChange={e => setYamlText(e.target.value)} spellCheck={false} style={{
+              width: '100%', minHeight: 300, background: T.surface, color: T.text, fontFamily: mono, fontSize: 12, lineHeight: 1.7,
+              border: `1px solid ${T.border}`, borderRadius: 8, outline: 'none', padding: '14px 18px', resize: 'vertical', caretColor: T.green,
+            }} />
           </div>
 
-          {/* Fixture Selector */}
           <div>
             <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>Select Fixture</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
@@ -338,8 +308,7 @@ export default function PlaygroundPage() {
                 return (
                   <button key={f.id} onClick={() => handleFixtureSelect(f.id)} style={{
                     padding: '10px 12px', background: active ? T.greenDim : T.surface,
-                    border: `1px solid ${active ? T.green : T.border}`,
-                    borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                    border: `1px solid ${active ? T.green : T.border}`, borderRadius: 8, cursor: 'pointer', textAlign: 'left',
                   }}>
                     <div style={{ fontFamily: sans, fontSize: 12, fontWeight: 600, color: active ? T.green : T.text }}>{f.name}</div>
                     <div style={{ fontFamily: mono, fontSize: 9, color: active ? T.green : T.muted, marginTop: 3 }}>{f.nodeCount} nodes</div>
@@ -349,36 +318,21 @@ export default function PlaygroundPage() {
             </div>
           </div>
 
-          {/* RUN SCAN button */}
-          <button onClick={() => handleScan()} disabled={scanning} style={{
-            width: '100%', padding: '14px 0',
-            background: scanning ? T.dim : `linear-gradient(135deg, ${T.green}, #00c070)`,
+          <button onClick={() => handleScan()} style={{
+            width: '100%', padding: '14px 0', background: `linear-gradient(135deg, ${T.green}, #00c070)`,
             border: 'none', borderRadius: 8, fontFamily: mono, fontSize: 14, fontWeight: 700,
-            color: scanning ? T.muted : T.bg, cursor: scanning ? 'wait' : 'pointer',
-            letterSpacing: 1.5, textTransform: 'uppercase',
-            boxShadow: scanning ? 'none' : `0 0 24px ${T.greenGlow}`,
-          }}>{scanning ? 'Scanning...' : 'Run Scan'}</button>
+            color: T.bg, cursor: 'pointer', letterSpacing: 1.5, textTransform: 'uppercase', boxShadow: `0 0 24px ${T.greenGlow}`,
+          }}>Run Scan</button>
 
-          {error && (
-            <div style={{
-              padding: '12px 16px', borderRadius: 8, background: T.redDim,
-              border: `1px solid ${T.red}44`, fontFamily: mono, fontSize: 12, color: T.red,
-            }}>
-              <strong>Error:</strong> {error}
-            </div>
-          )}
+          {error && <div style={{ padding: '12px 16px', borderRadius: 8, background: T.redDim, border: `1px solid ${T.red}44`, fontFamily: mono, fontSize: 12, color: T.red }}><strong>Error:</strong> {error}</div>}
         </div>
 
-        {/* RIGHT: Results */}
-        <div className="two-col-right" style={{
-          width: '45%', padding: '24px 32px 24px 20px',
-          display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto',
-        }}>
+        {/* RIGHT */}
+        <div className="two-col-right" style={{ width: '45%', padding: '24px 32px 24px 20px', display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto' }}>
           <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: 2 }}>Results</div>
 
           {scanResult && (
             <>
-              {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                 {[
                   { label: 'Nodes', value: scanResult.nodesScanned },
@@ -386,61 +340,39 @@ export default function PlaygroundPage() {
                   { label: 'Violations', value: scanResult.violations.length },
                   { label: 'Time', value: `${scanResult.scanDurationMs}ms` },
                 ].map(s => (
-                  <div key={s.label} style={{
-                    background: T.surface, border: `1px solid ${T.border}`,
-                    borderRadius: 6, padding: '10px 12px', textAlign: 'center',
-                  }}>
+                  <div key={s.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, padding: '10px 12px', textAlign: 'center' }}>
                     <div style={{ fontFamily: mono, fontSize: 18, fontWeight: 700, color: T.textBright }}>{s.value}</div>
                     <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 1 }}>{s.label}</div>
                   </div>
                 ))}
               </div>
 
-              {/* Health Score */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '12px 0' }}>
                 <ScoreRing score={rewriteResult ? rewriteResult.afterScore : scanResult.score} />
-                <div style={{
-                  fontFamily: mono, fontSize: 10, color: T.green, border: `1px solid ${T.green}44`,
-                  borderRadius: 20, padding: '4px 14px', background: T.greenDim, letterSpacing: 0.5,
-                }}>Deterministic evaluation · No AI in the loop</div>
+                <div style={{ fontFamily: mono, fontSize: 10, color: T.green, border: `1px solid ${T.green}44`, borderRadius: 20, padding: '4px 14px', background: T.greenDim, letterSpacing: 0.5 }}>Deterministic evaluation · No AI in the loop</div>
               </div>
 
-              {/* Violations */}
+              {/* Violations (before governance) */}
               {scanResult.violations.length > 0 && !rewriteResult && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: 2 }}>
-                    Violations ({scanResult.violations.length})
-                  </div>
+                  <div style={{ fontFamily: mono, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: 2 }}>Violations ({scanResult.violations.length})</div>
                   {scanResult.violations.map((v, i) => (
                     <div key={`${v.ruleId}-${v.nodeId}-${i}`} style={{
-                      background: T.surface, border: `1px solid ${T.border}`,
-                      borderRadius: 8, padding: '12px 14px',
-                      display: 'flex', flexDirection: 'column', gap: 6,
-                      animation: `fadeSlideIn 0.3s ease ${i * 0.05}s both`,
+                      background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '12px 14px',
+                      display: 'flex', flexDirection: 'column', gap: 6, animation: `fadeSlideIn 0.3s ease ${i * 0.05}s both`,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{
-                          fontFamily: mono, fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                          color: severityColor(v.severity), background: `${severityColor(v.severity)}18`,
-                          padding: '2px 8px', borderRadius: 4,
-                        }}>{v.severity}</span>
+                        <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: severityColor(v.severity), background: `${severityColor(v.severity)}18`, padding: '2px 8px', borderRadius: 4 }}>{v.severity}</span>
                         <span style={{ fontFamily: mono, fontSize: 10, color: T.blue, background: T.blueDim, padding: '2px 8px', borderRadius: 4 }}>{v.ruleId}</span>
                         <span style={{ flex: 1 }} />
-                        {v.autoFixAvailable ? (
-                          <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.green, background: T.greenDim, padding: '2px 8px', borderRadius: 4, border: `1px solid ${T.green}33` }}>AUTO-FIX</span>
-                        ) : (
-                          <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.amber, background: T.amberDim, padding: '2px 8px', borderRadius: 4, border: `1px solid ${T.amber}33` }}>MANUAL REVIEW</span>
-                        )}
+                        {v.autoFixAvailable
+                          ? <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.green, background: T.greenDim, padding: '2px 8px', borderRadius: 4, border: `1px solid ${T.green}33` }}>AUTO-FIX</span>
+                          : <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: T.amber, background: T.amberDim, padding: '2px 8px', borderRadius: 4, border: `1px solid ${T.amber}33` }}>MANUAL</span>}
                       </div>
                       <div style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>{v.nodePath}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <ValuePreview property={v.property} value={v.currentValue} />
-                        {v.suggestedValue != null && (
-                          <>
-                            <span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>→</span>
-                            <ValuePreview property={v.property} value={v.suggestedValue} />
-                          </>
-                        )}
+                        {v.suggestedValue != null && <><span style={{ fontFamily: mono, fontSize: 12, color: T.dim }}>→</span><ValuePreview property={v.property} value={v.suggestedValue} /></>}
                       </div>
                       <div style={{ fontFamily: sans, fontSize: 12, color: T.muted, lineHeight: 1.4 }}>{v.message}</div>
                     </div>
@@ -448,105 +380,178 @@ export default function PlaygroundPage() {
                 </div>
               )}
 
-              {/* Apply Governance button */}
               {scanResult.violations.length > 0 && !rewriteResult && (
                 <button onClick={handleApplyGovernance} style={{
-                  width: '100%', padding: '14px 0',
-                  background: `linear-gradient(135deg, ${T.green}, #00c070)`,
+                  width: '100%', padding: '14px 0', background: `linear-gradient(135deg, ${T.green}, #00c070)`,
                   border: 'none', borderRadius: 8, fontFamily: mono, fontSize: 14, fontWeight: 700,
-                  color: T.bg, cursor: 'pointer', letterSpacing: 1.5, textTransform: 'uppercase',
-                  boxShadow: `0 0 24px ${T.greenGlow}`,
+                  color: T.bg, cursor: 'pointer', letterSpacing: 1.5, textTransform: 'uppercase', boxShadow: `0 0 24px ${T.greenGlow}`,
                 }}>Apply Governance</button>
               )}
 
-              {/* Governance Results */}
+              {/* ═══ GOVERNED: 3-Tab Diff + Enterprise Report ═══ */}
               {rewriteResult && report && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {/* Three-category cards */}
+                  {/* Summary cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                     <div style={{ padding: '12px', background: T.greenDim, border: `1px solid ${T.green}33`, borderRadius: 8, textAlign: 'center' }}>
                       <div style={{ fontFamily: mono, fontSize: 20, fontWeight: 700, color: T.green }}>{report.autoFixedCount}</div>
-                      <div style={{ fontFamily: mono, fontSize: 8, color: T.green, letterSpacing: '0.08em', marginTop: 2 }}>✓ AUTO-FIXED</div>
+                      <div style={{ fontFamily: mono, fontSize: 8, color: T.green, letterSpacing: '0.08em' }}>✓ FIXED</div>
                     </div>
                     <div style={{ padding: '12px', background: T.amberDim, border: `1px solid ${T.amber}33`, borderRadius: 8, textAlign: 'center' }}>
                       <div style={{ fontFamily: mono, fontSize: 20, fontWeight: 700, color: T.amber }}>{report.warningCount}</div>
-                      <div style={{ fontFamily: mono, fontSize: 8, color: T.amber, letterSpacing: '0.08em', marginTop: 2 }}>⚠ WARNINGS</div>
+                      <div style={{ fontFamily: mono, fontSize: 8, color: T.amber, letterSpacing: '0.08em' }}>⚠ WARN</div>
                     </div>
                     <div style={{ padding: '12px', background: T.redDim, border: `1px solid ${T.red}33`, borderRadius: 8, textAlign: 'center' }}>
                       <div style={{ fontFamily: mono, fontSize: 20, fontWeight: 700, color: T.red }}>{report.blockedCount}</div>
-                      <div style={{ fontFamily: mono, fontSize: 8, color: T.red, letterSpacing: '0.08em', marginTop: 2 }}>✕ BLOCKED</div>
+                      <div style={{ fontFamily: mono, fontSize: 8, color: T.red, letterSpacing: '0.08em' }}>✕ BLOCK</div>
                     </div>
                   </div>
 
-                  {/* Category Bars */}
-                  <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: 14 }}>
-                    <div style={{ fontFamily: mono, fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10 }}>Category Scores</div>
-                    {report.categories.map(c => (
-                      <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontFamily: sans, fontSize: 10, color: T.muted, width: 90 }}>{c.name}</span>
-                        <div style={{ flex: 1, height: 5, borderRadius: 3, background: T.border }}>
-                          <div style={{ height: '100%', borderRadius: 3, width: `${c.score}%`, background: c.score >= 90 ? T.green : c.score >= 60 ? T.amber : T.red, transition: 'width 0.5s' }} />
-                        </div>
-                        <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 600, color: c.score >= 90 ? T.green : c.score >= 60 ? T.amber : T.red, width: 24 }}>{c.score}</span>
-                      </div>
-                    ))}
+                  {/* Score before → after */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '12px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+                    <ScoreRing score={report.overallScore} size={70} label="before" />
+                    <div style={{ textAlign: 'center' }}>
+                      <span style={{ fontFamily: mono, fontSize: 16, color: T.dim }}>→</span>
+                      <div style={{ fontFamily: mono, fontSize: 9, color: T.green }}>+{report.afterScore - report.overallScore}</div>
+                    </div>
+                    <ScoreRing score={report.afterScore} size={70} label="after" />
                   </div>
 
-                  {/* Score delta */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
-                    background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8,
-                  }}>
-                    <span style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: T.red }}>{report.overallScore}</span>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>→</span>
-                    <span style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: T.green }}>{report.afterScore}</span>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: T.green }}>+{report.afterScore - report.overallScore} pts</span>
-                  </div>
-
-                  {/* Enriched violation list grouped by severity */}
-                  {(['auto-fix', 'warn', 'block'] as GovernanceSeverity[]).map(sev => {
-                    const group = report.violations.filter(v => (v.fixApplied && sev === 'auto-fix') || (!v.fixApplied && v.severity === sev))
-                    if (group.length === 0) return null
-                    const s = GOV_SEV[sev]
-                    return (
-                      <div key={sev}>
-                        <div style={{ fontFamily: mono, fontSize: 10, color: s.color, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 6 }}>
-                          {s.label} ({group.length})
+                  {/* ─── 3-TAB DIFF VIEW ─── */}
+                  <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}` }}>
+                      {([
+                        { id: 'original' as const, label: 'Original', col: T.red },
+                        { id: 'violations' as const, label: 'Violations', col: T.amber },
+                        { id: 'governed' as const, label: 'Governed', col: T.green },
+                      ]).map(tab => (
+                        <button key={tab.id} onClick={() => setDiffTab(tab.id)} style={{
+                          flex: 1, padding: '10px', background: diffTab === tab.id ? T.surface2 : 'transparent',
+                          border: 'none', borderBottom: diffTab === tab.id ? `2px solid ${tab.col}` : '2px solid transparent',
+                          fontFamily: mono, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                          color: diffTab === tab.id ? T.textBright : T.muted,
+                        }}>
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ padding: '12px', maxHeight: 400, overflow: 'auto' }}>
+                      {diffTab === 'original' && fixture && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ fontFamily: mono, fontSize: 9, color: T.dim, marginBottom: 4 }}>Raw fixture — violations in red</div>
+                          {fixture.artifact.nodes.map(n => <NodeCard key={n.id} node={n} violations={report.violations} isGoverned={false} />)}
                         </div>
-                        {group.map(v => (
-                          <div key={v.id} style={{
-                            padding: '8px 12px', marginBottom: 6, background: T.surface,
-                            border: `1px solid ${s.color}22`, borderRadius: 6, opacity: v.fixApplied ? 0.6 : 1,
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                              <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 600, color: s.color, background: s.dim, padding: '1px 5px', borderRadius: 3, border: `1px solid ${s.color}33` }}>{s.label}</span>
-                              <span style={{ fontFamily: sans, fontSize: 10, color: T.text, flex: 1 }}>{v.ruleName}</span>
-                              <span style={{ fontFamily: mono, fontSize: 8, color: T.dim }}>{v.ruleSource}</span>
-                            </div>
-                            <div style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>{v.nodePath}</div>
-                            <div style={{ fontFamily: sans, fontSize: 10, color: T.muted, marginTop: 2 }}>{v.evidence}</div>
+                      )}
+                      {diffTab === 'violations' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {(['color_token', 'spacing', 'typography', 'component', 'layout', 'accessibility'] as const).map(type => {
+                            const group = report.violations.filter(v => v.type === type)
+                            if (!group.length) return null
+                            return (
+                              <div key={type}>
+                                <div style={{ fontFamily: mono, fontSize: 9, color: T.blue, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{type.replace('_', ' ')} ({group.length})</div>
+                                {group.map(v => <ViolationCard key={v.id} v={v} />)}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {diffTab === 'governed' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ fontFamily: mono, fontSize: 9, color: T.dim, marginBottom: 4 }}>Governed output — fixes in green</div>
+                          {rewriteResult.rewrittenArtifact.nodes.map(n => <NodeCard key={n.id} node={n} violations={report.violations} isGoverned={true} />)}
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                            <button onClick={() => copyText(JSON.stringify(rewriteResult.rewrittenArtifact, null, 2), 'gov')} style={{
+                              flex: 1, fontFamily: mono, fontSize: 9, fontWeight: 600, padding: '8px', borderRadius: 5, cursor: 'pointer',
+                              background: copied === 'gov' ? T.greenDim : T.bg, color: copied === 'gov' ? T.green : T.text, border: `1px solid ${T.border}`,
+                            }}>{copied === 'gov' ? 'COPIED ✓' : 'Copy Output'}</button>
                           </div>
-                        ))}
-                      </div>
-                    )
-                  })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                  {/* Copy + PDF buttons */}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={handleCopy} style={{
-                      flex: 1, fontFamily: mono, fontSize: 10, fontWeight: 600, padding: '10px', borderRadius: 6, cursor: 'pointer',
-                      background: copied ? T.greenDim : T.surface, color: copied ? T.green : T.text,
-                      border: `1px solid ${copied ? T.green + '33' : T.border}`, letterSpacing: '0.06em',
-                    }}>{copied ? 'COPIED ✓' : 'Copy Report'}</button>
-                    <button style={{
-                      flex: 1, fontFamily: mono, fontSize: 10, fontWeight: 600, padding: '10px', borderRadius: 6,
-                      background: T.surface, color: T.dim, border: `1px solid ${T.border}`, cursor: 'not-allowed', opacity: 0.5, letterSpacing: '0.06em',
-                    }}>Download PDF</button>
+                  {/* ─── ENTERPRISE REPORT ─── */}
+                  <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}`, background: `linear-gradient(180deg, ${T.surface2} 0%, ${T.surface} 100%)` }}>
+                      <div style={{ fontFamily: syne, fontSize: 14, fontWeight: 700, color: T.textBright, marginBottom: 4 }}>Governance Report</div>
+                      <div style={{ fontFamily: mono, fontSize: 9, color: T.muted }}>
+                        {report.fixtureName} · {report.fixtureSource} · Acme Design System v2.1
+                      </div>
+                      <div style={{ fontFamily: mono, fontSize: 9, color: T.dim, marginTop: 2 }}>{new Date(report.timestamp).toLocaleString()}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                        <span style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: T.red }}>{report.overallScore}</span>
+                        <span style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>→</span>
+                        <span style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: T.green }}>{report.afterScore}</span>
+                        <span style={{ fontFamily: mono, fontSize: 9, color: T.green, background: T.greenDim, padding: '2px 8px', borderRadius: 3 }}>+{report.afterScore - report.overallScore} pts</span>
+                      </div>
+                    </div>
+
+                    {/* Category scores */}
+                    <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.border}` }}>
+                      <div style={{ fontFamily: mono, fontSize: 9, color: T.muted, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>Categories</div>
+                      {report.categories.map(c => (
+                        <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontFamily: mono, fontSize: 9, color: T.muted, width: 80 }}>{c.name}</span>
+                          <div style={{ flex: 1, height: 4, borderRadius: 2, background: T.border }}>
+                            <div style={{ height: '100%', borderRadius: 2, width: `${c.score}%`, background: c.score >= 90 ? T.green : c.score >= 60 ? T.amber : T.red }} />
+                          </div>
+                          <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: c.score >= 90 ? T.green : c.score >= 60 ? T.amber : T.red, width: 20 }}>{c.score}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Fixed */}
+                    <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.border}` }}>
+                      <div style={{ fontFamily: syne, fontSize: 11, fontWeight: 700, color: T.green, marginBottom: 8 }}>✓ Auto-Fixed ({report.autoFixedCount})</div>
+                      {report.violations.filter(v => v.fixApplied).map(v => (
+                        <div key={v.id} style={{ fontFamily: mono, fontSize: 9, color: T.muted, padding: '6px 8px', marginBottom: 4, background: T.greenDim, borderRadius: 4 }}>
+                          <span style={{ color: T.green, fontWeight: 600 }}>{v.ruleName}</span> — {v.nodePath}<br />{v.fixDescription}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Warnings */}
+                    <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.border}` }}>
+                      <div style={{ fontFamily: syne, fontSize: 11, fontWeight: 700, color: T.amber, marginBottom: 8 }}>⚠ Warnings ({report.warningCount})</div>
+                      {report.violations.filter(v => !v.fixApplied && v.severity === 'warn').map(v => (
+                        <div key={v.id} style={{ fontFamily: mono, fontSize: 9, color: T.muted, padding: '6px 8px', marginBottom: 4, background: T.amberDim, borderRadius: 4 }}>
+                          <span style={{ color: T.amber, fontWeight: 600 }}>{v.ruleName}</span> — {v.nodePath}<br />{v.evidence}
+                        </div>
+                      ))}
+                      {report.warningCount === 0 && <div style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>No warnings</div>}
+                    </div>
+
+                    {/* Blocked */}
+                    <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.border}` }}>
+                      <div style={{ fontFamily: syne, fontSize: 11, fontWeight: 700, color: T.red, marginBottom: 8 }}>✕ Blocked ({report.blockedCount})</div>
+                      {report.violations.filter(v => !v.fixApplied && v.severity === 'block').map(v => (
+                        <div key={v.id} style={{ fontFamily: mono, fontSize: 9, color: T.muted, padding: '6px 8px', marginBottom: 4, background: T.redDim, borderRadius: 4 }}>
+                          <span style={{ color: T.red, fontWeight: 600 }}>{v.ruleName}</span> — {v.nodePath}<br />{v.evidence}
+                        </div>
+                      ))}
+                      {report.blockedCount === 0 && <div style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>No blockers</div>}
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{ padding: '12px 16px', display: 'flex', gap: 6 }}>
+                      <button onClick={() => copyText(reportToJSON(report), 'json')} style={{
+                        flex: 1, fontFamily: mono, fontSize: 9, fontWeight: 600, padding: '8px', borderRadius: 5, cursor: 'pointer',
+                        background: copied === 'json' ? T.greenDim : T.bg, color: copied === 'json' ? T.green : T.text, border: `1px solid ${T.border}`,
+                      }}>{copied === 'json' ? '✓' : 'JSON'}</button>
+                      <button onClick={() => copyText(reportToMarkdown(report), 'md')} style={{
+                        flex: 1, fontFamily: mono, fontSize: 9, fontWeight: 600, padding: '8px', borderRadius: 5, cursor: 'pointer',
+                        background: copied === 'md' ? T.greenDim : T.bg, color: copied === 'md' ? T.green : T.text, border: `1px solid ${T.border}`,
+                      }}>{copied === 'md' ? '✓' : 'Markdown'}</button>
+                      <button onClick={() => { setCopied('share'); setTimeout(() => setCopied(null), 2000) }} style={{
+                        flex: 1, fontFamily: mono, fontSize: 9, fontWeight: 600, padding: '8px', borderRadius: 5, cursor: 'pointer',
+                        background: copied === 'share' ? T.greenDim : T.bg, color: copied === 'share' ? T.green : T.text, border: `1px solid ${T.border}`,
+                      }}>{copied === 'share' ? '✓' : 'Share'}</button>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* No violations */}
               {scanResult.violations.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '32px 0' }}>
                   <div style={{ fontFamily: sans, fontSize: 16, color: T.green, fontWeight: 600, marginBottom: 6 }}>All clear</div>

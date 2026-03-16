@@ -1,145 +1,53 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  loadDesignSystem,
+  type ImportedDesignSystem,
+  loadGovernanceRules,
+  saveGovernanceRules,
+  type GovernanceRule,
+  DEFAULT_GOVERNANCE_RULES,
+  loadPrinciples,
+  savePrinciples,
+  type DesignPrinciple,
+  DEFAULT_PRINCIPLES,
+} from '@/lib/design-system-store'
+import { loadConfig, scanArtifact } from '@/lib/engine'
+import { getFixture } from '@/lib/fixtures'
+
+/* ---------- theme tokens ---------- */
 
 const T = {
-  bg: '#080909',
-  surface: '#0c0d0f',
-  surface2: '#101214',
-  border: '#161819',
-  border2: '#1e2226',
-  blue: '#0055FF',
-  text: '#f0f1f3',
-  muted: '#6b7280',
-  dim: '#374151',
-  green: '#22c55e',
-  greenDim: '#22c55e18',
-  amber: '#f59e0b',
-  amberDim: '#f59e0b18',
-  red: '#ef4444',
-  redDim: '#ef444418',
+  bg: '#080909', surface: '#0c0d0f', surface2: '#101214',
+  border: '#161819', border2: '#1e2226',
+  blue: '#0055FF', text: '#f0f1f3', muted: '#6b7280', dim: '#374151',
+  green: '#22c55e', greenDim: '#22c55e18',
+  amber: '#f59e0b', amberDim: '#f59e0b18',
+  red: '#ef4444', redDim: '#ef444418',
   blueDim: '#0055FF18',
 }
 
 const syne = "'Syne', sans-serif"
 const mono = "'DM Mono', monospace"
 
-/* ---------- types ---------- */
-
-interface ColorToken {
-  name: string
-  hex: string
-}
-
-interface Principle {
-  id: string
-  title: string
-  description: string
-  severity: 'critical' | 'high' | 'medium' | 'low'
-  fix: string | null
-  enabled: boolean
-}
-
-interface ContextRule {
-  id: string
-  feature: string
-  condition: string
-  override: string
-  reason: string
-}
-
 /* ---------- severity helpers ---------- */
 
-const severityColor: Record<string, string> = {
+const sevColor: Record<string, string> = {
   critical: T.red,
   high: T.red,
   medium: T.amber,
   low: T.muted,
 }
 
-const severityBg: Record<string, string> = {
+const sevBg: Record<string, string> = {
   critical: T.redDim,
   high: T.redDim,
   medium: T.amberDim,
   low: `${T.muted}18`,
 }
 
-/* ---------- initial data ---------- */
-
-const INITIAL_COLORS: ColorToken[] = [
-  { name: 'primary', hex: '#0055FF' },
-  { name: 'neutral900', hex: '#111111' },
-  { name: 'success', hex: '#22c55e' },
-  { name: 'warning', hex: '#f59e0b' },
-]
-
-const SPACING_SCALE = [4, 8, 12, 16, 24, 32, 48, 64]
-
-const TYPO_STYLES: { label: string; size: number; weight: number; family: string }[] = [
-  { label: 'h1', size: 36, weight: 700, family: syne },
-  { label: 'h2', size: 28, weight: 700, family: syne },
-  { label: 'h3', size: 22, weight: 700, family: syne },
-  { label: 'body', size: 15, weight: 400, family: mono },
-  { label: 'body-sm', size: 13, weight: 400, family: mono },
-  { label: 'caption', size: 11, weight: 400, family: mono },
-  { label: 'label', size: 10, weight: 600, family: mono },
-]
-
-const COLUMN_COUNTS = [4, 8, 12]
-
-const INITIAL_PRINCIPLES: Principle[] = [
-  {
-    id: 'p1',
-    title: 'Visual Hierarchy',
-    description: 'Primary action must be most visually dominant',
-    severity: 'high',
-    fix: 'Change variant to primary',
-    enabled: true,
-  },
-  {
-    id: 'p2',
-    title: 'WCAG AA Contrast',
-    description: 'All interactive elements must meet 4.5:1 contrast ratio minimum',
-    severity: 'high',
-    fix: 'Adjust foreground color',
-    enabled: true,
-  },
-  {
-    id: 'p3',
-    title: 'Cognitive Load',
-    description: 'Maximum one primary action per screen section',
-    severity: 'low',
-    fix: null,
-    enabled: true,
-  },
-  {
-    id: 'p4',
-    title: 'Spacing Grid Alignment',
-    description: 'All spacing must align to 8pt grid system',
-    severity: 'medium',
-    fix: 'Snap to nearest grid value',
-    enabled: true,
-  },
-]
-
-const INITIAL_RULES: ContextRule[] = [
-  {
-    id: 'r1',
-    feature: 'Elderly Care Module',
-    condition: 'when feature = elderly-care',
-    override: 'min font size: 18px',
-    reason: 'Larger text improves readability for elderly users',
-  },
-  {
-    id: 'r2',
-    feature: 'Kiosk Mode',
-    condition: 'when platform = kiosk',
-    override: 'min touch target: 48px',
-    reason: 'Kiosk displays require larger touch targets',
-  },
-]
-
-/* ---------- reusable micro-components ---------- */
+/* ---------- helper components ---------- */
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -267,6 +175,7 @@ function InputField({
         padding: '6px 10px',
         outline: 'none',
         width: '100%',
+        boxSizing: 'border-box',
         ...style,
       }}
     />
@@ -301,82 +210,206 @@ function TextArea({
         outline: 'none',
         width: '100%',
         resize: 'vertical',
+        boxSizing: 'border-box',
       }}
     />
   )
 }
 
-/* ---------- main component ---------- */
+/* ---------- violation count computation ---------- */
 
-let idCounter = 100
+function buildYamlFromRules(rules: GovernanceRule[]): string {
+  const ruleLines = rules
+    .map((r) => {
+      const autoFix = r.autoFix
+        ? r.autoFixStrategy || 'auto'
+        : 'false'
+      return [
+        `  - id: ${r.id}`,
+        `    severity: ${r.severity}`,
+        `    description: "${r.description.replace(/"/g, "'")}"`,
+        `    check: "${r.id}"`,
+        `    auto_fix: ${autoFix}`,
+      ].join('\n')
+    })
+    .join('\n')
+
+  return `name: muteform-governance
+version: "1.0"
+tokens:
+  colors:
+    blue-60: "#0f62fe"
+    blue-70: "#0043ce"
+    gray-100: "#161616"
+    gray-90: "#262626"
+    green-50: "#24a148"
+    red-60: "#da1e28"
+    yellow-30: "#f1c21b"
+  spacing:
+    scale: [2, 4, 8, 12, 16, 24, 32, 48, 64, 96]
+  typography:
+    allowed_styles:
+      - heading-01
+      - heading-02
+      - heading-03
+      - body-01
+      - body-02
+      - label-01
+      - caption-01
+  components:
+    button:
+      allowed_variants: [primary, secondary, tertiary, ghost, danger]
+      allowed_sizes: [sm, md, lg, xl]
+  layout:
+    grid_columns: [2, 4, 8, 16]
+rules:
+${ruleLines}
+`
+}
+
+function computeViolationCounts(rules: GovernanceRule[]): Record<string, number> {
+  try {
+    const fixture = getFixture('onboarding')
+    if (!fixture) return {}
+    const yaml = buildYamlFromRules(rules)
+    const config = loadConfig(yaml)
+    const result = scanArtifact(fixture.artifact, config)
+    const counts: Record<string, number> = {}
+    for (const rule of rules) counts[rule.id] = 0
+    for (const v of result.violations) {
+      if (counts[v.ruleId] !== undefined) {
+        counts[v.ruleId]++
+      }
+    }
+    return counts
+  } catch {
+    return {}
+  }
+}
+
+/* ---------- id counter ---------- */
+
+let idCounter = 200
+
+/* ---------- main page ---------- */
 
 export default function GovernancePage() {
-  const [colors] = useState<ColorToken[]>(INITIAL_COLORS)
-  const [principles, setPrinciples] = useState<Principle[]>(INITIAL_PRINCIPLES)
-  const [contextRules, setContextRules] = useState<ContextRule[]>(INITIAL_RULES)
-  const [toast, setToast] = useState<string | null>(null)
+  const [importedSystem, setImportedSystem] = useState<ImportedDesignSystem | null>(null)
+  const [rules, setRules] = useState<GovernanceRule[]>(DEFAULT_GOVERNANCE_RULES)
+  const [principles, setPrinciples] = useState<DesignPrinciple[]>(DEFAULT_PRINCIPLES)
+  const [violationCounts, setViolationCounts] = useState<Record<string, number>>({})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
-  const navItems = [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Scan', href: '/scan' },
-    { label: 'Rules', href: '/rules' },
-    { label: 'Governance', href: '/governance', active: true },
-    { label: 'Integrate', href: '/integrate' },
-    { label: 'Team', href: '/team' },
-  ]
+  /* load from localStorage on mount */
+  useEffect(() => {
+    setImportedSystem(loadDesignSystem())
+    setRules(loadGovernanceRules())
+    setPrinciples(loadPrinciples())
+  }, [])
+
+  /* recompute violation counts whenever rules change */
+  useEffect(() => {
+    setViolationCounts(computeViolationCounts(rules))
+  }, [rules])
 
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2500)
   }
 
-  /* principle helpers */
-  const updatePrinciple = (id: string, patch: Partial<Principle>) => {
-    setPrinciples((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    )
-  }
+  /* --- rule helpers --- */
+  const updateRule = useCallback((id: string, patch: Partial<GovernanceRule>) => {
+    setRules((prev) => {
+      const next = prev.map((r) => (r.id === id ? { ...r, ...patch } : r))
+      saveGovernanceRules(next)
+      return next
+    })
+  }, [])
 
-  const addPrinciple = () => {
+  const addRule = useCallback(() => {
     idCounter++
-    setPrinciples((prev) => [
-      ...prev,
-      {
-        id: `p-new-${idCounter}`,
-        title: '',
-        description: '',
-        severity: 'medium',
-        fix: null,
-        enabled: true,
-      },
-    ])
-  }
+    const newRule: GovernanceRule = {
+      id: `custom-rule-${idCounter}`,
+      name: '',
+      description: '',
+      severity: 'medium',
+      autoFix: false,
+      autoFixStrategy: '',
+      blocked: false,
+      violationCount: 0,
+    }
+    setRules((prev) => {
+      const next = [...prev, newRule]
+      saveGovernanceRules(next)
+      return next
+    })
+  }, [])
 
-  /* context rule helpers */
-  const updateRule = (id: string, patch: Partial<ContextRule>) => {
-    setContextRules((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-    )
-  }
+  const deleteRule = useCallback((id: string) => {
+    setRules((prev) => {
+      const next = prev.filter((r) => r.id !== id)
+      saveGovernanceRules(next)
+      return next
+    })
+  }, [])
 
-  const addContextRule = () => {
+  /* --- principle helpers --- */
+  const updatePrinciple = useCallback((id: string, patch: Partial<DesignPrinciple>) => {
+    setPrinciples((prev) => {
+      const next = prev.map((p) => (p.id === id ? { ...p, ...patch } : p))
+      savePrinciples(next)
+      return next
+    })
+  }, [])
+
+  const addPrinciple = useCallback(() => {
     idCounter++
-    setContextRules((prev) => [
-      ...prev,
-      {
-        id: `r-new-${idCounter}`,
-        feature: '',
-        condition: '',
-        override: '',
-        reason: '',
-      },
-    ])
-  }
+    const newPrinciple: DesignPrinciple = {
+      id: `dp-new-${idCounter}`,
+      title: '',
+      description: '',
+      whyItMatters: '',
+      severity: 'medium',
+      autoFix: false,
+      autoFixBehavior: '',
+    }
+    setPrinciples((prev) => {
+      const next = [...prev, newPrinciple]
+      savePrinciples(next)
+      return next
+    })
+  }, [])
+
+  const deletePrinciple = useCallback((id: string) => {
+    setPrinciples((prev) => {
+      const next = prev.filter((p) => p.id !== id)
+      savePrinciples(next)
+      return next
+    })
+  }, [])
+
+  /* --- nav --- */
+  const navItems = [
+    { label: 'Import', href: '/import' },
+    { label: 'Demo', href: '/demo' },
+    { label: 'Playground', href: '/playground' },
+    { label: 'Governance', href: '/governance', active: true },
+    { label: 'Integrate', href: '/integrate' },
+  ]
+
+  /* --- derived design system display data --- */
+  const ds = importedSystem
+  const colorEntries = ds ? Object.entries(ds.tokens.color) : []
+  const spacingScale = ds ? ds.tokens.spacing : []
+  const typoStyles = ds ? ds.typography.allowedStyles : []
+  const componentEntries = ds ? Object.entries(ds.components) : []
+  const gridColumns = ds ? ds.layout.allowedGridColumns : []
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text }}>
-      {/* --- toast --- */}
+
+      {/* toast */}
       {toast && (
         <div
           style={{
@@ -399,7 +432,7 @@ export default function GovernancePage() {
         </div>
       )}
 
-      {/* --- top nav bar --- */}
+      {/* nav */}
       <header
         style={{
           position: 'sticky',
@@ -415,7 +448,7 @@ export default function GovernancePage() {
         }}
       >
         <a
-          href="/dashboard"
+          href="/"
           style={{
             fontFamily: "'Georgia', 'Times New Roman', serif",
             fontStyle: 'italic',
@@ -428,7 +461,15 @@ export default function GovernancePage() {
         >
           muteform
         </a>
-        <nav className="nav-links" style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+
+        <nav
+          style={{
+            display: 'flex',
+            gap: 20,
+            alignItems: 'center',
+          }}
+          className="nav-links"
+        >
           {navItems.map((l) => (
             <a
               key={l.label}
@@ -450,300 +491,678 @@ export default function GovernancePage() {
             </a>
           ))}
         </nav>
-        <button className="nav-hamburger" onClick={() => setMobileMenuOpen(true)}
-          aria-label="Open menu">
+
+        <button
+          className="nav-hamburger"
+          onClick={() => setMobileMenuOpen(true)}
+          aria-label="Open menu"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+        >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
             <path d="M3 6h18M3 12h18M3 18h18" />
           </svg>
         </button>
       </header>
 
-      {/* mobile menu */}
-      <div className={`nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
-        <button className="nav-mobile-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">&times;</button>
-        {navItems.map(l => (
-          <a key={l.label} href={l.href} onClick={() => setMobileMenuOpen(false)}
-            style={{ fontFamily: syne, color: l.active ? T.green : undefined }}>{l.label}</a>
-        ))}
-      </div>
-
-      {/* --- page body --- */}
-      <main className="page-container" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 96px' }}>
-        {/* ============================== SECTION 1: DESIGN SYSTEM ============================== */}
-        <section style={{ marginBottom: 56 }}>
-          <SectionHeader>Design System</SectionHeader>
-
-          {/* Color tokens */}
-          <SubHeader>Color Tokens</SubHeader>
+      {/* mobile overlay */}
+      {mobileMenuOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 200,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+          }}
+          onClick={() => setMobileMenuOpen(false)}
+        >
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-              gap: 12,
-              marginBottom: 32,
+              background: T.surface,
+              width: 240,
+              height: '100%',
+              padding: '24px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              borderLeft: `1px solid ${T.border}`,
             }}
+            onClick={(e) => e.stopPropagation()}
           >
-            {colors.map((c) => (
-              <div
-                key={c.name}
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close menu"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 22, alignSelf: 'flex-end', marginBottom: 16 }}
+            >
+              &times;
+            </button>
+            {navItems.map((l) => (
+              <a
+                key={l.label}
+                href={l.href}
+                onClick={() => setMobileMenuOpen(false)}
                 style={{
-                  background: T.surface,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 8,
-                  overflow: 'hidden',
+                  fontFamily: syne,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: l.active ? T.green : T.text,
+                  textDecoration: 'none',
+                  padding: '8px 0',
+                  borderBottom: `1px solid ${T.border}`,
                 }}
               >
+                {l.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* page body */}
+      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 20px 96px' }}>
+
+        {/* page title */}
+        <div style={{ marginBottom: 40 }}>
+          <h1
+            style={{
+              fontFamily: syne,
+              fontSize: 28,
+              fontWeight: 700,
+              color: T.text,
+              marginBottom: 8,
+            }}
+          >
+            Governance
+          </h1>
+          <p style={{ fontFamily: mono, fontSize: 13, color: T.muted, margin: 0 }}>
+            Baseline from imported design system, rules engine, and design principles.
+          </p>
+        </div>
+
+        {/* ======================================================
+            SECTION A — Baseline (Imported Design System)
+        ====================================================== */}
+        <section style={{ marginBottom: 64 }}>
+          <SectionHeader>Section A — Baseline</SectionHeader>
+
+          {!ds ? (
+            /* no system imported */
+            <Card>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '32px 0' }}>
                 <div
                   style={{
-                    width: '100%',
-                    height: 64,
-                    background: c.hex,
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    background: T.surface2,
+                    border: `1px solid ${T.border2}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
-                />
-                <div style={{ padding: '8px 10px' }}>
-                  <div
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="1.5">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                  </svg>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: syne, fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 6 }}>
+                    No design system imported
+                  </div>
+                  <div style={{ fontFamily: mono, fontSize: 12, color: T.muted, marginBottom: 20 }}>
+                    Import a design system to populate the baseline.
+                  </div>
+                  <a
+                    href="/import"
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: T.bg,
+                      background: T.blue,
+                      textDecoration: 'none',
+                      padding: '9px 20px',
+                      borderRadius: 7,
+                      display: 'inline-block',
+                    }}
+                  >
+                    Go to Import
+                  </a>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <>
+              {/* header row */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 28,
+                  flexWrap: 'wrap',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span
                     style={{
                       fontFamily: mono,
                       fontSize: 11,
-                      fontWeight: 600,
-                      color: T.text,
-                      marginBottom: 2,
-                    }}
-                  >
-                    {c.name}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 10,
                       color: T.muted,
                     }}
                   >
-                    {c.hex}
-                  </div>
+                    Imported from:
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: syne,
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: T.text,
+                    }}
+                  >
+                    {ds.sourceLabel}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 10,
+                      color: T.green,
+                      background: T.greenDim,
+                      border: `1px solid ${T.green}30`,
+                      borderRadius: 4,
+                      padding: '2px 8px',
+                    }}
+                  >
+                    {ds.source}
+                  </span>
                 </div>
+                <a
+                  href="/import"
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: T.blue,
+                    background: T.blueDim,
+                    border: `1px solid ${T.blue}30`,
+                    textDecoration: 'none',
+                    padding: '6px 16px',
+                    borderRadius: 6,
+                  }}
+                >
+                  Edit
+                </a>
               </div>
-            ))}
-          </div>
 
-          {/* Spacing scale */}
-          <SubHeader>Spacing Scale</SubHeader>
-          <Card style={{ marginBottom: 32 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {SPACING_SCALE.map((val) => (
-                <div
-                  key={val}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 10,
-                      color: T.muted,
-                      width: 28,
-                      textAlign: 'right',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {val}
-                  </span>
-                  <div
-                    style={{
-                      height: 14,
-                      width: val * 4,
-                      borderRadius: 3,
-                      background: `linear-gradient(90deg, ${T.blue}, ${T.blue}99)`,
-                      transition: 'width 0.3s',
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Typography */}
-          <SubHeader>Typography</SubHeader>
-          <Card style={{ marginBottom: 32 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {TYPO_STYLES.map((t) => (
-                <div
-                  key={t.label}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: 16,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 10,
-                      color: T.muted,
-                      width: 60,
-                      textAlign: 'right',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {t.label}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: t.family,
-                      fontSize: t.size,
-                      fontWeight: t.weight,
-                      color: T.text,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Aa
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 10,
-                      color: T.dim,
-                    }}
-                  >
-                    {t.size}px / {t.weight}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Components */}
-          <SubHeader>Components</SubHeader>
-          <Card style={{ marginBottom: 32 }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <span
+              {/* Color swatches grid */}
+              <SubHeader>Color Tokens ({colorEntries.length})</SubHeader>
+              <div
                 style={{
-                  fontFamily: mono,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: T.bg,
-                  background: T.green,
-                  padding: '5px 14px',
-                  borderRadius: 6,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                  gap: 10,
+                  marginBottom: 32,
                 }}
               >
-                primary
-              </span>
-              <span
-                style={{
-                  fontFamily: mono,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: T.text,
-                  background: 'transparent',
-                  padding: '5px 14px',
-                  borderRadius: 6,
-                  border: `1px solid ${T.border2}`,
-                }}
-              >
-                secondary
-              </span>
-            </div>
-          </Card>
-
-          {/* Layout grid visualizer */}
-          <SubHeader>Layout</SubHeader>
-          <Card style={{ marginBottom: 32 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {COLUMN_COUNTS.map((cols) => (
-                <div key={cols}>
+                {colorEntries.map(([name, hex]) => (
                   <div
+                    key={name}
                     style={{
-                      fontFamily: mono,
-                      fontSize: 10,
-                      color: T.muted,
-                      marginBottom: 6,
+                      background: T.surface,
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 8,
+                      overflow: 'hidden',
                     }}
                   >
-                    {cols}-column
+                    <div style={{ width: '100%', height: 56, background: hex }} />
+                    <div style={{ padding: '7px 9px' }}>
+                      <div style={{ fontFamily: mono, fontSize: 10, fontWeight: 600, color: T.text, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {name}
+                      </div>
+                      <div style={{ fontFamily: mono, fontSize: 9, color: T.muted }}>
+                        {hex}
+                      </div>
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                      gap: 3,
-                    }}
-                  >
-                    {Array.from({ length: cols }).map((_, i) => (
+                ))}
+              </div>
+
+              {/* Spacing scale bars */}
+              <SubHeader>Spacing Scale ({spacingScale.length} steps)</SubHeader>
+              <Card style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {spacingScale.map((val) => (
+                    <div key={val} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontFamily: mono, fontSize: 10, color: T.muted, width: 28, textAlign: 'right', flexShrink: 0 }}>
+                        {val}
+                      </span>
                       <div
-                        key={i}
                         style={{
-                          height: 18,
-                          borderRadius: 2,
-                          background:
-                            cols === 4
-                              ? T.blue
-                              : cols === 8
-                                ? T.green
-                                : T.amber,
-                          opacity: 0.5 + (i / cols) * 0.5,
+                          height: 13,
+                          width: Math.min(val * 3.5, 480),
+                          borderRadius: 3,
+                          background: `linear-gradient(90deg, ${T.blue}, ${T.blue}99)`,
+                          transition: 'width 0.3s',
                         }}
                       />
-                    ))}
-                  </div>
+                      <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>px</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Card>
+              </Card>
 
-          {/* Save to Supabase */}
+              {/* Typography style badges */}
+              <SubHeader>Typography Styles ({typoStyles.length})</SubHeader>
+              <Card style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {typoStyles.map((style) => (
+                    <span
+                      key={style}
+                      style={{
+                        fontFamily: mono,
+                        fontSize: 11,
+                        color: T.blue,
+                        background: T.blueDim,
+                        border: `1px solid ${T.blue}30`,
+                        padding: '4px 12px',
+                        borderRadius: 5,
+                      }}
+                    >
+                      {style}
+                    </span>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Component name + variant badges */}
+              <SubHeader>Components ({componentEntries.length})</SubHeader>
+              <Card style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {componentEntries.map(([name, def]) => (
+                    <div key={name}>
+                      <div style={{ fontFamily: syne, fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+                        {name}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: def.allowedSizes.length ? 6 : 0 }}>
+                        {def.allowedVariants.map((v) => (
+                          <span
+                            key={v}
+                            style={{
+                              fontFamily: mono,
+                              fontSize: 10,
+                              color: T.green,
+                              background: T.greenDim,
+                              border: `1px solid ${T.green}30`,
+                              padding: '3px 10px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            {v}
+                          </span>
+                        ))}
+                      </div>
+                      {def.allowedSizes.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {def.allowedSizes.map((s) => (
+                            <span
+                              key={s}
+                              style={{
+                                fontFamily: mono,
+                                fontSize: 10,
+                                color: T.amber,
+                                background: T.amberDim,
+                                border: `1px solid ${T.amber}30`,
+                                padding: '3px 10px',
+                                borderRadius: 4,
+                              }}
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Grid column visualizer */}
+              <SubHeader>Layout Grid</SubHeader>
+              <Card style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  {gridColumns.map((cols, ci) => {
+                    const colors = [T.blue, T.green, T.amber, T.red]
+                    const col = colors[ci % colors.length]
+                    return (
+                      <div key={cols}>
+                        <div style={{ fontFamily: mono, fontSize: 10, color: T.muted, marginBottom: 6 }}>
+                          {cols}-column grid
+                        </div>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                            gap: 3,
+                          }}
+                        >
+                          {Array.from({ length: cols }).map((_, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                height: 18,
+                                borderRadius: 2,
+                                background: col,
+                                opacity: 0.25 + (i / cols) * 0.6,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
+            </>
+          )}
+        </section>
+
+        {/* ======================================================
+            SECTION B — Governance Rules
+        ====================================================== */}
+        <section style={{ marginBottom: 64 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 24,
+              paddingBottom: 10,
+              borderBottom: `1px solid ${T.border}`,
+            }}
+          >
+            <h2
+              style={{
+                fontFamily: syne,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: T.muted,
+                margin: 0,
+              }}
+            >
+              Section B — Governance Rules
+            </h2>
+            <span
+              style={{
+                fontFamily: mono,
+                fontSize: 11,
+                color: T.muted,
+              }}
+            >
+              {rules.length} rule{rules.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {rules.map((rule) => {
+              const vCount = violationCounts[rule.id] ?? 0
+              return (
+                <Card key={rule.id}>
+                  {/* rule header */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      marginBottom: 14,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <InputField
+                        value={rule.name}
+                        onChange={(v) => updateRule(rule.id, { name: v })}
+                        placeholder="Rule name"
+                        style={{
+                          fontFamily: syne,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: `1px solid ${T.border2}`,
+                          borderRadius: 0,
+                          padding: '2px 0',
+                          marginBottom: 8,
+                          color: T.text,
+                        }}
+                      />
+                      <div
+                        style={{
+                          fontFamily: mono,
+                          fontSize: 11,
+                          color: T.muted,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {rule.description || (
+                          <span style={{ color: T.dim, fontStyle: 'italic' }}>No description</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* violation count badge */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                      <div
+                        style={{
+                          minWidth: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          background: vCount > 0 ? sevBg[rule.severity] : T.surface2,
+                          border: `1px solid ${vCount > 0 ? `${sevColor[rule.severity]}30` : T.border2}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0 6px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: syne,
+                            fontSize: 16,
+                            fontWeight: 700,
+                            color: vCount > 0 ? sevColor[rule.severity] : T.dim,
+                          }}
+                        >
+                          {vCount}
+                        </span>
+                      </div>
+                      <span style={{ fontFamily: mono, fontSize: 9, color: T.dim }}>violations</span>
+                    </div>
+                  </div>
+
+                  {/* rule controls row */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 16,
+                      alignItems: 'center',
+                    }}
+                  >
+                    {/* severity */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Severity</span>
+                      <select
+                        value={rule.severity}
+                        onChange={(e) =>
+                          updateRule(rule.id, { severity: e.target.value as GovernanceRule['severity'] })
+                        }
+                        style={{
+                          fontFamily: mono,
+                          fontSize: 11,
+                          color: sevColor[rule.severity],
+                          background: sevBg[rule.severity],
+                          border: `1px solid ${sevColor[rule.severity]}30`,
+                          borderRadius: 5,
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          outline: 'none',
+                        }}
+                      >
+                        {(['critical', 'high', 'medium', 'low'] as const).map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* auto-fix toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Toggle
+                        checked={rule.autoFix}
+                        onChange={(v) => updateRule(rule.id, { autoFix: v })}
+                      />
+                      <span style={{ fontFamily: mono, fontSize: 11, color: rule.autoFix ? T.green : T.muted }}>
+                        Auto-fix {rule.autoFix ? 'on' : 'off'}
+                      </span>
+                    </div>
+
+                    {/* strategy — shown when auto-fix on */}
+                    {rule.autoFix && (
+                      <div style={{ flex: 1, minWidth: 180 }}>
+                        <InputField
+                          value={rule.autoFixStrategy}
+                          onChange={(v) => updateRule(rule.id, { autoFixStrategy: v })}
+                          placeholder="Auto-fix strategy (e.g. snap_nearest)"
+                          style={{ fontSize: 11 }}
+                        />
+                      </div>
+                    )}
+
+                    {/* blocked toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                      <Toggle
+                        checked={rule.blocked}
+                        onChange={(v) => updateRule(rule.id, { blocked: v })}
+                      />
+                      <span
+                        style={{
+                          fontFamily: mono,
+                          fontSize: 11,
+                          color: rule.blocked ? T.red : T.muted,
+                        }}
+                      >
+                        {rule.blocked ? 'Merge-blocking' : 'Non-blocking'}
+                      </span>
+                    </div>
+
+                    {/* delete */}
+                    <button
+                      type="button"
+                      onClick={() => deleteRule(rule.id)}
+                      title="Remove rule"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: T.dim,
+                        padding: 4,
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Add Rule */}
           <button
             type="button"
-            onClick={() => showToast('Design system saved to Supabase')}
+            onClick={addRule}
             style={{
               fontFamily: mono,
               fontSize: 12,
               fontWeight: 600,
-              color: '#fff',
-              background: T.blue,
-              border: 'none',
+              color: T.muted,
+              background: 'transparent',
+              border: `1px dashed ${T.border2}`,
               borderRadius: 8,
-              padding: '10px 24px',
+              padding: '10px 20px',
               cursor: 'pointer',
-              transition: 'opacity 0.15s',
+              marginTop: 14,
+              width: '100%',
+              transition: 'border-color 0.15s, color 0.15s',
             }}
             onMouseEnter={(e) => {
-              ;(e.target as HTMLButtonElement).style.opacity = '0.85'
+              e.currentTarget.style.borderColor = T.blue
+              e.currentTarget.style.color = T.blue
             }}
             onMouseLeave={(e) => {
-              ;(e.target as HTMLButtonElement).style.opacity = '1'
+              e.currentTarget.style.borderColor = T.border2
+              e.currentTarget.style.color = T.muted
             }}
           >
-            Save to Supabase
+            + Add Rule
           </button>
         </section>
 
-        {/* ============================== SECTION 2: DESIGN PRINCIPLES ============================== */}
-        <section style={{ marginBottom: 56 }}>
-          <SectionHeader>Design Principles</SectionHeader>
+        {/* ======================================================
+            SECTION C — Design Principles
+        ====================================================== */}
+        <section>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 24,
+              paddingBottom: 10,
+              borderBottom: `1px solid ${T.border}`,
+            }}
+          >
+            <h2
+              style={{
+                fontFamily: syne,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: T.muted,
+                margin: 0,
+              }}
+            >
+              Section C — Design Principles
+            </h2>
+            <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>
+              {principles.length} principle{principles.length !== 1 ? 's' : ''}
+            </span>
+          </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {principles.map((p) => (
-              <Card
-                key={p.id}
-                style={{
-                  opacity: p.enabled ? 1 : 0.5,
-                  transition: 'opacity 0.2s',
-                }}
-              >
+              <Card key={p.id}>
+                {/* principle title row */}
                 <div
                   style={{
                     display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'flex-start',
-                    gap: 16,
-                    marginBottom: 12,
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    marginBottom: 14,
                   }}
                 >
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <InputField
                       value={p.title}
                       onChange={(v) => updatePrinciple(p.id, { title: v })}
@@ -752,99 +1171,153 @@ export default function GovernancePage() {
                         fontFamily: syne,
                         fontSize: 14,
                         fontWeight: 700,
-                        border: 'none',
                         background: 'transparent',
-                        padding: 0,
-                        marginBottom: 6,
+                        border: 'none',
+                        borderBottom: `1px solid ${T.border2}`,
+                        borderRadius: 0,
+                        padding: '2px 0',
                         color: T.text,
                       }}
                     />
-                    <TextArea
-                      value={p.description}
-                      onChange={(v) =>
-                        updatePrinciple(p.id, { description: v })
-                      }
-                      placeholder="Why does this principle matter?"
-                      rows={2}
-                    />
                   </div>
-                  <Toggle
-                    checked={p.enabled}
-                    onChange={(v) => updatePrinciple(p.id, { enabled: v })}
-                  />
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  {/* severity */}
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => deletePrinciple(p.id)}
+                    title="Remove principle"
                     style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: T.dim,
+                      padding: 4,
+                      borderRadius: 4,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 6,
+                      flexShrink: 0,
                     }}
                   >
-                    <span
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* description + why it matters */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                  <div>
+                    <label
                       style={{
                         fontFamily: mono,
                         fontSize: 10,
                         color: T.muted,
+                        display: 'block',
+                        marginBottom: 5,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
                       }}
                     >
-                      Severity
-                    </span>
+                      Description
+                    </label>
+                    <TextArea
+                      value={p.description}
+                      onChange={(v) => updatePrinciple(p.id, { description: v })}
+                      placeholder="Plain English description of the principle..."
+                      rows={3}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        fontFamily: mono,
+                        fontSize: 10,
+                        color: T.muted,
+                        display: 'block',
+                        marginBottom: 5,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                      }}
+                    >
+                      Why it matters
+                    </label>
+                    <TextArea
+                      value={p.whyItMatters}
+                      onChange={(v) => updatePrinciple(p.id, { whyItMatters: v })}
+                      placeholder="Why does this principle matter to users and the product?"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                {/* controls row */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+                  {/* severity */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>Severity</span>
                     <select
                       value={p.severity}
                       onChange={(e) =>
-                        updatePrinciple(p.id, {
-                          severity: e.target.value as Principle['severity'],
-                        })
+                        updatePrinciple(p.id, { severity: e.target.value as DesignPrinciple['severity'] })
                       }
                       style={{
                         fontFamily: mono,
                         fontSize: 11,
-                        color: severityColor[p.severity],
-                        background: severityBg[p.severity],
-                        border: `1px solid ${T.border2}`,
+                        color: sevColor[p.severity],
+                        background: sevBg[p.severity],
+                        border: `1px solid ${sevColor[p.severity]}30`,
                         borderRadius: 5,
-                        padding: '3px 8px',
+                        padding: '4px 8px',
                         cursor: 'pointer',
                         outline: 'none',
                       }}
                     >
-                      {['critical', 'high', 'medium', 'low'].map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
+                      {(['critical', 'high', 'medium', 'low'] as const).map((s) => (
+                        <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
                   </div>
 
-                  {/* auto-fix */}
-                  <span
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 10,
-                      padding: '3px 10px',
-                      borderRadius: 5,
-                      background: p.fix ? T.greenDim : T.surface2,
-                      color: p.fix ? T.green : T.muted,
-                      border: `1px solid ${p.fix ? `${T.green}30` : T.border2}`,
-                    }}
-                  >
-                    {p.fix ? `auto-fix: ${p.fix}` : 'manual review'}
-                  </span>
+                  {/* auto-fix toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Toggle
+                      checked={p.autoFix}
+                      onChange={(v) => updatePrinciple(p.id, { autoFix: v })}
+                    />
+                    <span style={{ fontFamily: mono, fontSize: 11, color: p.autoFix ? T.green : T.muted }}>
+                      Auto-fix {p.autoFix ? 'on' : 'off'}
+                    </span>
+                  </div>
+
+                  {/* auto-fix behavior text */}
+                  {p.autoFix ? (
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <InputField
+                        value={p.autoFixBehavior}
+                        onChange={(v) => updatePrinciple(p.id, { autoFixBehavior: v })}
+                        placeholder="Auto-fix behavior (e.g. Change variant to primary)"
+                        style={{ fontSize: 11 }}
+                      />
+                    </div>
+                  ) : (
+                    <span
+                      style={{
+                        fontFamily: mono,
+                        fontSize: 11,
+                        color: T.dim,
+                        background: T.surface2,
+                        border: `1px solid ${T.border2}`,
+                        padding: '4px 12px',
+                        borderRadius: 5,
+                      }}
+                    >
+                      {p.autoFixBehavior || 'Manual review required'}
+                    </span>
+                  )}
                 </div>
               </Card>
             ))}
           </div>
 
+          {/* Add Principle */}
           <button
             type="button"
             onClick={addPrinciple}
@@ -858,298 +1331,23 @@ export default function GovernancePage() {
               borderRadius: 8,
               padding: '10px 20px',
               cursor: 'pointer',
-              marginTop: 16,
+              marginTop: 14,
               width: '100%',
               transition: 'border-color 0.15s, color 0.15s',
             }}
             onMouseEnter={(e) => {
-              const el = e.currentTarget
-              el.style.borderColor = T.green
-              el.style.color = T.green
+              e.currentTarget.style.borderColor = T.green
+              e.currentTarget.style.color = T.green
             }}
             onMouseLeave={(e) => {
-              const el = e.currentTarget
-              el.style.borderColor = T.border2
-              el.style.color = T.muted
+              e.currentTarget.style.borderColor = T.border2
+              e.currentTarget.style.color = T.muted
             }}
           >
             + Add Principle
           </button>
         </section>
 
-        {/* ============================== SECTION 2.5: WCAG CONTRAST CHECK ============================== */}
-        <section style={{ marginBottom: 56 }}>
-          <SectionHeader>Accessibility Check</SectionHeader>
-
-          <Card>
-            {/* Test case: #3478F6 on white */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ fontFamily: syne, fontSize: 14, fontWeight: 700, color: T.text }}>
-                WCAG AA Contrast Verification
-              </div>
-
-              {/* Color pair display */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: 8,
-                    background: '#3478F6', border: `1px solid ${T.border2}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: '#fff' }}>Aa</span>
-                  </div>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>#3478F6</span>
-                </div>
-                <div style={{ fontFamily: mono, fontSize: 10, color: T.dim }}>on</div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: 8,
-                    background: '#FFFFFF', border: `1px solid ${T.border2}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: '#3478F6' }}>Aa</span>
-                  </div>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>#FFFFFF</span>
-                </div>
-                <div style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: T.amber, marginLeft: 8 }}>
-                  3.1:1
-                </div>
-              </div>
-
-              {/* Contrast ratio meter bar */}
-              <div style={{ position: 'relative', height: 24, borderRadius: 6, overflow: 'hidden', background: T.surface2 }}>
-                {/* Scale markers */}
-                <div style={{
-                  position: 'absolute', left: '33.3%', top: 0, bottom: 0,
-                  borderLeft: `1px dashed ${T.border2}`, zIndex: 2,
-                }} />
-                <div style={{
-                  position: 'absolute', left: '60%', top: 0, bottom: 0,
-                  borderLeft: `1px dashed ${T.border2}`, zIndex: 2,
-                }} />
-                {/* Bar fill: 3.1 / 7.0 scale = ~44% but we use a 1-7 range */}
-                <div style={{
-                  position: 'absolute', left: 0, top: 0, bottom: 0,
-                  width: `${(3.1 / 7) * 100}%`,
-                  background: `linear-gradient(90deg, ${T.red}, ${T.amber})`,
-                  borderRadius: 6,
-                  transition: 'width 0.5s ease',
-                }} />
-                {/* Labels */}
-                <div style={{
-                  position: 'absolute', left: '33.3%', top: -1, transform: 'translateX(-50%)',
-                  fontFamily: mono, fontSize: 8, color: T.muted,
-                }}>3:1</div>
-                <div style={{
-                  position: 'absolute', left: '60%', bottom: -1, transform: 'translateX(-50%)',
-                  fontFamily: mono, fontSize: 8, color: T.muted,
-                }}>4.5:1</div>
-              </div>
-
-              {/* FAIL badge */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 14px', borderRadius: 8,
-                background: T.redDim, border: `1px solid ${T.red}33`,
-              }}>
-                <span style={{
-                  fontFamily: mono, fontSize: 11, fontWeight: 800,
-                  color: T.red, background: `${T.red}22`,
-                  padding: '2px 10px', borderRadius: 4,
-                  border: `1px solid ${T.red}44`,
-                  letterSpacing: '0.1em',
-                }}>FAIL</span>
-                <span style={{ fontFamily: mono, fontSize: 11, color: T.muted }}>
-                  Minimum 4.5:1 required for WCAG AA
-                </span>
-              </div>
-
-              {/* Suggested fix */}
-              <div style={{
-                display: 'flex', flexDirection: 'column', gap: 12,
-                padding: '14px', borderRadius: 8,
-                background: T.greenDim, border: `1px solid ${T.green}33`,
-              }}>
-                <div style={{ fontFamily: mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, color: T.green }}>
-                  Suggested Fix
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                  {/* Before swatch */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 6,
-                      background: '#3478F6', border: `2px solid ${T.red}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <span style={{ fontFamily: mono, fontSize: 10, color: '#fff' }}>Aa</span>
-                    </div>
-                    <span style={{ fontFamily: mono, fontSize: 9, color: T.red }}>#3478F6</span>
-                    <span style={{ fontFamily: mono, fontSize: 9, color: T.muted }}>3.1:1</span>
-                  </div>
-
-                  <span style={{ fontFamily: mono, fontSize: 18, color: T.dim }}>&rarr;</span>
-
-                  {/* After swatch */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 6,
-                      background: '#0055FF', border: `2px solid ${T.green}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <span style={{ fontFamily: mono, fontSize: 10, color: '#fff' }}>Aa</span>
-                    </div>
-                    <span style={{ fontFamily: mono, fontSize: 9, color: T.green }}>#0055FF</span>
-                    <span style={{ fontFamily: mono, fontSize: 9, color: T.green }}>5.2:1</span>
-                  </div>
-
-                  {/* Second meter bar showing improvement */}
-                  <div style={{ flex: 1, minWidth: 120 }}>
-                    <div style={{ position: 'relative', height: 16, borderRadius: 4, overflow: 'hidden', background: T.surface2 }}>
-                      <div style={{
-                        position: 'absolute', left: 0, top: 0, bottom: 0,
-                        width: `${(5.2 / 7) * 100}%`,
-                        background: `linear-gradient(90deg, ${T.green}99, ${T.green})`,
-                        borderRadius: 4,
-                      }} />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                      <span style={{ fontFamily: mono, fontSize: 8, color: T.muted }}>1:1</span>
-                      <span style={{ fontFamily: mono, fontSize: 8, color: T.green, fontWeight: 700 }}>5.2:1 PASS</span>
-                      <span style={{ fontFamily: mono, fontSize: 8, color: T.muted }}>7:1</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </section>
-
-        {/* ============================== SECTION 3: CONTEXT RULES ============================== */}
-        <section>
-          <SectionHeader>Context Rules</SectionHeader>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {contextRules.map((r) => (
-              <Card key={r.id}>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 12,
-                    marginBottom: 12,
-                  }}
-                >
-                  <div>
-                    <label
-                      style={{
-                        fontFamily: mono,
-                        fontSize: 10,
-                        color: T.muted,
-                        display: 'block',
-                        marginBottom: 4,
-                      }}
-                    >
-                      Feature
-                    </label>
-                    <InputField
-                      value={r.feature}
-                      onChange={(v) => updateRule(r.id, { feature: v })}
-                      placeholder="Feature name"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      style={{
-                        fontFamily: mono,
-                        fontSize: 10,
-                        color: T.muted,
-                        display: 'block',
-                        marginBottom: 4,
-                      }}
-                    >
-                      Condition
-                    </label>
-                    <InputField
-                      value={r.condition}
-                      onChange={(v) => updateRule(r.id, { condition: v })}
-                      placeholder="when feature = ..."
-                    />
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <label
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 10,
-                      color: T.muted,
-                      display: 'block',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Override
-                  </label>
-                  <InputField
-                    value={r.override}
-                    onChange={(v) => updateRule(r.id, { override: v })}
-                    placeholder="CSS override value"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 10,
-                      color: T.muted,
-                      display: 'block',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Reason
-                  </label>
-                  <TextArea
-                    value={r.reason}
-                    onChange={(v) => updateRule(r.id, { reason: v })}
-                    placeholder="Why is this override necessary?"
-                    rows={2}
-                  />
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={addContextRule}
-            style={{
-              fontFamily: mono,
-              fontSize: 12,
-              fontWeight: 600,
-              color: T.muted,
-              background: 'transparent',
-              border: `1px dashed ${T.border2}`,
-              borderRadius: 8,
-              padding: '10px 20px',
-              cursor: 'pointer',
-              marginTop: 16,
-              width: '100%',
-              transition: 'border-color 0.15s, color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget
-              el.style.borderColor = T.green
-              el.style.color = T.green
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget
-              el.style.borderColor = T.border2
-              el.style.color = T.muted
-            }}
-          >
-            + Add Context Rule
-          </button>
-        </section>
       </main>
     </div>
   )
