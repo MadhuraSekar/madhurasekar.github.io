@@ -129,14 +129,7 @@ export default function LandingPage() {
   const [email, setEmail] = useState('')
   const [formState, setFormState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
-  const [waitlistCount, setWaitlistCount] = useState(347)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/waitlist').then(r => r.json()).then(d => {
-      if (d.count) setWaitlistCount(d.count)
-    }).catch(() => {})
-  }, [])
 
   const handleWaitlist = useCallback(async function (e: FormEvent) {
     e.preventDefault()
@@ -149,8 +142,7 @@ export default function LandingPage() {
         body: JSON.stringify({ email: email.trim() }),
       })
       if (!res.ok) throw new Error('Request failed')
-      var data = await res.json()
-      if (data.count) setWaitlistCount(data.count)
+      await res.json()
       setFormState('success')
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Something went wrong')
@@ -324,8 +316,8 @@ export default function LandingPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
           {[
-            { val: '10,000+', label: 'interfaces generated daily by AI agents' },
-            { val: '73%', label: 'drift from design systems within 30 days' },
+            { val: '9', label: 'violations detected in a single AI-generated screen' },
+            { val: '97', label: 'health score after Muteform auto-fix' },
             { val: '0', label: 'governance tools for AI output (before Muteform)' },
           ].map(function (item, i) {
             return (
@@ -595,9 +587,8 @@ export default function LandingPage() {
 
           <p style={{
             fontFamily: mono, fontSize: 12, color: T.dim, marginTop: 20,
-            animation: 'pulse 3s ease-in-out infinite',
           }}>
-            {waitlistCount} / 500 spots claimed
+            Early access — limited spots
           </p>
         </FadeIn>
       </section>

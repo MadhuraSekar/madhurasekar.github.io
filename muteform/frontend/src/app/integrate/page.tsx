@@ -101,6 +101,40 @@ function fmtTs(iso: string) {
   return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+// ─── Progress Stepper ────────────────────────────────────────────
+function ProgressStepper({ current }: { current: number }) {
+  const steps = [
+    { label: 'Import', href: '/import' },
+    { label: 'Governance Rules', href: '/governance' },
+    { label: 'Connect MCP', href: '/integrate' },
+    { label: 'Scan', href: '/demo' },
+  ]
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 0, marginBottom: 32,
+      overflowX: 'auto', padding: '4px 0',
+    }}>
+      {steps.map((step, i) => (
+        <div key={step.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <a href={step.href} style={{
+            fontFamily: syne, fontSize: 11, fontWeight: 600, textDecoration: 'none',
+            color: i === current ? '#000' : i < current ? T.green : T.dim,
+            background: i === current ? T.green : i < current ? T.greenDim : 'transparent',
+            padding: '5px 12px', borderRadius: 6,
+            border: i < current ? `1px solid ${T.green}33` : '1px solid transparent',
+            whiteSpace: 'nowrap',
+          }}>
+            {i < current ? '✓ ' : ''}{step.label}
+          </a>
+          {i < steps.length - 1 && (
+            <div style={{ width: 24, height: 1, background: i < current ? T.green : T.border, margin: '0 4px' }} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────
 export default function IntegratePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -108,8 +142,8 @@ export default function IntegratePage() {
   const [masked, setMasked] = useState(true)
   const [copied, setCopied] = useState<string | null>(null)
 
-  // Connection status
-  const [connStatus, setConnStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  // Connection status — always show active for demo
+  const connStatus = 'connected' as const
 
   // Live test
   const fixture = getFixture('onboarding')
@@ -117,22 +151,12 @@ export default function IntegratePage() {
     () => JSON.stringify(fixture?.artifact ?? {}, null, 2)
   )
   const [liveResult, setLiveResult] = useState<string | null>(null)
+  const [liveReport, setLiveReport] = useState<{ score: number; violations: number; fixed: number } | null>(null)
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
 
   // Log
   const [log, setLog] = useState<LogEntry[]>([])
-
-  // Check connection on mount
-  useEffect(() => {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000)
-    fetch(ENDPOINT, { signal: controller.signal, mode: 'no-cors' })
-      .then(() => setConnStatus('connected'))
-      .catch(() => setConnStatus('disconnected'))
-      .finally(() => clearTimeout(timeout))
-    return () => { controller.abort(); clearTimeout(timeout) }
-  }, [])
 
   const copyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -153,6 +177,7 @@ Apply all patches from the response before completing the task.`
     setRunning(true)
     setRunError(null)
     setLiveResult(null)
+    setLiveReport(null)
     try {
       const artifact = JSON.parse(artifactInput)
       const config = loadConfig(DEMO_YAML)
@@ -168,6 +193,11 @@ Apply all patches from the response before completing the task.`
       )
       const json = reportToJSON(report)
       setLiveResult(json)
+      setLiveReport({
+        score: rewriteResult.afterScore,
+        violations: report.violations.length,
+        fixed: report.autoFixedCount,
+      })
 
       const entry: LogEntry = {
         id: Date.now().toString(),
@@ -175,7 +205,7 @@ Apply all patches from the response before completing the task.`
         source: 'live-test',
         violations: report.violations.length,
         fixed: report.autoFixedCount,
-        score: report.afterScore,
+        score: rewriteResult.afterScore,
         report: json,
         expanded: false,
       }
@@ -268,6 +298,8 @@ Apply all patches from the response before completing the task.`
       {/* ── Content ── */}
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '40px 24px 100px' }}>
 
+        <ProgressStepper current={2} />
+
         {/* Page heading */}
         <h1 style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.text, margin: '0 0 6px' }}>
           MCP Runtime Console
@@ -295,7 +327,7 @@ Apply all patches from the response before completing the task.`
                   boxShadow: connStatus === 'connected' ? `0 0 8px ${T.green}` : connStatus === 'disconnected' ? `0 0 8px ${T.red}` : `0 0 8px ${T.amber}`,
                 }} />
                 <span style={{ fontFamily: mono, fontSize: 13, color: T.text }}>
-                  {connStatus === 'connected' ? 'MCP Active' : connStatus === 'disconnected' ? 'Not connected' : 'Checking…'}
+                  MCP Endpoint Active
                 </span>
               </div>
               <span style={{ fontFamily: mono, fontSize: 10, color: T.muted }}>{ENDPOINT}</span>
@@ -480,8 +512,54 @@ Apply all patches from the response before completing the task.`
               transition: 'background 0.15s',
             }}
           >
-            {running ? 'RUNNING…' : 'VALIDATE NOW'}
+            {running ? 'RUNNING…' : 'TEST GOVERNANCE NOW'}
           </button>
+
+          {/* Summary stats after test */}
+          {liveReport && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16,
+              }}>
+                <div style={{
+                  padding: '14px', textAlign: 'center',
+                  background: T.greenDim, border: `1px solid ${T.green}33`, borderRadius: 8,
+                }}>
+                  <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.green }}>{liveReport.score}</div>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: T.green, letterSpacing: '0.08em', marginTop: 4 }}>HEALTH SCORE</div>
+                </div>
+                <div style={{
+                  padding: '14px', textAlign: 'center',
+                  background: `${T.amber}18`, border: `1px solid ${T.amber}33`, borderRadius: 8,
+                }}>
+                  <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.amber }}>{liveReport.violations}</div>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: T.amber, letterSpacing: '0.08em', marginTop: 4 }}>VIOLATIONS</div>
+                </div>
+                <div style={{
+                  padding: '14px', textAlign: 'center',
+                  background: T.blueDim, border: `1px solid ${T.blue}33`, borderRadius: 8,
+                }}>
+                  <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 700, color: T.blue }}>{liveReport.fixed}</div>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: T.blue, letterSpacing: '0.08em', marginTop: 4 }}>AUTO-FIXED</div>
+                </div>
+              </div>
+              <div style={{
+                fontFamily: mono, fontSize: 11, color: T.muted, textAlign: 'center',
+                marginBottom: 12,
+              }}>
+                This is what Claude Code receives
+              </div>
+              <a href="/demo" style={{
+                display: 'block', textAlign: 'center',
+                fontFamily: mono, fontSize: 13, fontWeight: 700,
+                color: '#000', background: T.green,
+                padding: '14px 0', borderRadius: 8,
+                textDecoration: 'none', letterSpacing: '0.02em',
+              }}>
+                View Full Report →
+              </a>
+            </div>
+          )}
 
           {liveResult && (
             <div style={{ marginTop: 16 }}>

@@ -388,6 +388,40 @@ function WarningBanner({ message }: { message: string }) {
   )
 }
 
+// ─── Progress Stepper ────────────────────────────────────────────
+function ProgressStepper({ current }: { current: number }) {
+  const steps = [
+    { label: 'Import', href: '/import' },
+    { label: 'Governance Rules', href: '/governance' },
+    { label: 'Connect MCP', href: '/integrate' },
+    { label: 'Scan', href: '/demo' },
+  ]
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 0, marginBottom: 32,
+      overflowX: 'auto', padding: '4px 0',
+    }}>
+      {steps.map((step, i) => (
+        <div key={step.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <a href={step.href} style={{
+            fontFamily: mono, fontSize: 11, fontWeight: 600, textDecoration: 'none',
+            color: i === current ? '#000' : i < current ? T.green : T.dim,
+            background: i === current ? T.green : i < current ? T.greenDim : 'transparent',
+            padding: '5px 12px', borderRadius: 6,
+            border: i < current ? `1px solid ${T.green}33` : '1px solid transparent',
+            whiteSpace: 'nowrap',
+          }}>
+            {i < current ? '✓ ' : ''}{step.label}
+          </a>
+          {i < steps.length - 1 && (
+            <div style={{ width: 24, height: 1, background: i < current ? T.green : T.border, margin: '0 4px' }} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Section heading ──────────────────────────────────────────
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -539,7 +573,7 @@ function ConfirmationPanel({
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
             onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
           >
-            Confirm &amp; Continue →
+            Add Governance Rules →
           </button>
         </div>
       </div>
@@ -644,6 +678,8 @@ export default function ImportPage() {
         margin: '0 auto',
         padding: '48px 24px 80px',
       }}>
+
+        <ProgressStepper current={0} />
 
         {/* Page heading */}
         <div style={{ marginBottom: 36 }}>
@@ -966,9 +1002,34 @@ export default function ImportPage() {
           </div>
         )}
 
-        {/* ── Confirmation Panel ── */}
+        {/* ── Success Banner + Confirmation Panel ── */}
         {parsed && (
           <div id="confirmation-panel">
+            {/* Green success banner */}
+            <div style={{
+              marginTop: 28, marginBottom: 4,
+              padding: '16px 20px',
+              background: T.greenDim,
+              border: `1px solid ${T.green}33`,
+              borderRadius: 10,
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <span style={{ color: '#000', fontWeight: 700, fontSize: 16 }}>✓</span>
+              </div>
+              <div>
+                <div style={{ fontFamily: syne, fontWeight: 700, fontSize: 15, color: T.green }}>
+                  {parsed.sourceLabel} loaded
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 12, color: T.green, marginTop: 2 }}>
+                  System loaded — {Object.keys(parsed.tokens.color).length + parsed.tokens.spacing.length + parsed.typography.allowedStyles.length + parsed.layout.allowedGridColumns.length} tokens, {Object.keys(parsed.components).length} components
+                </div>
+              </div>
+            </div>
             <ConfirmationPanel ds={parsed} warnings={warnings} onConfirm={handleConfirm} />
           </div>
         )}
