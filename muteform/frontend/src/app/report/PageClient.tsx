@@ -573,68 +573,57 @@ function CategoryBar({ name, score, delay }: { name: string; score: number; dela
   )
 }
 
+// ─── Default SSR Report (Onboarding Flow) ──────────────────
+
+const DEFAULT_REPORT: GovernanceReport = {
+  fixtureName: 'Onboarding Flow',
+  fixtureSource: 'Cursor AI',
+  timestamp: '2026-03-17T00:00:00.000Z',
+  overallScore: 26,
+  afterScore: 79,
+  categories: [
+    { name: 'Accessibility', key: 'accessibility', score: 50, color: 'var(--warning)' },
+    { name: 'Color', key: 'color', score: 91, color: 'var(--success)' },
+    { name: 'Spacing', key: 'spacing', score: 88, color: 'var(--success)' },
+    { name: 'Typography', key: 'typography', score: 97, color: 'var(--success)' },
+    { name: 'Components', key: 'components', score: 97, color: 'var(--success)' },
+    { name: 'Layout', key: 'layout', score: 85, color: 'var(--success)' },
+  ],
+  violations: [
+    // 8 AUTO-FIXED
+    { id: 'af1', type: 'color_token', severity: 'auto-fix', ruleName: 'Color Token Compliance', ruleSource: 'muteform', nodeId: 'n1', nodeName: 'Header BG', nodePath: 'Onboarding Flow / Header / Background', evidence: 'color #1a73e8 not a registered token (ΔE 12.4 from #0055FF)', fixApplied: true, fixDescription: 'Snapped to nearest token', suggestedFix: '#0055FF' },
+    { id: 'af2', type: 'color_token', severity: 'auto-fix', ruleName: 'Color Token Compliance', ruleSource: 'muteform', nodeId: 'n2', nodeName: 'CTA Text', nodePath: 'Onboarding Flow / Step 1 / CTA Text', evidence: 'color #1976d2 not a registered token', fixApplied: true, fixDescription: 'Snapped to nearest token', suggestedFix: '#0055FF' },
+    { id: 'af3', type: 'spacing', severity: 'auto-fix', ruleName: 'Spacing Scale Compliance', ruleSource: 'muteform', nodeId: 'n3', nodeName: 'Card Padding', nodePath: 'Onboarding Flow / Step 1 / Card / Padding', evidence: 'spacing 18px not on scale [4,8,12,16,24,32,48,64]', fixApplied: true, fixDescription: 'Snapped to nearest: 16px', suggestedFix: '16px' },
+    { id: 'af4', type: 'spacing', severity: 'auto-fix', ruleName: 'Spacing Scale Compliance', ruleSource: 'muteform', nodeId: 'n4', nodeName: 'Section Gap', nodePath: 'Onboarding Flow / Step 2 / Section Gap', evidence: 'spacing 22px not on scale', fixApplied: true, fixDescription: 'Snapped to nearest: 24px', suggestedFix: '24px' },
+    { id: 'af5', type: 'typography', severity: 'auto-fix', ruleName: 'Typography Style Compliance', ruleSource: 'muteform', nodeId: 'n5', nodeName: 'Subtitle', nodePath: 'Onboarding Flow / Step 1 / Subtitle', evidence: 'style "subtitle" not in allowed styles', fixApplied: true, fixDescription: 'Replaced with "body"', suggestedFix: 'body' },
+    { id: 'af6', type: 'typography', severity: 'auto-fix', ruleName: 'Typography Style Compliance', ruleSource: 'muteform', nodeId: 'n6', nodeName: 'Helper Text', nodePath: 'Onboarding Flow / Step 2 / Helper Text', evidence: 'style "small" not in allowed styles', fixApplied: true, fixDescription: 'Replaced with "caption"', suggestedFix: 'caption' },
+    { id: 'af7', type: 'component', severity: 'auto-fix', ruleName: 'Component Variant Compliance', ruleSource: 'muteform', nodeId: 'n7', nodeName: 'Skip Button', nodePath: 'Onboarding Flow / Step 1 / Skip Button', evidence: 'variant "ghost" not in allowed [primary, secondary]', fixApplied: true, fixDescription: 'Changed to "secondary"', suggestedFix: 'secondary' },
+    { id: 'af8', type: 'layout', severity: 'auto-fix', ruleName: 'Layout Grid Compliance', ruleSource: 'muteform', nodeId: 'n8', nodeName: 'Feature Grid', nodePath: 'Onboarding Flow / Step 3 / Feature Grid', evidence: 'grid 5-col not in allowed [4, 8, 12]', fixApplied: true, fixDescription: 'Changed to 4 columns', suggestedFix: '4' },
+    // 1 WARNING
+    { id: 'w1', type: 'component', severity: 'warn', ruleName: 'Primary Action Must Use Filled Variant', ruleSource: 'muteform', nodeId: 'n9', nodeName: 'Continue Button', nodePath: 'Onboarding Flow / Step 1 / Continue Button', evidence: 'Primary action button uses "outline" variant instead of "primary"', fixApplied: false, fixDescription: 'Change variant to "primary" for primary actions', suggestedFix: 'primary' },
+    // 3 BLOCKED (WCAG contrast failures)
+    { id: 'b1', type: 'accessibility', severity: 'block', ruleName: 'WCAG AA Contrast', ruleSource: 'wcag-aa', nodeId: 'n10', nodeName: 'Step Label', nodePath: 'Onboarding Flow / Step 1 / Step Label', evidence: 'Contrast ratio 2.8:1 — requires 4.5:1 for normal text', fixApplied: false, fixDescription: 'Darken text color or lighten background — cannot auto-fix without design review', suggestedFix: '' },
+    { id: 'b2', type: 'accessibility', severity: 'block', ruleName: 'WCAG AA Contrast', ruleSource: 'wcag-aa', nodeId: 'n11', nodeName: 'Muted Paragraph', nodePath: 'Onboarding Flow / Step 2 / Muted Paragraph', evidence: 'Contrast ratio 3.1:1 — requires 4.5:1 for normal text', fixApplied: false, fixDescription: 'Increase text contrast — auto-fix disabled for accessibility rules', suggestedFix: '' },
+    { id: 'b3', type: 'accessibility', severity: 'block', ruleName: 'WCAG AA Contrast', ruleSource: 'wcag-aa', nodeId: 'n12', nodeName: 'Footer Link', nodePath: 'Onboarding Flow / Step 3 / Footer Link', evidence: 'Contrast ratio 2.4:1 — requires 4.5:1 for normal text', fixApplied: false, fixDescription: 'Link color too light against background — requires manual color selection', suggestedFix: '' },
+  ],
+  autoFixedCount: 8,
+  warningCount: 1,
+  blockedCount: 3,
+}
+
 // ─── Main Page ──────────────────────────────────────────────
 
 export default function ReportPage() {
-  const [report, setReport] = useState<GovernanceReport | null>(null)
+  const [report, setReport] = useState<GovernanceReport>(DEFAULT_REPORT)
   const [company, setCompany] = useState('Your Company')
 
   useEffect(() => {
     const r = loadReport() as GovernanceReport | null
     const session = loadSession()
-    setReport(r)
+    if (r) setReport(r)
     setCompany(session.user?.company || 'Your Company')
     markStepComplete(3)
   }, [])
-
-  // ─── Empty State ────────────────────────────────────────
-  if (!report) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)' }}>
-        <style>{keyframesCSS}</style>
-        <Header />
-        <div style={{
-          maxWidth: 900, margin: '0 auto', padding: '120px 20px',
-          textAlign: 'center',
-          animation: 'fadeInPage 0.5s ease both',
-        }}>
-          <h1 style={{
-            fontFamily: 'var(--font-heading)', fontSize: 24, fontWeight: 800,
-            color: 'var(--text-primary)', marginBottom: 24, marginTop: 0,
-          }}>
-            Governance Report
-          </h1>
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700,
-            color: 'var(--text-primary)', marginBottom: 8,
-          }}>
-            No report yet.
-          </div>
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text-muted)', marginBottom: 28,
-          }}>
-            Run a governance scan first.
-          </div>
-          <a
-            href="/scan"
-            className="report-btn"
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
-              color: 'var(--bg)', background: 'var(--accent)',
-              textDecoration: 'none',
-              padding: '12px 32px', borderRadius: 4,
-              border: 'none',
-              display: 'inline-block',
-              letterSpacing: '0.02em',
-              transition: 'all 150ms ease',
-            }}
-          >
-            Go to Scan {'\u2192'}
-          </a>
-        </div>
-      </div>
-    )
-  }
 
   // ─── Report Data ────────────────────────────────────────
   const autoFixed = report.violations.filter(v => v.fixApplied)
