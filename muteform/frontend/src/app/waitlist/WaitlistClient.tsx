@@ -30,8 +30,8 @@ function randomGlyph() {
 }
 
 // ─── HOOKS ───
-function useFadeIn(threshold = 0.15): [React.RefObject<HTMLDivElement | null>, boolean] {
-  const ref = useRef<HTMLDivElement | null>(null)
+function useFadeIn(threshold = 0.15): [React.RefObject<HTMLDivElement>, boolean] {
+  const ref = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>
   const [visible, setVisible] = useState(false)
   useEffect(() => {
     const el = ref.current
