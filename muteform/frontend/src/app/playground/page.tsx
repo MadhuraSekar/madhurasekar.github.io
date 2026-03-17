@@ -7,6 +7,7 @@ import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
 import type { MuteformConfig, ScanResult, RewriteResult } from '@/lib/engine'
 import { FIXTURES, getFixture } from '@/lib/fixtures'
 import { buildGovernanceReport, reportToJSON, type GovernanceReport, type EnrichedViolation, type GovernanceSeverity } from '@/lib/governance'
+import { saveReport } from '@/lib/session'
 
 const T = tokens
 const mono = T.fontMono
@@ -341,6 +342,7 @@ export default function PlaygroundPage() {
             setRewriteResult(result)
             const r = buildGovernanceReport(fixture.name, fixture.source, fixture.artifact, scanResult, result, policy)
             setReport(r)
+            saveReport(r)
             setDiffTab('original')
           } catch (e: any) { setError(e.message) }
           setFixing(false)
@@ -672,6 +674,20 @@ export default function PlaygroundPage() {
                       background: copied === 'md' ? T.greenDim : T.surface, color: copied === 'md' ? T.green : T.text, border: `1px solid ${T.border}`,
                     }}>{copied === 'md' ? '✓ Copied' : 'Export Markdown'}</button>
                   </div>
+
+                  {/* Green banner */}
+                  <div style={{
+                    padding: '12px 16px', borderRadius: 8, background: T.greenDim, border: `1px solid ${T.green}33`,
+                    textAlign: 'center', fontFamily: mono, fontSize: 11, color: T.green,
+                  }}>
+                    Governance applied — {report.autoFixedCount} fixes · {report.warningCount} warning{report.warningCount !== 1 ? 's' : ''} · {report.blockedCount} blocked
+                  </div>
+
+                  <a href="/report" style={{
+                    display: 'block', textAlign: 'center', fontFamily: mono, fontSize: 12, fontWeight: 700, color: T.bg, textDecoration: 'none',
+                    padding: '12px', borderRadius: 8, background: `linear-gradient(135deg, ${T.green}, #00c070)`,
+                    letterSpacing: 0.5, boxShadow: `0 0 20px ${T.greenDim}`,
+                  }}>View full report →</a>
 
                   <a href="/governance" style={{
                     display: 'block', textAlign: 'center', fontFamily: mono, fontSize: 11, color: T.blue, textDecoration: 'none',

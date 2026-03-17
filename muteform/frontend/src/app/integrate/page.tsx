@@ -2,68 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import Header from '@/components/Header'
-import { loadConfig, scanArtifact, rewriteArtifact } from '@/lib/engine'
 import { getFixture } from '@/lib/fixtures'
-import { buildGovernanceReport, reportToJSON } from '@/lib/governance'
 import { getOrCreateMcpToken, loadSession, syncMcpToken } from '@/lib/session'
 
 // ─── Constants ────────────────────────────────────────────────
 const ENDPOINT = 'https://madhurasekar-github-io.vercel.app'
-
-const DEMO_YAML = `name: "Acme Design System"
-version: "1.0.0"
-tokens:
-  colors:
-    primary: "#0055FF"
-    neutral900: "#111111"
-    success: "#22c55e"
-    warning: "#f59e0b"
-    accent: "#9ca3af"
-  spacing:
-    scale: [4, 8, 12, 16, 24, 32, 48, 64]
-  typography:
-    families:
-      display: "Instrument Serif"
-      body: "DM Sans"
-      mono: "JetBrains Mono"
-    allowed_styles: [h1, h2, h3, body, body-sm, caption, label]
-  components:
-    button:
-      allowed_variants: [primary, secondary]
-      allowed_sizes: [sm, md, lg]
-  layout:
-    grid_columns: [4, 8, 12]
-rules:
-  - id: "color-token-compliance"
-    severity: high
-    description: "All colors must reference approved design tokens"
-    check: "color.value IN tokens.colors.*"
-    auto_fix: "snap_nearest_delta_e"
-  - id: "spacing-scale-compliance"
-    severity: medium
-    description: "Spacing values must use the approved scale"
-    check: "spacing.value IN tokens.spacing.scale"
-    auto_fix: "snap_nearest"
-  - id: "contrast-wcag-aa"
-    severity: critical
-    description: "All text must meet WCAG AA contrast requirements"
-    check: "contrast.ratio >= 4.5"
-    auto_fix: "adjust_foreground"
-  - id: "typography-style-compliance"
-    severity: high
-    description: "Typography styles must be from approved list"
-    check: "typography.style IN tokens.typography.allowed_styles"
-    auto_fix: "snap_nearest_category"
-  - id: "component-variant-compliance"
-    severity: critical
-    description: "Component variants must be from approved list"
-    check: "component.variant IN tokens.components.*.allowed_variants"
-    auto_fix: "snap_nearest_category"
-  - id: "layout-grid-compliance"
-    severity: medium
-    description: "Grid columns must use approved column counts"
-    check: "layout.columns IN tokens.layout.grid_columns"
-    auto_fix: false`
 
 // ─── Types ────────────────────────────────────────────────────
 interface LogEntry {
@@ -151,39 +94,46 @@ Only return code where health_score >= 85.`
     setLiveReport(null)
     setJsonCollapsed(true)
     try {
-      const artifact = JSON.parse(artifactInput)
-      const config = loadConfig(DEMO_YAML)
-      const scanResult = scanArtifact(artifact, config)
-      const rewriteResult = rewriteArtifact(artifact, scanResult.violations, config)
-      const report = buildGovernanceReport(
-        fixture?.name ?? 'Custom Artifact',
-        fixture?.source ?? 'live-test',
-        artifact,
-        scanResult,
-        rewriteResult,
-        config,
-      )
-      const json = reportToJSON(report)
-      setLiveResult(json)
+      const payload = JSON.parse(artifactInput)
+
+      // Call the real /api/validate endpoint
+      const res = await fetch('/api/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-muteform-token': apiKey,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok) {
+        setRunError(`API ${res.status} \u2014 ${json.error || 'Unknown error'}`)
+        return
+      }
+
+      const formatted = JSON.stringify(json, null, 2)
+      setLiveResult(formatted)
       setLiveReport({
-        score: rewriteResult.afterScore,
-        violations: report.violations.length,
-        fixed: report.autoFixedCount,
+        score: json.health_score ?? 0,
+        violations: json.summary?.violations_total ?? json.violations?.length ?? 0,
+        fixed: json.summary?.auto_fixed ?? json.patches?.length ?? 0,
       })
 
       const entry: LogEntry = {
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
         source: 'live-test',
-        violations: report.violations.length,
-        fixed: report.autoFixedCount,
-        score: rewriteResult.afterScore,
-        report: json,
+        violations: json.summary?.violations_total ?? json.violations?.length ?? 0,
+        fixed: json.summary?.auto_fixed ?? json.patches?.length ?? 0,
+        score: json.health_score ?? 0,
+        report: formatted,
         expanded: false,
       }
       setLog(prev => [entry, ...prev])
     } catch (e: any) {
-      setRunError(e?.message ? `Parse error \u2014 ${e.message}` : 'Parse error \u2014 check your JSON')
+      setRunError(e?.message ? `Error \u2014 ${e.message}` : 'Error \u2014 check your JSON and try again')
     } finally {
       setRunning(false)
     }
@@ -521,7 +471,7 @@ Only return code where health_score >= 85.`
             fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)',
             margin: '0 0 14px', lineHeight: 1.6,
           }}>
-            Paste an artifact JSON and run it through the engine locally. The raw JSON response below is exactly what Claude Code receives.
+            Paste an artifact JSON and call the real /api/validate endpoint. The raw JSON response below is exactly what Claude Code receives.
           </p>
 
           <div style={{ marginBottom: 14 }}>
@@ -634,7 +584,7 @@ Only return code where health_score >= 85.`
                     fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--success)',
                     letterSpacing: '0.06em', textTransform: 'uppercase',
                   }}>
-                    Raw JSON Response
+                    API Response — what Claude Code receives
                   </span>
                   <span style={{
                     fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
