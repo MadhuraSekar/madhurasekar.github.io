@@ -300,14 +300,16 @@ export function buildGovernanceReport(
     { name: 'Spacing', key: 'spacing', color: '#f59e0b' },
   ]
 
+  // Exact weights from governance spec — sum to 1.0
   const catWeights: Record<string, number> = {
-    token: 0.20,
     accessibility: 0.30,
-    typography: 0.15,
-    component: 0.10,
-    layout: 0.10,
+    token: 0.25,
+    component: 0.20,
     spacing: 0.15,
+    layout: 0.10,
   }
+  // Typography is displayed in category bars but not weighted into overall score.
+  // Overall = weighted average of the 5 weighted categories only.
 
   const categories: CategoryScore[] = catDefs.map(c => ({
     ...c,
@@ -319,9 +321,9 @@ export function buildGovernanceReport(
   const blocked = enriched.filter(v => !v.fixApplied && v.severity === 'block')
   const unfixedAutoFix = enriched.filter(v => !v.fixApplied && v.severity === 'auto-fix')
 
-  // Overall score (weighted average of category scores)
+  // Overall score = weighted average of category scores (only weighted categories)
   const overallBefore = Math.round(categories.reduce((sum, cat) => {
-    const weight = catWeights[cat.key] || (1 / categories.length)
+    const weight = catWeights[cat.key] || 0
     return sum + cat.score * weight
   }, 0))
 
@@ -340,7 +342,7 @@ export function buildGovernanceReport(
   }))
   const overallAfter = rewriteResult
     ? Math.round(afterCats.reduce((sum, cat) => {
-        const weight = catWeights[cat.key] || (1 / afterCats.length)
+        const weight = catWeights[cat.key] || 0
         return sum + cat.score * weight
       }, 0))
     : overallBefore

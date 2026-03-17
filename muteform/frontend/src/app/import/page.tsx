@@ -600,17 +600,12 @@ function SuccessScreen({
   ds: ImportedDesignSystem
   onContinue: () => void
 }) {
-  const colorCount = Object.keys(ds.tokens.color).length
-  const spacingCount = ds.tokens.spacing.length
-  const compCount = Object.keys(ds.components).length
-  const typoCount = ds.typography.allowedStyles.length
-
-  const pills = [
-    { label: `${colorCount} colors`, category: 'colors' },
-    { label: `${spacingCount} spacing values`, category: 'spacing' },
-    { label: `${compCount} components`, category: 'components' },
-    { label: `${typoCount} typography styles`, category: 'typography' },
-  ]
+  const colorEntries = Object.entries(ds.tokens.color)
+  const spacingValues = ds.tokens.spacing
+  const compEntries = Object.entries(ds.components)
+  const typoStyles = ds.typography.allowedStyles
+  const [showAllColors, setShowAllColors] = useState(false)
+  const displayColors = showAllColors ? colorEntries : colorEntries.slice(0, 12)
 
   return (
     <div style={{
@@ -621,100 +616,153 @@ function SuccessScreen({
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
+      padding: '40px 24px 80px',
       overflow: 'auto',
     }}>
       {/* Animated checkmark */}
       <div style={{
-        width: 80,
-        height: 80,
+        width: 64,
+        height: 64,
         borderRadius: '50%',
         background: 'var(--success)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 32,
+        marginBottom: 20,
         animation: 'checkPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+        flexShrink: 0,
       }}>
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <path
-            d="M11 20L17 26L29 14"
-            stroke="var(--bg)"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+        <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+          <path d="M11 20L17 26L29 14" stroke="var(--bg)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
 
-      {/* Title */}
       <h1 style={{
-        fontFamily: serif,
-        fontWeight: 400,
-        fontSize: 40,
-        color: 'var(--text-primary)',
-        margin: '0 0 12px',
-        textAlign: 'center',
-        lineHeight: 1.2,
+        fontFamily: serif, fontWeight: 400, fontSize: 32,
+        color: 'var(--text-primary)', margin: '0 0 8px', textAlign: 'center', lineHeight: 1.2,
       }}>
         {ds.sourceLabel} is live in Muteform.
       </h1>
-
       <p style={{
-        fontFamily: sans,
-        fontSize: 15,
-        color: 'var(--text-secondary)',
-        margin: '0 0 40px',
-        textAlign: 'center',
+        fontFamily: sans, fontSize: 13, color: 'var(--text-secondary)',
+        margin: '0 0 28px', textAlign: 'center',
       }}>
-        Your design system is ready. Here&apos;s what we found:
+        Here&apos;s what we parsed from your design system:
       </p>
 
-      {/* Category pills */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 12,
-        justifyContent: 'center',
-        marginBottom: 48,
-        maxWidth: 600,
-      }}>
-        {pills.map(pill => (
-          <div
-            key={pill.category}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 4,
-              padding: '10px 16px',
-            }}
-          >
-            <span style={{
-              fontFamily: mono,
-              fontSize: 13,
-              color: 'var(--text-primary)',
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-            }}>
-              {pill.label}
-            </span>
+      {/* ─── Parsed tokens display ─── */}
+      <div style={{ width: '100%', maxWidth: 620, display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+        {/* COLORS */}
+        {colorEntries.length > 0 && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px' }}>
+            <div style={{ fontFamily: mono, fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12, letterSpacing: '0.04em' }}>
+              Colors ({colorEntries.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {displayColors.map(([name, hex]) => (
+                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: '50%', background: hex, flexShrink: 0,
+                    border: '1px solid var(--border)',
+                  }} />
+                  <span style={{ fontFamily: mono, fontSize: 12, color: 'var(--text-primary)', flex: 1 }}>{name}</span>
+                  <span style={{ fontFamily: mono, fontSize: 11, color: 'var(--text-muted)' }}>{hex}</span>
+                </div>
+              ))}
+            </div>
+            {colorEntries.length > 12 && !showAllColors && (
+              <button onClick={() => setShowAllColors(true)} style={{
+                marginTop: 8, fontFamily: mono, fontSize: 10, color: 'var(--accent)',
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              }}>
+                Show all {colorEntries.length} colors →
+              </button>
+            )}
           </div>
-        ))}
+        )}
+
+        {/* SPACING */}
+        {spacingValues.length > 0 && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px' }}>
+            <div style={{ fontFamily: mono, fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12, letterSpacing: '0.04em' }}>
+              Spacing scale ({spacingValues.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {spacingValues.map(val => (
+                <div key={val} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: Math.min(val * 2, 200), height: 8, borderRadius: 3,
+                    background: 'var(--accent)', opacity: 0.6,
+                  }} />
+                  <span style={{ fontFamily: mono, fontSize: 11, color: 'var(--text-primary)' }}>{val}px</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TYPOGRAPHY */}
+        {typoStyles.length > 0 && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px' }}>
+            <div style={{ fontFamily: mono, fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12, letterSpacing: '0.04em' }}>
+              Styles ({typoStyles.length})
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {typoStyles.map(style => (
+                <span key={style} style={{
+                  fontFamily: mono, fontSize: 11, color: 'var(--accent)',
+                  background: 'var(--accent-dim)', padding: '4px 10px', borderRadius: 4,
+                  border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+                }}>{style}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* COMPONENTS */}
+        {compEntries.length > 0 && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px' }}>
+            <div style={{ fontFamily: mono, fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12, letterSpacing: '0.04em' }}>
+              Components ({compEntries.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {compEntries.map(([name, comp]) => (
+                <div key={name} style={{ borderLeft: '2px solid var(--accent)', paddingLeft: 12 }}>
+                  <div style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{name}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {comp.allowedVariants.map(v => (
+                      <span key={v} style={{
+                        fontFamily: mono, fontSize: 9, color: 'var(--text-muted)',
+                        background: 'var(--surface-elevated)', padding: '2px 6px', borderRadius: 3,
+                        border: '1px solid var(--border)',
+                      }}>{v}</span>
+                    ))}
+                    {comp.allowedSizes.map(s => (
+                      <span key={s} style={{
+                        fontFamily: mono, fontSize: 9, color: 'var(--text-muted)',
+                        background: 'var(--surface-elevated)', padding: '2px 6px', borderRadius: 3,
+                        border: '1px solid var(--border)',
+                      }}>{s}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CTA button */}
       <button
         onClick={onContinue}
         style={{
-          fontFamily: sans, fontSize: 16, fontWeight: 600,
+          fontFamily: sans, fontSize: 14, fontWeight: 600,
           color: 'var(--bg)', background: 'var(--accent)',
           border: 'none', borderRadius: 4,
-          padding: '16px 40px', cursor: 'pointer',
+          padding: '14px 36px', cursor: 'pointer',
           transition: 'opacity 0.15s',
+          marginTop: 28, flexShrink: 0,
         }}
         onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
         onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}

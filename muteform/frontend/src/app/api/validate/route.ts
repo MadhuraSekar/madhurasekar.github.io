@@ -57,6 +57,63 @@ rules:
     check: "layout.columns IN tokens.layout.grid_columns"
     auto_fix: false`
 
+/**
+ * Normalize incoming nodes from simplified API format to engine InterfaceNode format.
+ * Accepts: { id, type, name, styles: { color, spacing, ... }, component: { name, variant } }
+ * Produces: { id, type, path, properties: { colors, spacing, component, ... } }
+ */
+function normalizeNodes(nodes: any[]): any[] {
+  const VALID_TYPES = new Set(['element', 'text', 'image', 'container', 'interactive'])
+  return nodes.map((n, i) => {
+    // If already in engine format (has properties object), pass through
+    if (n.properties && typeof n.properties === 'object') return n
+
+    const type = VALID_TYPES.has(n.type) ? n.type : 'interactive'
+    const path = n.path || `root/${n.type || 'node'}[${i}]`
+    const properties: Record<string, any> = {}
+
+    // Map styles.color → properties.colors.color
+    if (n.styles) {
+      if (n.styles.color) {
+        properties.colors = { color: n.styles.color }
+      }
+      if (n.styles.backgroundColor || n.styles.background) {
+        properties.colors = {
+          ...properties.colors,
+          background: n.styles.backgroundColor || n.styles.background,
+        }
+      }
+      if (typeof n.styles.spacing === 'number') {
+        properties.spacing = { padding: n.styles.spacing }
+      }
+      if (n.styles.fontSize || n.styles.fontFamily) {
+        properties.typography = {
+          size: n.styles.fontSize,
+          family: n.styles.fontFamily,
+        }
+      }
+    }
+
+    // Map component directly
+    if (n.component) {
+      properties.component = n.component
+    }
+
+    // Map contrast if present
+    if (n.contrast) {
+      properties.contrast = n.contrast
+    }
+
+    return {
+      id: n.id || `node_${i}`,
+      type,
+      path,
+      properties,
+      children: n.children,
+    }
+  })
+}
+
 export async function POST(req: Request) {
   try {
     const token = req.headers.get('x-muteform-token') || ''
@@ -68,14 +125,24 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const artifact = body.artifact || body.code || body
+    const raw = body.artifact || body.code || body
 
     // Validate artifact shape
-    if (!artifact.nodes || !Array.isArray(artifact.nodes)) {
+    if (!raw.nodes || !Array.isArray(raw.nodes)) {
       return NextResponse.json(
-        { error: 'Invalid artifact: must contain a "nodes" array. Send { "artifact": { "nodes": [...], "metadata": {...} } }' },
+        { error: 'Invalid artifact: must contain a "nodes" array. Send { "nodes": [...] } or { "artifact": { "nodes": [...] } }' },
         { status: 400 }
       )
+    }
+
+    // Normalize nodes from simplified API format to engine format
+    const artifact = {
+      nodes: normalizeNodes(raw.nodes),
+      metadata: raw.metadata || {
+        source: 'api',
+        platform: 'external',
+        generatedAt: new Date().toISOString(),
+      },
     }
 
     const config = loadConfig(DEFAULT_YAML)

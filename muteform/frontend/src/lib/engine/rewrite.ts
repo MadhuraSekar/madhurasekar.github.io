@@ -8,6 +8,7 @@ import type {
   RewriteResult,
 } from './types'
 import { scanArtifact } from './scan'
+import { scoreFromViolations } from './scoring'
 import { findNearestColor, adjustForegroundForContrast, contrastRatio } from './color'
 import { flattenColors } from './engine'
 
@@ -21,7 +22,7 @@ export function rewriteArtifact(
   policy: MuteformConfig
 ): RewriteResult {
   const colorPalette = flattenColors(policy.tokens.colors)
-  const beforeScore = computeScore(violations)
+  const beforeScore = scoreFromViolations(violations)
 
   // Deep clone nodes
   const rewrittenNodes: InterfaceNode[] = JSON.parse(JSON.stringify(artifact.nodes))
@@ -168,8 +169,4 @@ function makeFix(violation: Violation, suggestedOverride?: any): Fix {
   }
 }
 
-function computeScore(violations: Violation[]): number {
-  const weights: Record<string, number> = { critical: 15, high: 8, medium: 3, low: 1 }
-  const deduction = violations.reduce((sum, v) => sum + (weights[v.severity] || 1), 0)
-  return Math.max(0, 100 - deduction)
-}
+// computeScore removed — uses shared scoreFromViolations from scoring.ts
