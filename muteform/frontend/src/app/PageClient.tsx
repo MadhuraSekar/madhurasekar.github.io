@@ -118,6 +118,9 @@ export default function LandingPage() {
                 <a href="/demo" style={{ fontFamily: T.fontMono, fontSize: 13, fontWeight: 500, color: T.blue }}>
                   Watch demo
                 </a>
+                <a href="/waitlist" style={{ fontFamily: T.fontMono, fontSize: 13, fontWeight: 500, color: T.textMuted }}>
+                  Join waitlist →
+                </a>
               </div>
             </FadeIn>
           </div>

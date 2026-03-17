@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { label: 'Demo', href: '/demo' },
   { label: 'Governance', href: '/governance' },
   { label: 'Dashboard', href: '/dashboard' },
+  { label: 'Waitlist', href: '/waitlist' },
 ]
 
 export default function Header() {
