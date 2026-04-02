@@ -1992,3 +1992,246 @@ footer
         body.is-mobile .banner > article {
             background-attachment: scroll;
         }
+
+
+/* FEATURE CARDS */
+
+.feature-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    padding: 20px 0;
+}
+
+.feature-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 32px 24px 28px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    opacity: 0;
+    transform: translateY(40px);
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                box-shadow 0.3s ease,
+                border-color 0.3s ease;
+    will-change: transform, opacity;
+}
+
+.feature-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+    animation: cardFadeUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, transparent);
+    transition: background 0.4s ease;
+    border-radius: 12px 12px 0 0;
+}
+
+.feature-card:hover::before {
+    background: linear-gradient(90deg, #32DB8A, #4C9EE7);
+}
+
+.feature-card:nth-child(2):hover::before {
+    background: linear-gradient(90deg, #4C9EE7, #3498DB);
+}
+
+.feature-card:nth-child(3):hover::before {
+    background: linear-gradient(90deg, #FFBB42, #E67E22);
+}
+
+.feature-card:nth-child(4):hover::before {
+    background: linear-gradient(90deg, #E74C78, #9B59B6);
+}
+
+.feature-card:nth-child(5):hover::before {
+    background: linear-gradient(90deg, #9B59B6, #E74C78);
+}
+
+.feature-card:nth-child(6):hover::before {
+    background: linear-gradient(90deg, #E67E22, #FFBB42);
+}
+
+.feature-card:nth-child(7):hover::before {
+    background: linear-gradient(90deg, #1ABC9C, #32DB8A);
+}
+
+.feature-card:nth-child(8):hover::before {
+    background: linear-gradient(90deg, #3498DB, #1ABC9C);
+}
+
+.feature-card-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                box-shadow 0.3s ease;
+}
+
+.feature-card:hover .feature-card-icon {
+    transform: scale(1.1) translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.feature-card-icon i {
+    font-size: 28px;
+    color: #fff;
+}
+
+.feature-card-title {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 2px;
+    color: #23214c;
+    margin-bottom: 12px;
+    padding: 0;
+    transition: color 0.3s ease;
+}
+
+.feature-card:hover .feature-card-title {
+    color: #000;
+}
+
+.feature-card-desc {
+    font-size: 13px;
+    line-height: 21px;
+    color: #666;
+    margin: 0;
+    transition: color 0.3s ease;
+}
+
+.feature-card:hover .feature-card-desc {
+    color: #444;
+}
+
+@keyframes cardFadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Feature Cards Responsive */
+
+@media screen and (max-width: 1270px) {
+    .feature-cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+}
+
+@media screen and (max-width: 1020px) {
+    .feature-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        padding: 10px 0;
+    }
+
+    .feature-card {
+        padding: 28px 20px 24px;
+    }
+
+    .feature-card-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+    }
+
+    .feature-card-icon i {
+        font-size: 24px;
+    }
+
+    .feature-card-title {
+        font-size: 14px;
+        letter-spacing: 1.5px;
+    }
+
+    .feature-card-desc {
+        font-size: 12px;
+        line-height: 19px;
+    }
+}
+
+@media screen and (max-width: 650px) {
+    .feature-cards-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .feature-card {
+        padding: 24px 20px 20px;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        text-align: left;
+        gap: 16px;
+    }
+
+    .feature-card-icon {
+        margin: 0;
+        flex-shrink: 0;
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+    }
+
+    .feature-card-icon i {
+        font-size: 22px;
+    }
+
+    .feature-card-text {
+        flex: 1;
+    }
+
+    .feature-card-title {
+        font-size: 14px;
+        margin-bottom: 6px;
+    }
+
+    .feature-card-desc {
+        font-size: 13px;
+        line-height: 20px;
+    }
+}
+
+@media screen and (max-width: 350px) {
+    .feature-card {
+        padding: 18px 14px 16px;
+    }
+
+    .feature-card-icon {
+        width: 44px;
+        height: 44px;
+    }
+
+    .feature-card-icon i {
+        font-size: 20px;
+    }
+}
+
+/* END FEATURE CARDS */
